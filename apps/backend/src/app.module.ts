@@ -17,9 +17,12 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ContextBuilderModule } from './modules/context-builder/context-builder.module';
 import { GithubModule } from './modules/github/github.module';
 import { RunModule } from './modules/run/run.module';
+import { UsersModule } from './modules/users/user.module';
+import { PostgresModule } from './shared/database/postgres/postgres.module';
 
 @Module({
   imports: [
+    PostgresModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,
@@ -30,6 +33,7 @@ import { RunModule } from './modules/run/run.module';
     GithubModule,
     ContextBuilderModule,
     RunModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -27,13 +27,16 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-socket.io": "^11.1.28",
     "@nestjs/throttler": "^6.5.0",
+    "@nestjs/typeorm": "^11.0.3",
     "@nestjs/websockets": "^11.1.28",
     "@octokit/rest": "^22.0.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "typeorm": "^0.3.31"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
