@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { User } from "./user.entity";
 import { UserService } from "./user.service";
+import { CreateUserDto } from "./dtos/create-user.dto";
 
 @Controller('users')
 export class UserController {
@@ -9,8 +9,8 @@ export class UserController {
     ){}
 
     @Post()
-    async createUser(@Body() user: User) {
-        return this.userService.createUser(user);
+    async createUser(@Body() dto: CreateUserDto) {
+        return this.userService.createUser(dto);
     }
 
     @Get(':id')
