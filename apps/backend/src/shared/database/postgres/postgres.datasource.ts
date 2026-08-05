@@ -11,8 +11,8 @@ export default new DataSource({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   entities: [User],
-  synchronize: true, // dev only — troca por migrations antes de prod
-  migrations: [`${__dirname}/migrations/**/*.js`],
+  synchronize: false,
+  migrations: [`${__dirname}/migrations/**/*{.ts,.js}`],
   migrationsTableName: 'migrations',
   useUTC: true
 })
