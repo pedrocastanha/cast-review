@@ -1,3 +1,6 @@
+/**
+ * Health/root do Nest — smoke test rápido sem auth.
+ */
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
 
@@ -8,5 +11,10 @@ export class AppController {
   @Get()
   getHello(): string {
     return this.appService.getHello();
+  }
+
+  @Get('health')
+  health() {
+    return { status: 'ok', service: 'cast-review-api' };
   }
 }

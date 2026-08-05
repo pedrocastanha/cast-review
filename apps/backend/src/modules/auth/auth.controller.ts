@@ -1,21 +1,21 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dtos/login.dto';
+import { ValidatePatDto } from './dtos/validate-pat.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('login')
+  @Post('validate')
   @UseGuards(ThrottlerGuard)
   @Throttle({
     default: {
       limit: 5,
-      ttl: 60_000, // 60 seconds (was 60_0000 = 10 minutes)
+      ttl: 60_000,
     },
   })
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async validate(@Body() dto: ValidatePatDto) {
+    return await this.authService.validatePat(dto);
   }
 }
