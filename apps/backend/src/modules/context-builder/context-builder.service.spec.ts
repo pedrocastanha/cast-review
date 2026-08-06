@@ -3,8 +3,8 @@ jest.mock('@octokit/rest', () => ({
 }));
 
 import { Test } from '@nestjs/testing';
-import { ContextBuilderService } from './context-builder.service';
 import { GithubService } from '../github/github.service';
+import { ContextBuilderService } from './context-builder.service';
 
 describe('ContextBuilderService', () => {
   let service: ContextBuilderService;
@@ -52,10 +52,7 @@ describe('ContextBuilderService', () => {
     });
 
     it('keeps extension when already present', () => {
-      const candidates = service.expandPathCandidates(
-        'src/a.ts',
-        './b.json',
-      );
+      const candidates = service.expandPathCandidates('src/a.ts', './b.json');
       expect(candidates).toEqual(['src/b.json']);
     });
   });

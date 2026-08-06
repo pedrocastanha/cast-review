@@ -1,8 +1,8 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { Octokit } from '@octokit/rest';
 
@@ -206,7 +206,11 @@ export class GithubService {
     repo: string,
     ref: string,
   ): Promise<string> {
-    const candidates = ['conventions.md', 'CONVENTIONS.md', '.cast/conventions.md'];
+    const candidates = [
+      'conventions.md',
+      'CONVENTIONS.md',
+      '.cast/conventions.md',
+    ];
     for (const path of candidates) {
       const content = await this.getFileContent(token, owner, repo, path, ref);
       if (!content.startsWith('/* file not found')) {

@@ -1,26 +1,26 @@
-import { Injectable, LoggerService } from '@nestjs/common'
-import { Logger } from 'winston'
-import { initLogger } from 'src/shared/logger/logger.factory'
+import { Injectable, LoggerService } from '@nestjs/common';
+import { initLogger } from 'src/shared/logger/logger.factory';
+import { Logger } from 'winston';
 
-type ContextType = Record<string, unknown> & { exception?: unknown }
+type ContextType = Record<string, unknown> & { exception?: unknown };
 
 @Injectable()
 export class AppLogger implements LoggerService {
-  private readonly logger: Logger
+  private readonly logger: Logger;
   constructor() {
-    this.logger = initLogger('application')
+    this.logger = initLogger('application');
   }
 
   private getDefaultFields(exception?: unknown) {
     const { originClass: callerClass, originMethod: callerMethod } =
-      this.getCallerContext(exception)
+      this.getCallerContext(exception);
 
     return {
       defaultContext: {
         originClass: callerClass,
-        originMethod: callerMethod
-      }
-    }
+        originMethod: callerMethod,
+      },
+    };
   }
 
   /**
@@ -34,44 +34,44 @@ export class AppLogger implements LoggerService {
      * This is necessary because the stack trace of the exception will be different from the stack trace of the logger.
      */
     if (exception && exception instanceof Error) {
-      const caller = exception.stack?.split('\n')[1].trim().split(' ')[1]
-      const callerClass = caller?.split('.')[0]
-      const callerMethod = caller?.split('.').slice(1).join('.')
+      const caller = exception.stack?.split('\n')[1].trim().split(' ')[1];
+      const callerClass = caller?.split('.')[0];
+      const callerMethod = caller?.split('.').slice(1).join('.');
       return {
         originClass: callerClass,
-        originMethod: callerMethod
-      }
+        originMethod: callerMethod,
+      };
     }
     /**
      * If no exception is passed, we can get the caller from the stack trace of the logger.
      */
-    const stack = new Error().stack
-    const caller = stack?.split('\n')[4].trim().split(' ')[1]
-    const callerClass = caller?.split('.')[0]
-    const callerMethod = caller?.split('.').slice(1).join('.')
+    const stack = new Error().stack;
+    const caller = stack?.split('\n')[4].trim().split(' ')[1];
+    const callerClass = caller?.split('.')[0];
+    const callerMethod = caller?.split('.').slice(1).join('.');
 
     return {
       originClass: callerClass,
-      originMethod: callerMethod
-    }
+      originMethod: callerMethod,
+    };
   }
 
   log(message: string, context: ContextType = {}) {
     this.logger.info(message, {
       ...context,
-      ...this.getDefaultFields(context.exception)
-    })
+      ...this.getDefaultFields(context.exception),
+    });
   }
   error(message: string, context: ContextType = {}) {
     this.logger.error(message, {
       ...context,
-      ...this.getDefaultFields(context.exception)
-    })
+      ...this.getDefaultFields(context.exception),
+    });
   }
   warn(message: string, context: ContextType = {}) {
     this.logger.warn(message, {
       ...context,
-      ...this.getDefaultFields(context.exception)
-    })
+      ...this.getDefaultFields(context.exception),
+    });
   }
 }
