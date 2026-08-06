@@ -40,6 +40,10 @@ export class UserService extends BaseService {
     });
   }
 
+  async updateUser(id: string, dto: UpdateUserDto){
+    return this.userRepository.update(id, ..dto)
+  }
+
   async getById(id: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { id } });
   }
