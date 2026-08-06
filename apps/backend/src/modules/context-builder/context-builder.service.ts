@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GithubService } from '../github/github.service';
 import type { ChangedFileContext, RelatedFile } from '../../shared/types';
+import { GithubService } from '../github/github.service';
 
 const DEFAULT_RELATED_LIMIT = 5;
 const RELATIVE_IMPORT_RE =

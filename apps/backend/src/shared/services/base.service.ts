@@ -1,5 +1,5 @@
-import { ConflictException, NotFoundException } from '@nestjs/common'
-import { AppLogger } from '../logger/logger.service'
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { AppLogger } from '../logger/logger.service';
 
 export class BaseService {
   constructor(protected readonly logger: AppLogger) {}
@@ -40,39 +40,39 @@ export class BaseService {
   protected async getOrFail<T>(
     fn: () => Promise<T | null>,
     entityName: string,
-    criteria: Record<string, unknown>
+    criteria: Record<string, unknown>,
   ): Promise<T> {
-    const entity = await this.safeExecute(fn)
+    const entity = await this.safeExecute(fn);
     if (!entity) {
       throw new NotFoundException(
-        `${entityName} not found with criteria: ${JSON.stringify(criteria)}`
-      )
+        `${entityName} not found with criteria: ${JSON.stringify(criteria)}`,
+      );
     }
-    return entity
+    return entity;
   }
 
   /**
    * Handle database errors consistently across all services.
    */
   protected handleError(err: any): never {
-    this.logger.error(err)
+    this.logger.error(err);
 
     if (err.code === '23505') {
-      const detail = err.detail || ''
-      const match = detail.match(/\(([^)]+)\)=\(([^)]+)\)/)
+      const detail = err.detail || '';
+      const match = detail.match(/\(([^)]+)\)=\(([^)]+)\)/);
 
       if (match) {
-        const field = match[1]
-        const value = match[2]
+        const field = match[1];
+        const value = match[2];
         throw new ConflictException(
-          `The value "${value}" for field "${field}" already exists`
-        )
+          `The value "${value}" for field "${field}" already exists`,
+        );
       }
 
-      throw new ConflictException('Duplicate key value already exists')
+      throw new ConflictException('Duplicate key value already exists');
     }
 
-    throw err
+    throw err;
   }
 
   /**
@@ -80,9 +80,9 @@ export class BaseService {
    */
   protected async safeExecute<T>(fn: () => Promise<T>): Promise<T> {
     try {
-      return await fn()
+      return await fn();
     } catch (err) {
-      return this.handleError(err)
+      return this.handleError(err);
     }
   }
 }

@@ -20,6 +20,8 @@
  *   event: "run_error"     { runId?, message }
  *   event: "run_finished"  { runId }
  */
+
+import { Logger } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -28,10 +30,9 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
-import { RunService } from './run.service';
 import type { StartRunMessage } from '../../shared/types';
+import { RunService } from './run.service';
 
 @WebSocketGateway({
   // Namespace default "/". CORS aberto no MVP local.
@@ -73,7 +74,8 @@ export class RunGateway implements OnGatewayConnection {
     }
     if (!body.models?.testReviewer || !body.models?.architectureReviewer) {
       client.emit('run_error', {
-        message: 'models.testReviewer and models.architectureReviewer are required',
+        message:
+          'models.testReviewer and models.architectureReviewer are required',
       });
       return;
     }

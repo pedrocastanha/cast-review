@@ -1,7 +1,7 @@
-import 'dotenv/config'
+import 'dotenv/config';
 
-import { DataSource } from 'typeorm'
-import { User } from 'src/modules/users/user.entity'
+import { User } from 'src/modules/users/user.entity';
+import { DataSource } from 'typeorm';
 
 export default new DataSource({
   type: 'postgres',
@@ -14,5 +14,5 @@ export default new DataSource({
   synchronize: false,
   migrations: [`${__dirname}/migrations/**/*{.ts,.js}`],
   migrationsTableName: 'migrations',
-  useUTC: true
-})
+  useUTC: true,
+});

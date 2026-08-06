@@ -18,14 +18,15 @@
  * --------
  * Passam só no body desta request. Não logamos o body.
  */
-import { Injectable, Logger } from '@nestjs/common';
+
 import { randomUUID } from 'node:crypto';
-import { ContextBuilderService } from '../context-builder/context-builder.service';
+import { Injectable, Logger } from '@nestjs/common';
 import type {
   AgentEvent,
   StartRunMessage,
   StoredReport,
 } from '../../shared/types';
+import { ContextBuilderService } from '../context-builder/context-builder.service';
 
 @Injectable()
 export class RunService {
