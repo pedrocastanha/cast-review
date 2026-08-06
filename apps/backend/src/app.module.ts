@@ -19,9 +19,11 @@ import { GithubModule } from './modules/github/github.module';
 import { RunModule } from './modules/run/run.module';
 import { UsersModule } from './modules/users/user.module';
 import { PostgresModule } from './shared/database/postgres/postgres.module';
+import { LoggerModule } from './shared/logger/logger.module';
 
 @Module({
   imports: [
+    LoggerModule,
     PostgresModule,
     ThrottlerModule.forRoot([
       {
