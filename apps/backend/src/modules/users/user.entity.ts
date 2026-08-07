@@ -35,4 +35,13 @@ export class User extends DefaultEntity<User> {
     select: false,
   })
   currentRefreshToken: string | null;
+
+  @Column({
+    name: 'github_token',
+    type: 'varchar',
+    nullable: true,
+    unique: true,
+  })
+  @IsOptional()
+  githubToken: string | null;
 }
