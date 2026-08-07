@@ -41,6 +41,7 @@ export class User extends DefaultEntity<User> {
     type: 'varchar',
     nullable: true,
     unique: true,
+    select: false,
   })
   @IsOptional()
   githubToken: string | null;

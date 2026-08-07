@@ -31,30 +31,37 @@ export class UserService extends BaseService {
     });
   }
 
-  async updateUser(id: string, dto: UpdateUserDto){
-    if(dto.githubToken !== null){
-        const token = dto.githubToken?.trim();
-        if (!token) {
-          throw new BadRequestException('Token is required');
-        }
+  async updateUser(id: string, dto: UpdateUserDto) {
+    const { githubToken, ...rest } = dto;
 
-        const octokit = new Octokit({ auth: token });
-
-        try {
-          const { data } = await octokit.users.getAuthenticated();
-
-          return {
-            login: data.login,
-            id: data.id,
-            name: data.name,
-            avatarUrl: data.avatar_url,
-          };
-        } catch {
-          throw new UnauthorizedException('Token do Github expirado ou inválido.');
-        }
+    if (githubToken === undefined) {
+      return this.userRepository.update(id, rest);
     }
 
-    return this.userRepository.update(id, {...dto})
+    const token = githubToken?.trim();
+
+    if (!token) {
+      throw new BadRequestException('Token do Github é obrigatório');
+    }
+
+    const octokit = new Octokit({ auth: token });
+
+    try {
+      await octokit.users.getAuthenticated();
+    } catch {
+      throw new UnauthorizedException('Token do Github expirado ou inválido.');
+    }
+
+    return this.userRepository.update(id, { ...rest, githubToken: token });
+  }
+
+  async getGithubToken(id: string): Promise<string | null> {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      select: { id: true, githubToken: true },
+    });
+
+    return user?.githubToken ?? null;
   }
 
   async getById(id: string): Promise<User | null> {
@@ -63,13 +70,29 @@ export class UserService extends BaseService {
 
   async getByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
-      where: { email }
+      where: { email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        username: true,
+        active: true,
+        password: true,
+      },
     });
   }
 
   async getByUsername(username: string): Promise<User | null> {
     return this.userRepository.findOne({
-      where: { username }
+      where: { username },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        username: true,
+        active: true,
+        password: true,
+      },
     });
   }
 

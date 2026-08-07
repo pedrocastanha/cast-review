@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
-import { UserService } from './user.service';
+import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { SelfGuard } from '../auth/guards/self.guard';
 import { UpdateUserDto } from './dtos/update-user.dto';
+import { UserService } from './user.service';
 
 @Controller('users')
+@UseGuards(SelfGuard)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
@@ -13,6 +15,6 @@ export class UserController {
 
   @Patch(':id')
   async updateUser(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.userService.updateUser(id, dto)
+    return this.userService.updateUser(id, dto);
   }
 }
