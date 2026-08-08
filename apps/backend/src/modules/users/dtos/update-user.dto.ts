@@ -1,19 +1,22 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-export class UpdateUserDto{
+export class UpdateUserDto {
   @IsString()
+  @IsNotEmpty()
   @IsOptional()
-  name: string
+  name?: string;
 
   @IsString()
+  @IsNotEmpty()
   @IsOptional()
-  username: string
+  username?: string;
 
   @IsEmail()
   @IsOptional()
-  email: string
+  email?: string;
 
   @IsString()
+  @IsNotEmpty()
   @IsOptional()
-  githubToken: string
+  githubToken?: string;
 }

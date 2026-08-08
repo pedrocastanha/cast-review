@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  UseGuards,
+} from '@nestjs/common';
 import { SelfGuard } from '../auth/guards/self.guard';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { UserService } from './user.service';
@@ -10,11 +18,16 @@ export class UserController {
 
   @Get(':id')
   async getById(@Param('id') id: string) {
-    return this.userService.getById(id);
+    return this.userService.getByIdOrFail(id);
   }
 
   @Patch(':id')
   async updateUser(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.userService.updateUser(id, dto);
+  }
+
+  @Delete(':id/github-token')
+  async removeGithubToken(@Param('id') id: string) {
+    return this.userService.removeGithubToken(id);
   }
 }
