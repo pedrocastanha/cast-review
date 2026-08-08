@@ -1,0 +1,27 @@
+import { User } from '../user.entity';
+
+export class UserResponseDto {
+  id: string;
+  name: string;
+  email: string;
+  username: string;
+  active: boolean;
+  githubConnected: boolean;
+  githubLogin: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export function toUserResponse(user: User): UserResponseDto {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    username: user.username,
+    active: user.active,
+    githubConnected: Boolean(user.githubLogin),
+    githubLogin: user.githubLogin ?? null,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
