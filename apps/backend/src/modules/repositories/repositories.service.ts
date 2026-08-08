@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -30,15 +30,10 @@ type GithubSession = {
   owner: string;
 };
 
-const OWNER_CACHE_TTL_MS = 5 * 60_000;
+const REPO_AFFILIATION = 'owner,collaborator,organization_member';
 
 @Injectable()
 export class RepositoriesService extends BaseService {
-  private readonly ownerCache = new Map<
-    string,
-    { owner: string; expiresAt: number }
-  >();
-
   constructor(
     private readonly userService: UserService,
     logger: AppLogger,
@@ -47,16 +42,12 @@ export class RepositoriesService extends BaseService {
   }
 
   private async session(currentUser: CurrentUserData): Promise<GithubSession> {
-    const token = await this.userService.getGithubToken(currentUser.id);
-
-    if (!token?.trim()) {
-      throw new BadRequestException(
-        'Você precisa configurar o token do Github primeiro',
-      );
-    }
+    const { token, login } = await this.userService.getGithubCredentials(
+      currentUser.id,
+    );
 
     const octokit = new Octokit({ auth: token });
-    const owner = await this.resolveOwner(octokit, currentUser.id);
+    const owner = login ?? (await this.backfillLogin(octokit, currentUser.id));
 
     return { octokit, owner };
   }
@@ -70,7 +61,7 @@ export class RepositoriesService extends BaseService {
         {
           per_page: 100,
           sort: 'updated',
-          affiliation: 'owner',
+          affiliation: REPO_AFFILIATION,
         },
       );
 
@@ -90,11 +81,16 @@ export class RepositoriesService extends BaseService {
     }
   }
 
-  async listPulls(repo: string, currentUser: CurrentUserData) {
-    const { octokit, owner } = await this.session(currentUser);
+  async listPulls(
+    repo: string,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ) {
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
 
     try {
-      const pulls = await octokit.paginate(octokit.pulls.list, {
+      const pulls = await session.octokit.paginate(session.octokit.pulls.list, {
         owner,
         repo,
         per_page: 100,
@@ -113,11 +109,13 @@ export class RepositoriesService extends BaseService {
     repo: string,
     pullNumber: number,
     currentUser: CurrentUserData,
+    ownerOverride?: string,
   ) {
-    const { octokit, owner } = await this.session(currentUser);
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
 
     try {
-      const { data } = await octokit.pulls.get({
+      const { data } = await session.octokit.pulls.get({
         owner,
         repo,
         pull_number: pullNumber,
@@ -129,27 +127,16 @@ export class RepositoriesService extends BaseService {
     }
   }
 
-  private async resolveOwner(
+  private async backfillLogin(
     octokit: Octokit,
     userId: string,
   ): Promise<string> {
-    const cached = this.ownerCache.get(userId);
-
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.owner;
-    }
-
     try {
       const { data } = await octokit.users.getAuthenticated();
-
-      this.ownerCache.set(userId, {
-        owner: data.login,
-        expiresAt: Date.now() + OWNER_CACHE_TTL_MS,
-      });
+      await this.userService.setGithubLogin(userId, data.login);
 
       return data.login;
     } catch (err) {
-      this.ownerCache.delete(userId);
       this.handleGithubError(err);
     }
   }
@@ -173,7 +160,9 @@ export class RepositoriesService extends BaseService {
       throw new NotFoundException('Recurso não encontrado no Github');
     }
 
-    throw err;
+    throw new InternalServerErrorException(
+      'Erro inesperado ao consultar a API do Github',
+    );
   }
 
   private toPullSummary(pull: GithubPull) {
