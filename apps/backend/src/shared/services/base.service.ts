@@ -55,7 +55,7 @@ export class BaseService {
    * Handle database errors consistently across all services.
    */
   protected handleError(err: any): never {
-    this.logger.error(err);
+    this.logger.error('Erro na operação de banco de dados', { exception: err });
 
     if (err.code === '23505') {
       const detail = err.detail || '';
@@ -63,9 +63,8 @@ export class BaseService {
 
       if (match) {
         const field = match[1];
-        const value = match[2];
         throw new ConflictException(
-          `The value "${value}" for field "${field}" already exists`,
+          `The value provided for field "${field}" already exists`,
         );
       }
 

@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { encryptedColumn } from 'src/shared/crypto/secret-crypto';
 import { DefaultEntity } from 'src/shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
 
@@ -40,9 +41,17 @@ export class User extends DefaultEntity<User> {
     name: 'github_token',
     type: 'varchar',
     nullable: true,
-    unique: true,
     select: false,
+    transformer: encryptedColumn,
   })
   @IsOptional()
   githubToken: string | null;
+
+  @Column({
+    name: 'github_login',
+    type: 'varchar',
+    nullable: true,
+  })
+  @IsOptional()
+  githubLogin: string | null;
 }
