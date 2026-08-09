@@ -21,9 +21,9 @@ export class User extends DefaultEntity<User> {
   email: string;
 
   @Index({ unique: true })
-  @Column()
+  @Column({ type: 'varchar', nullable: true })
   @IsOptional()
-  username: string;
+  username: string | null;
 
   @Column({ select: false })
   @IsNotEmpty()
