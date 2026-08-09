@@ -3,7 +3,7 @@ import { User } from 'src/modules/users/user.entity';
 
 export interface CurrentUserData {
   id: string;
-  username: string;
+  username: string | null;
   email: string;
 }
 
