@@ -53,30 +53,16 @@ export interface AgentEvent {
   payload: Record<string, unknown>;
 }
 
-/** Mensagem que o front envia no WebSocket para iniciar uma run. */
-export interface StartRunMessage {
-  /** Token GitHub (PAT) — só em memória da conexão. */
-  githubToken: string;
-  owner: string;
-  repo: string;
-  /** Número da PR (não o id interno). */
-  pullNumber: number;
+/** Body de `POST /agent/run` no ai-api — espelha `AgentRunRequest` em schemas.py. */
+export interface AgentRunRequest {
+  diff: string;
+  changedFiles: ChangedFileContext[];
+  conventions: string;
   models: {
     testReviewer: string;
     architectureReviewer: string;
   };
   apiKeys: {
-    anthropic?: string;
-    openai?: string;
+    anthropic: string;
   };
-}
-
-/** Relatório guardado em memória no Nest enquanto o processo estiver de pé. */
-export interface StoredReport {
-  runId: string;
-  owner: string;
-  repo: string;
-  pullNumber: number;
-  report: Record<string, unknown>;
-  createdAt: string;
 }
