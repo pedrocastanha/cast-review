@@ -30,6 +30,12 @@ type GithubSession = {
   owner: string;
 };
 
+type GithubPullFile = {
+  filename: string;
+  status: string;
+  patch?: string;
+};
+
 const REPO_AFFILIATION = 'owner,collaborator,organization_member';
 
 @Injectable()
@@ -125,6 +131,110 @@ export class RepositoriesService extends BaseService {
     } catch (err) {
       this.handleGithubError(err);
     }
+  }
+
+  /** Diff bruto da PR (patch unificado), usado como contexto pro Change Analyzer. */
+  async getPullDiff(
+    repo: string,
+    pullNumber: number,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ): Promise<string> {
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
+
+    try {
+      const { data } = await session.octokit.pulls.get({
+        owner,
+        repo,
+        pull_number: pullNumber,
+        mediaType: { format: 'diff' },
+      });
+
+      return data as unknown as string;
+    } catch (err) {
+      this.handleGithubError(err);
+    }
+  }
+
+  /** Arquivos alterados na PR (path + patch por arquivo), base do Context Builder. */
+  async listPullFiles(
+    repo: string,
+    pullNumber: number,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ): Promise<GithubPullFile[]> {
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
+
+    try {
+      const files = await session.octokit.paginate(
+        session.octokit.pulls.listFiles,
+        { owner, repo, pull_number: pullNumber, per_page: 100 },
+      );
+
+      return files.map((file) => ({
+        filename: file.filename,
+        status: file.status,
+        patch: file.patch,
+      }));
+    } catch (err) {
+      this.handleGithubError(err);
+    }
+  }
+
+  /**
+   * Conteúdo completo de um arquivo numa ref (branch/sha) específica.
+   * Devolve `null` em vez de lançar quando o arquivo não existe na ref
+   * (path advinhado pela heurística de imports errou, ou arquivo foi deletado).
+   */
+  async getFileContent(
+    repo: string,
+    path: string,
+    ref: string,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ): Promise<string | null> {
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
+
+    try {
+      const { data } = await session.octokit.repos.getContent({
+        owner,
+        repo,
+        path,
+        ref,
+      });
+
+      if (Array.isArray(data) || data.type !== 'file' || !data.content) {
+        return null;
+      }
+
+      return Buffer.from(data.content, 'base64').toString('utf-8');
+    } catch (err) {
+      if ((err as { status?: number }).status === 404) {
+        return null;
+      }
+      this.handleGithubError(err);
+    }
+  }
+
+  /** `conventions.md` na raiz do repo, na ref da PR. String vazia se não existir. */
+  async getConventions(
+    repo: string,
+    ref: string,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ): Promise<string> {
+    const content = await this.getFileContent(
+      repo,
+      'conventions.md',
+      ref,
+      currentUser,
+      ownerOverride,
+    );
+
+    return content ?? '';
   }
 
   private async backfillLogin(
