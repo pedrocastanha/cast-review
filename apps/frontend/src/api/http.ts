@@ -94,3 +94,40 @@ export async function request<T>(
 
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
+
+/** Fetch autenticado sem parsear o body — usado no SSE da análise. */
+export async function authorizedFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const buildHeaders = (accessToken: string | null): Headers => {
+    const headers = new Headers(init.headers);
+    if (accessToken && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${accessToken}`);
+    }
+    return headers;
+  };
+
+  const doFetch = (accessToken: string | null) =>
+    fetch(`${BASE_URL}${path}`, { ...init, headers: buildHeaders(accessToken) });
+
+  let res = await doFetch(tokenStore.getAccess());
+
+  if (res.status === 401) {
+    refreshPromise ??= refreshTokens().finally(() => {
+      refreshPromise = null;
+    });
+    const refreshed = await refreshPromise;
+
+    if (!refreshed) {
+      tokenStore.clear();
+      window.dispatchEvent(new Event('auth:logout'));
+      throw await toApiError(res);
+    }
+
+    res = await doFetch(refreshed.accessToken);
+  }
+
+  if (!res.ok) throw await toApiError(res);
+  return res;
+}

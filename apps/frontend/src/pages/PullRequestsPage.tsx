@@ -54,7 +54,12 @@ export function PullRequestsPage() {
       )}
 
       {selectedPull && (
-        <PullRequestDetailModal pull={selectedPull} onClose={() => setSelectedPull(null)} />
+        <PullRequestDetailModal
+          pull={selectedPull}
+          owner={owner}
+          repo={repo}
+          onClose={() => setSelectedPull(null)}
+        />
       )}
     </div>
   );

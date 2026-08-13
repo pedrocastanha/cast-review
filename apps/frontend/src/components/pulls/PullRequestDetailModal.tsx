@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { PullRequest } from '../../types';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
@@ -13,10 +14,17 @@ const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
 
 interface PullRequestDetailModalProps {
   pull: PullRequest;
+  owner: string;
+  repo: string;
   onClose: () => void;
 }
 
-export function PullRequestDetailModal({ pull, onClose }: PullRequestDetailModalProps) {
+export function PullRequestDetailModal({
+  pull,
+  owner,
+  repo,
+  onClose,
+}: PullRequestDetailModalProps) {
   return (
     <Modal title={`#${pull.number}`} onClose={onClose} wide>
       <div className="flex flex-col gap-5">
@@ -46,11 +54,18 @@ export function PullRequestDetailModal({ pull, onClose }: PullRequestDetailModal
           </div>
         </dl>
 
-        <a href={pull.htmlUrl} target="_blank" rel="noreferrer">
-          <Button variant="secondary" className="w-full">
-            Abrir no GitHub ↗
-          </Button>
-        </a>
+        <div className="flex flex-col gap-2">
+          <Link
+            to={`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pull.number}/run`}
+          >
+            <Button className="w-full">Rodar análise</Button>
+          </Link>
+          <a href={pull.htmlUrl} target="_blank" rel="noreferrer">
+            <Button variant="secondary" className="w-full">
+              Abrir no GitHub ↗
+            </Button>
+          </a>
+        </div>
       </div>
     </Modal>
   );
