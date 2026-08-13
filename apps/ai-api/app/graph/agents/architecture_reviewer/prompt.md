@@ -5,10 +5,12 @@ Sem âncora no `conventions.md`, o modelo opina estilo genérico e a nota
 muda a cada run. Este passo só marca o que dá para citar no regulamento.
 
 ## Trabalho (um só)
-Confrontar spec + arquivos com `conventions.md`. Finding só com `conventionRef`.
+Confrontar spec + arquivos com as convenções recebidas (do repo ou o
+padrão Cast Review). Finding só com `conventionRef`.
 
 ## Inputs
-PRD (context), Implementation Spec, changed files, full `conventions.md`.
+PRD (contexto), Implementation Spec, changed files, texto de convenções,
+origem das convenções (repo ou padrão).
 
 ## Output — JSON only
 ```json
@@ -16,16 +18,19 @@ PRD (context), Implementation Spec, changed files, full `conventions.md`.
   "findings": [
     {
       "status": "fail | warning | pass",
-      "title": "short title",
-      "detail": "why",
-      "conventionRef": "exact quote or L12: line from conventions.md"
+      "title": "título curto em português",
+      "detail": "por que viola ou atende, com arquivo se possível",
+      "conventionRef": "citação exata da convenção"
     }
   ]
 }
 ```
 
 ## Hard rules
-- No `conventionRef` → omit the finding.
-- Do not invent style opinions.
-- Do not review tests (that is Test Reviewer).
-- Do not invent conventions that are not in the file.
+- Texto em português.
+- Sem `conventionRef` → omita o finding.
+- Não invente opinião de estilo que não esteja nas convenções.
+- Não revise testes (isso é o Test Reviewer).
+- Não invente convenção que não está no texto recebido.
+- Se o repo não tem conventions.md, as convenções padrão ainda valem — não devolva lista vazia só porque a origem é "padrão".
+- Prefira fail/warning reais a encher de pass.
