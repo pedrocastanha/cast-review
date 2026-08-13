@@ -9,14 +9,6 @@ export function parsePullNumber(raw: string): number {
   return pullNumber;
 }
 
-export function parseOwner(raw: string | undefined): string {
-  const owner = raw?.trim() ?? '';
-  if (!owner) {
-    throw new BadRequestException('owner é obrigatório');
-  }
-  return owner;
-}
-
 export function parseOptionalPullNumber(
   raw: string | undefined,
 ): number | undefined {

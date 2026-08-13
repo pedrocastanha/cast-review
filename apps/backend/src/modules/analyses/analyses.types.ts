@@ -32,7 +32,6 @@ export interface ReviewComment extends ReviewFinding {
   reviewer: string;
 }
 
-/** Snapshot do review: PRD, spec, notas, comentários e markdown. */
 export interface AnalysisReview {
   changeAnalysis?: ChangeAnalysis;
   prd?: Record<string, unknown> | null;

@@ -1,7 +1,3 @@
-/**
- * Gera o id, persiste a análise, abre o SSE e orquestra o run.
- * apiKeys nunca vão para o banco.
- */
 import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
@@ -25,7 +21,6 @@ import {
 import { buildAgentRunRequest } from './helpers/context-builder.helper';
 import {
   parseOptionalPullNumber,
-  parseOwner,
   parsePullNumber,
   parseRunAnalysisBody,
 } from './helpers/parse-run-input';
@@ -213,18 +208,27 @@ export class AnalysesService extends BaseService {
       throw new BadRequestException('repo é obrigatório');
     }
 
-    const owner = parseOwner(input.owner);
     const pullNumber = parseOptionalPullNumber(input.pullNumber);
+    const owner = input.owner?.trim();
 
-    const rows = await this.analysisRepository.find({
-      where: {
-        requestedBy: input.currentUser.id,
-        owner,
-        repo: input.repo,
-        ...(pullNumber !== undefined ? { pullNumber } : {}),
-      },
-      order: { createdAt: 'DESC' },
-    });
+    const query = this.analysisRepository
+      .createQueryBuilder('analysis')
+      .where('analysis.requestedBy = :userId', { userId: input.currentUser.id })
+      .andWhere('LOWER(analysis.repo) = LOWER(:repo)', { repo: input.repo.trim() })
+      .orderBy('analysis.createdAt', 'DESC');
+
+    if (owner) {
+      query.andWhere(
+        '(LOWER(analysis.owner) = LOWER(:owner) OR analysis.owner = :emptyOwner)',
+        { owner, emptyOwner: '' },
+      );
+    }
+
+    if (pullNumber !== undefined) {
+      query.andWhere('analysis.pullNumber = :pullNumber', { pullNumber });
+    }
+
+    const rows = await query.getMany();
     return rows.map((row) => this.toRecord(row));
   }
 
