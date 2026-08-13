@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import type { PullRequest } from '../../types';
+import type { AnalysisRecord, PullRequest } from '../../types';
+import { AnalysisHistoryList } from '../analysis/AnalysisHistoryList';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { PullRequestStatusBadge } from './PullRequestStatusBadge';
@@ -16,6 +17,7 @@ interface PullRequestDetailModalProps {
   pull: PullRequest;
   owner: string;
   repo: string;
+  analyses: AnalysisRecord[];
   onClose: () => void;
 }
 
@@ -23,6 +25,7 @@ export function PullRequestDetailModal({
   pull,
   owner,
   repo,
+  analyses,
   onClose,
 }: PullRequestDetailModalProps) {
   return (
@@ -53,6 +56,20 @@ export function PullRequestDetailModal({
             <dd className="mt-0.5 text-ink">{dateTimeFormatter.format(new Date(pull.updatedAt))}</dd>
           </div>
         </dl>
+
+        {analyses.length > 0 && (
+          <div>
+            <h4 className="mb-3 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
+              Análises desta PR
+            </h4>
+            <AnalysisHistoryList
+              owner={owner}
+              repo={repo}
+              analyses={analyses}
+              emptyTitle="Nenhuma análise nesta PR"
+            />
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <Link

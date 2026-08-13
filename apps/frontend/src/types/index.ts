@@ -107,6 +107,22 @@ export interface ReviewResult {
   findings: Finding[];
 }
 
+export interface ReviewComment extends Finding {
+  reviewer: string;
+}
+
+export interface ChangeAnalysisFile {
+  path: string;
+  kind: string;
+  extension: string;
+}
+
+export interface ChangeAnalysis {
+  files: ChangeAnalysisFile[];
+  hasTests: boolean;
+  hasMigration: boolean;
+}
+
 export interface PrdPayload {
   title: string;
   problem: string;
@@ -125,10 +141,12 @@ export interface SpecPayload {
 }
 
 export interface ReportPayload {
+  changeAnalysis?: ChangeAnalysis;
   prd?: PrdPayload | null;
-  spec: SpecPayload;
-  results: ReviewResult[];
-  markdown: string;
+  spec?: SpecPayload | null;
+  results?: ReviewResult[];
+  comments?: ReviewComment[];
+  markdown?: string;
 }
 
 export type AnalysisStatus = 'running' | 'completed' | 'error';
@@ -140,8 +158,10 @@ export interface AnalysisRecord {
   repo: string;
   pullNumber: number;
   status: AnalysisStatus;
-  report: ReportPayload | Record<string, unknown> | null;
+  report: ReportPayload | null;
+  thoughts: Record<string, string> | null;
   errorMessage: string | null;
+  models: { testReviewer: string; architectureReviewer: string } | null;
   createdAt: string;
   finishedAt: string | null;
 }

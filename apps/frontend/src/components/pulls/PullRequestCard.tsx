@@ -6,9 +6,10 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 
 interface PullRequestCardProps {
   pull: PullRequest;
   onSelect: (pull: PullRequest) => void;
+  analysisCount?: number;
 }
 
-export function PullRequestCard({ pull, onSelect }: PullRequestCardProps) {
+export function PullRequestCard({ pull, onSelect, analysisCount = 0 }: PullRequestCardProps) {
   return (
     <button
       type="button"
@@ -27,6 +28,14 @@ export function PullRequestCard({ pull, onSelect }: PullRequestCardProps) {
           <span>
             {pull.headRef} → {pull.baseRef}
           </span>
+          {analysisCount > 0 && (
+            <>
+              <span>·</span>
+              <span>
+                {analysisCount} {analysisCount === 1 ? 'análise' : 'análises'}
+              </span>
+            </>
+          )}
         </div>
       </div>
 

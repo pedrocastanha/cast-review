@@ -3,12 +3,14 @@ import { Link, useParams } from 'react-router-dom';
 import { openaiKeyStore } from '../api/openai-key-store';
 import { repositoriesApi } from '../api/repositories.api';
 import { AgentStepper } from '../components/analysis/AgentStepper';
+import { AnalysisHistoryList } from '../components/analysis/AnalysisHistoryList';
 import { ReportView } from '../components/analysis/ReportView';
 import { ThoughtLog } from '../components/analysis/ThoughtLog';
 import { Button } from '../components/ui/Button';
 import { Field } from '../components/ui/Field';
 import { Spinner } from '../components/ui/Spinner';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
+import { useRepoAnalyses } from '../hooks/useRepoAnalyses';
 import type { PullRequest } from '../types';
 
 const DEFAULT_MODEL = 'gpt-4o';
@@ -17,6 +19,11 @@ export function AnalysisPage() {
   const { owner = '', repo = '', pullNumber = '' } = useParams();
   const number = Number(pullNumber);
   const { phase, events, errorMessage, start, reset, report, thoughts } = useAnalysisRun();
+  const { analyses, loading: analysesLoading } = useRepoAnalyses(
+    owner,
+    repo,
+    Number.isFinite(number) ? number : undefined,
+  );
 
   const [pull, setPull] = useState<PullRequest | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -144,6 +151,20 @@ export function AnalysisPage() {
       )}
 
       {report && <ReportView report={report} />}
+
+      {!analysesLoading && analyses && analyses.length > 0 && phase === 'idle' && (
+        <section className="mt-4">
+          <h2 className="mb-4 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
+            Análises anteriores desta PR
+          </h2>
+          <AnalysisHistoryList
+            owner={owner}
+            repo={repo}
+            analyses={analyses}
+            emptyTitle="Nenhuma análise anterior"
+          />
+        </section>
+      )}
     </div>
   );
 }

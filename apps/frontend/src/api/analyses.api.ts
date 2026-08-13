@@ -14,6 +14,14 @@ function parseSseChunk(rawEvent: string): AgentEvent | null {
 export const analysesApi = {
   list: () => request<AnalysisRecord[]>('/analyses'),
 
+  listByRepo: (owner: string, repo: string, pullNumber?: number) => {
+    const params = new URLSearchParams({ owner });
+    if (pullNumber !== undefined) params.set('pullNumber', String(pullNumber));
+    return request<AnalysisRecord[]>(
+      `/repositories/${encodeURIComponent(repo)}/analyses?${params.toString()}`,
+    );
+  },
+
   getById: (id: string) => request<AnalysisRecord>(`/analyses/${encodeURIComponent(id)}`),
 
   async *run(

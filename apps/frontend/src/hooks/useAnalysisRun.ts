@@ -1,13 +1,15 @@
 import { useCallback, useRef, useState } from 'react';
 import { analysesApi } from '../api/analyses.api';
 import { ApiError } from '../api/http';
-import type { AgentEvent, AgentEventType, ReportPayload, RunAnalysisPayload } from '../types';
+import { assembleReport } from '../lib/assemble-report';
+import type { AgentEvent, AgentEventType, RunAnalysisPayload } from '../types';
 
 export type RunPhase = 'idle' | 'running' | 'completed' | 'error';
 
 export function useAnalysisRun() {
   const [phase, setPhase] = useState<RunPhase>('idle');
   const [events, setEvents] = useState<AgentEvent[]>([]);
+  const [thoughts, setThoughts] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -16,6 +18,7 @@ export function useAnalysisRun() {
     abortRef.current = null;
     setPhase('idle');
     setEvents([]);
+    setThoughts({});
     setErrorMessage(null);
   }, []);
 
@@ -27,6 +30,7 @@ export function useAnalysisRun() {
 
       setPhase('running');
       setEvents([]);
+      setThoughts({});
       setErrorMessage(null);
 
       try {
@@ -37,6 +41,18 @@ export function useAnalysisRun() {
           payload,
           controller.signal,
         )) {
+          if (event.type === 'thought') {
+            const step = String(event.payload.step ?? '');
+            const delta = String(event.payload.delta ?? '');
+            if (step && delta) {
+              setThoughts((current) => ({
+                ...current,
+                [step]: `${current[step] ?? ''}${delta}`,
+              }));
+            }
+            continue;
+          }
+
           setEvents((current) => [...current, event]);
 
           if (event.type === 'error') {
@@ -61,16 +77,7 @@ export function useAnalysisRun() {
   const latest = (type: AgentEventType) =>
     [...events].reverse().find((event) => event.type === type);
 
-  const report = latest('report_ready')?.payload as ReportPayload | undefined;
-
-  const thoughts: Record<string, string> = {};
-  for (const event of events) {
-    if (event.type !== 'thought') continue;
-    const step = String(event.payload.step ?? '');
-    const delta = String(event.payload.delta ?? '');
-    if (!step || !delta) continue;
-    thoughts[step] = `${thoughts[step] ?? ''}${delta}`;
-  }
+  const report = assembleReport(events);
 
   return { phase, events, errorMessage, start, reset, latest, report, thoughts };
 }
