@@ -5,6 +5,7 @@ from app.graph.utils.findings import normalize_findings, review_payload
 from app.graph.utils.loader import build_system_prompt
 from app.graph.state import GraphState
 from app.graph.thoughts import emit_thought
+from app.graph.utils.usage import skipped_step, step_usage
 from app.infrastructure.llm.client import complete_json
 
 
@@ -22,10 +23,11 @@ async def run_architecture_reviewer(
     if not text:
         payload = review_payload([])
         payload["conventionsSource"] = source
+        payload["usage"] = skipped_step("architecture_reviewer")
         return payload
 
     system = build_system_prompt("architecture_reviewer", ["cite-convention"])
-    raw = await complete_json(
+    result = await complete_json(
         system=system,
         user=_user_prompt(spec, changed_files, text, source, prd),
         model=model,
@@ -34,11 +36,12 @@ async def run_architecture_reviewer(
     )
     findings = [
         finding
-        for finding in normalize_findings(raw.get("findings"))
+        for finding in normalize_findings(result.data.get("findings"))
         if finding.convention_ref
     ]
     payload = review_payload(findings)
     payload["conventionsSource"] = source
+    payload["usage"] = step_usage("architecture_reviewer", model, result.usage)
     return payload
 
 
