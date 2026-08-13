@@ -7,9 +7,10 @@
  * - CORS para o front Vite local;
  * - porta (env PORT ou 3000).
  *
- * WebSocket (socket.io) é plugado automaticamente via RunGateway
- * quando o Nest carrega o RunModule.
+ * Sem WebSocket: o run de análise é `POST /repositories/:repo/pulls/:n/analyses`
+ * (AnalysesModule), resposta em streaming (SSE) na mesma conexão HTTP.
  */
+import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';

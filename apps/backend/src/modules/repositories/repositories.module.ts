@@ -7,5 +7,6 @@ import { RepositoriesService } from './repositories.service';
   imports: [UsersModule],
   controllers: [RepositoriesController],
   providers: [RepositoriesService],
+  exports: [RepositoriesService],
 })
 export class RepositoriesModule {}

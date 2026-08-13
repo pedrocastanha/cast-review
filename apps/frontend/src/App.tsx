@@ -3,6 +3,8 @@ import { GuestRoute } from './components/layout/GuestRoute';
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
+import { AnalysisPage } from './pages/AnalysisPage';
+import { AnalysisRecordPage } from './pages/AnalysisRecordPage';
 import { LoginPage } from './pages/LoginPage';
 import { PullRequestsPage } from './pages/PullRequestsPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -48,6 +50,26 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <PullRequestsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/repos/:owner/:repo/analyses/:analysisId"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AnalysisRecordPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/repos/:owner/:repo/pulls/:pullNumber/run"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AnalysisPage />
                 </Layout>
               </ProtectedRoute>
             }

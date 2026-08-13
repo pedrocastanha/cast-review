@@ -1,4 +1,8 @@
-import type { PullRequest } from '../../types';
+import { Link } from 'react-router-dom';
+import { hasReviewContent } from '../../lib/assemble-report';
+import type { AnalysisRecord, PullRequest } from '../../types';
+import { AnalysisHistoryList } from '../analysis/AnalysisHistoryList';
+import { ReportView } from '../analysis/ReportView';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { PullRequestStatusBadge } from './PullRequestStatusBadge';
@@ -13,10 +17,21 @@ const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
 
 interface PullRequestDetailModalProps {
   pull: PullRequest;
+  owner: string;
+  repo: string;
+  analyses: AnalysisRecord[];
   onClose: () => void;
 }
 
-export function PullRequestDetailModal({ pull, onClose }: PullRequestDetailModalProps) {
+export function PullRequestDetailModal({
+  pull,
+  owner,
+  repo,
+  analyses,
+  onClose,
+}: PullRequestDetailModalProps) {
+  const latestReport = analyses.find((analysis) => hasReviewContent(analysis.report))?.report ?? null;
+
   return (
     <Modal title={`#${pull.number}`} onClose={onClose} wide>
       <div className="flex flex-col gap-5">
@@ -46,11 +61,36 @@ export function PullRequestDetailModal({ pull, onClose }: PullRequestDetailModal
           </div>
         </dl>
 
-        <a href={pull.htmlUrl} target="_blank" rel="noreferrer">
-          <Button variant="secondary" className="w-full">
-            Abrir no GitHub ↗
-          </Button>
-        </a>
+        <div>
+          <h4 className="mb-3 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
+            Análises desta PR
+          </h4>
+          <AnalysisHistoryList
+            owner={owner}
+            repo={repo}
+            analyses={analyses}
+            emptyTitle="Nenhuma análise nesta PR"
+            emptyDescription="Rode a primeira análise para o review aparecer aqui."
+          />
+          {latestReport && (
+            <div className="mt-6">
+              <ReportView report={latestReport} />
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Link
+            to={`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pull.number}/run`}
+          >
+            <Button className="w-full">Rodar análise</Button>
+          </Link>
+          <a href={pull.htmlUrl} target="_blank" rel="noreferrer">
+            <Button variant="secondary" className="w-full">
+              Abrir no GitHub ↗
+            </Button>
+          </a>
+        </div>
       </div>
     </Modal>
   );

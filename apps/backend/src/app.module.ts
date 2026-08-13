@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AnalysesModule } from './modules/analyses/analyses.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAccessGuard } from './modules/auth/guards/jwt-access.guard';
 import { RepositoriesModule } from './modules/repositories/repositories.module';
@@ -23,6 +24,7 @@ import { LoggerModule } from './shared/logger/logger.module';
     AuthModule,
     UsersModule,
     RepositoriesModule,
+    AnalysesModule,
   ],
   controllers: [AppController],
   providers: [

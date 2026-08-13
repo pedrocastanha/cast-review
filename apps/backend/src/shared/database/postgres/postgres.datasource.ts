@@ -1,5 +1,6 @@
 import 'dotenv/config';
 
+import { Analysis } from 'src/modules/analyses/analysis.entity';
 import { User } from 'src/modules/users/user.entity';
 import { DataSource } from 'typeorm';
 
@@ -10,7 +11,7 @@ export default new DataSource({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  entities: [User],
+  entities: [User, Analysis],
   synchronize: false,
   migrations: [`${__dirname}/migrations/**/*{.ts,.js}`],
   migrationsTableName: 'migrations',
