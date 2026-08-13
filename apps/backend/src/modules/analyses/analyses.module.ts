@@ -3,10 +3,11 @@ import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { AnalysesController } from './analyses.controller';
 import { AnalysesService } from './analyses.service';
+import { AnalysisRepository } from './analysis.repository';
 
 @Module({
   imports: [RepositoriesModule],
   controllers: [AnalysesController],
-  providers: [AnalysesService, AiApiClient],
+  providers: [AnalysesService, AiApiClient, AnalysisRepository],
 })
 export class AnalysesModule {}

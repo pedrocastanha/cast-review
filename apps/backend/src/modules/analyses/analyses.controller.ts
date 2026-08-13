@@ -34,6 +34,21 @@ export class AnalysesController {
     return this.analysesService.listForUser(currentUser);
   }
 
+  @Get('repositories/:repo/analyses')
+  listByRepository(
+    @Param('repo') repo: string,
+    @Query('owner') owner: string | undefined,
+    @Query('pullNumber') pullNumber: string | undefined,
+    @CurrentUser() currentUser: CurrentUserData,
+  ) {
+    return this.analysesService.listForRepository({
+      repo,
+      owner,
+      pullNumber,
+      currentUser,
+    });
+  }
+
   @Get('analyses/:id')
   getById(@Param('id') id: string, @CurrentUser() currentUser: CurrentUserData) {
     return this.analysesService.getByIdForUser(id, currentUser);

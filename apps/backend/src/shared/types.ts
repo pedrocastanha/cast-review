@@ -28,6 +28,7 @@ export type AgentEventType =
   | 'test_reviewer_done'
   | 'architecture_reviewer_done'
   | 'report_ready'
+  | 'thought'
   | 'error';
 
 export interface AgentEvent {

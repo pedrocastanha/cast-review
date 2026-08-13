@@ -9,6 +9,19 @@ export function parsePullNumber(raw: string): number {
   return pullNumber;
 }
 
+export function parseOwner(raw: string | undefined): string {
+  const owner = raw?.trim() ?? '';
+  if (!owner) {
+    throw new BadRequestException('owner é obrigatório');
+  }
+  return owner;
+}
+
+export function parseOptionalPullNumber(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw.trim() === '') return undefined;
+  return parsePullNumber(raw);
+}
+
 export function parseRunAnalysisBody(body: unknown): RunAnalysisDto {
   if (!isRecord(body)) {
     throw new BadRequestException('Body da análise inválido');
