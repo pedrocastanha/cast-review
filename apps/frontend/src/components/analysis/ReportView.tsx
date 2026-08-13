@@ -131,18 +131,61 @@ function SpecBlock({ spec }: { spec: SpecPayload }) {
   );
 }
 
+const VERDICT_LABEL = {
+  approve: 'Aprovar',
+  comment: 'Comentar',
+  request_changes: 'Pedir mudanças',
+} as const;
+
+const VERDICT_TONE = {
+  approve: 'border-state-open text-state-open',
+  comment: 'border-accent text-accent',
+  request_changes: 'border-state-closed text-state-closed',
+} as const;
+
 export function ReportView({ report }: { report: ReportPayload }) {
   const results = report.results ?? [];
-  const comments: ReviewComment[] =
+  const comments: ReviewComment[] = (
     report.comments?.length
       ? report.comments
       : results.flatMap((result) =>
           (result.findings ?? []).map((finding) => ({ reviewer: result.name, ...finding })),
-        );
+        )
+  ).slice().sort((left, right) => {
+    const rank = { fail: 0, warning: 1, pass: 2 };
+    return (rank[left.status] ?? 3) - (rank[right.status] ?? 3);
+  });
   const files = report.changeAnalysis?.files ?? [];
+  const visibleFiles = files.slice(0, 12);
+  const hiddenFiles = Math.max(0, files.length - visibleFiles.length);
+  const actionable = comments.filter((item) => item.status !== 'pass');
 
   return (
     <div className="flex flex-col gap-8">
+      {(report.verdict || report.overallScore !== undefined) && (
+        <section className={`rounded-sm border px-4 py-4 ${report.verdict ? VERDICT_TONE[report.verdict] : 'border-border'}`}>
+          <p className="font-mono text-[10px] tracking-wider uppercase">Veredito</p>
+          <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="font-display text-xl font-semibold">
+                {report.verdict ? VERDICT_LABEL[report.verdict] : 'Em análise'}
+              </p>
+              {report.headline && <p className="mt-1 text-sm text-ink">{report.headline}</p>}
+              {report.conventionsSource === 'default' && (
+                <p className="mt-2 font-mono text-[10px] tracking-wide text-ink-faint uppercase">
+                  Convenções padrão Cast Review
+                </p>
+              )}
+            </div>
+            {report.overallScore !== undefined && (
+              <p className={`font-display text-4xl font-semibold ${scoreTone(report.overallScore)}`}>
+                {report.overallScore}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+
       {report.changeAnalysis && (
         <section>
           <h3 className="mb-2 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
@@ -159,15 +202,18 @@ export function ReportView({ report }: { report: ReportPayload }) {
               migration {report.changeAnalysis.hasMigration ? 'sim' : 'não'}
             </span>
           </div>
-          {files.length > 0 && (
+          {visibleFiles.length > 0 && (
             <ul className="mt-3 flex flex-col gap-1">
-              {files.map((file) => (
+              {visibleFiles.map((file) => (
                 <li key={file.path} className="font-mono text-xs text-ink-faint">
                   <span className="text-ink-dim">{file.kind}</span>
                   <span className="mx-2">·</span>
                   {file.path}
                 </li>
               ))}
+              {hiddenFiles > 0 && (
+                <li className="font-mono text-xs text-ink-faint">+ {hiddenFiles} arquivos</li>
+              )}
             </ul>
           )}
         </section>
@@ -191,15 +237,30 @@ export function ReportView({ report }: { report: ReportPayload }) {
       {report.prd && <PrdBlock prd={report.prd} />}
       {report.spec && <SpecBlock spec={report.spec} />}
 
-      {comments.length > 0 && (
+      {actionable.length > 0 && (
         <section>
           <h3 className="mb-2 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
-            Comentários
+            O que precisa de atenção
           </h3>
           <ul>
-            {comments.map((comment, index) => (
+            {actionable.map((comment, index) => (
               <CommentRow key={`${comment.reviewer}-${comment.title}-${index}`} comment={comment} />
             ))}
+          </ul>
+        </section>
+      )}
+
+      {comments.some((item) => item.status === 'pass') && (
+        <section>
+          <h3 className="mb-2 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
+            O que passou
+          </h3>
+          <ul>
+            {comments
+              .filter((item) => item.status === 'pass')
+              .map((comment, index) => (
+                <CommentRow key={`pass-${comment.reviewer}-${comment.title}-${index}`} comment={comment} />
+              ))}
           </ul>
         </section>
       )}

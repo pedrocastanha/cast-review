@@ -140,6 +140,8 @@ export interface SpecPayload {
   businessRules: string[];
 }
 
+export type ReviewVerdict = 'approve' | 'comment' | 'request_changes';
+
 export interface ReportPayload {
   changeAnalysis?: ChangeAnalysis;
   prd?: PrdPayload | null;
@@ -147,6 +149,12 @@ export interface ReportPayload {
   results?: ReviewResult[];
   comments?: ReviewComment[];
   markdown?: string;
+  verdict?: ReviewVerdict;
+  overallScore?: number;
+  failCount?: number;
+  warningCount?: number;
+  headline?: string;
+  conventionsSource?: 'repo' | 'default';
 }
 
 export type AnalysisStatus = 'running' | 'completed' | 'error';

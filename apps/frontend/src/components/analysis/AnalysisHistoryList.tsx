@@ -11,6 +11,17 @@ const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
 });
 
 function scoresLabel(record: AnalysisRecord) {
+  if (record.report?.overallScore !== undefined) {
+    const verdict =
+      record.report.verdict === 'approve'
+        ? 'aprovar'
+        : record.report.verdict === 'comment'
+          ? 'comentar'
+          : record.report.verdict === 'request_changes'
+            ? 'mudanças'
+            : null;
+    return verdict ? `${record.report.overallScore} · ${verdict}` : String(record.report.overallScore);
+  }
   const results = record.report?.results ?? [];
   if (results.length === 0) return null;
   return results.map((result) => result.score).join(' · ');

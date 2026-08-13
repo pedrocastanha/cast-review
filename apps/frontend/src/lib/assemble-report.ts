@@ -50,5 +50,11 @@ export function assembleReport(events: AgentEvent[]): ReportPayload | undefined 
       result.findings.map((finding) => ({ reviewer: result.name, ...finding })),
     ),
     markdown: ready?.markdown ?? '',
+    verdict: ready?.verdict,
+    overallScore: ready?.overallScore,
+    failCount: ready?.failCount,
+    warningCount: ready?.warningCount,
+    headline: ready?.headline,
+    conventionsSource: ready?.conventionsSource,
   };
 }
