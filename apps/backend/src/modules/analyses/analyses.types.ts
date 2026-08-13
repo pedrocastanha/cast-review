@@ -1,6 +1,5 @@
 export type AnalysisStatus = 'running' | 'completed' | 'error';
 
-/** Registro em memória de uma execução do pipeline de agentes. */
 export interface AnalysisRecord {
   id: string;
   requestedBy: string;

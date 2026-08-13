@@ -4,10 +4,6 @@ import type { AgentEvent, AgentRunRequest } from 'src/shared/types';
 
 const AI_API_URL = process.env.AI_API_URL ?? 'http://localhost:8000';
 
-/**
- * Único ponto do Nest que fala com o ai-api (Python).
- * Consome `POST /agent/run` como stream e reemite cada evento já parseado.
- */
 @Injectable()
 export class AiApiClient {
   constructor(private readonly logger: AppLogger) {}

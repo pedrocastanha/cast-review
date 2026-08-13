@@ -11,11 +11,6 @@ import { candidatePathsFor, extractRelativeImportPaths } from './import-resolver
 const MAX_RELATED_FILES_PER_CHANGE = 3;
 const MAX_RELATED_FILE_CHARS = 4000;
 
-/**
- * Monta o payload de `POST /agent/run` a partir de uma PR.
- * Só consumido por `AnalysesService` — sem estado próprio, por isso é
- * função e não um provider (não precisa de DI nem de mock em teste isolado).
- */
 export async function buildAgentRunRequest(
   repositoriesService: RepositoriesService,
   repo: string,

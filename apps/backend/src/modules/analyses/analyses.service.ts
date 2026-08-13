@@ -1,18 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import { BaseService } from 'src/shared/services/base.service';
-import type { AgentEvent } from 'src/shared/types';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { RepositoriesService } from '../repositories/repositories.service';
 import type { AnalysisRecord } from './analyses.types';
-import type { RunAnalysisDto } from './dtos/run-analysis.dto';
 import { buildAgentRunRequest } from './helpers/context-builder.helper';
+import { parsePullNumber, parseRunAnalysisBody } from './helpers/parse-run-input';
 
-/**
- * Orquestra uma execução: builda contexto, chama o ai-api, mantém o estado
- * do run em memória (sem persistência — decisão do PRD/ADR do ai-api).
- */
+type RunInput = {
+  repo: string;
+  pullNumber: string;
+  currentUser: CurrentUserData;
+  body: unknown;
+  owner?: string;
+  req: Request;
+  res: Response;
+};
+
 @Injectable()
 export class AnalysesService extends BaseService {
   private readonly records = new Map<string, AnalysisRecord>();
@@ -25,15 +32,18 @@ export class AnalysesService extends BaseService {
     super(logger);
   }
 
-  async *run(
-    analysisId: string,
-    repo: string,
-    pullNumber: number,
-    currentUser: CurrentUserData,
-    dto: RunAnalysisDto,
-    signal: AbortSignal,
-    owner?: string,
-  ): AsyncGenerator<AgentEvent> {
+  async run({ repo, pullNumber: pullNumberRaw, currentUser, body, owner, req, res }: RunInput) {
+    if (!repo?.trim()) {
+      throw new BadRequestException('repo é obrigatório');
+    }
+
+    const pullNumber = parsePullNumber(pullNumberRaw);
+    const dto = parseRunAnalysisBody(body);
+
+    const analysisId = randomUUID();
+    const abortController = new AbortController();
+    req.on('close', () => abortController.abort());
+
     const record: AnalysisRecord = {
       id: analysisId,
       requestedBy: currentUser.id,
@@ -49,6 +59,17 @@ export class AnalysesService extends BaseService {
 
     this.records.set(record.id, record);
 
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Analysis-Id': analysisId,
+    });
+
+    const writeEvent = (event: unknown) => {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
     try {
       const payload = await buildAgentRunRequest(
         this.repositoriesService,
@@ -59,7 +80,7 @@ export class AnalysesService extends BaseService {
         owner,
       );
 
-      for await (const event of this.aiApiClient.runAgent(payload, signal)) {
+      for await (const event of this.aiApiClient.runAgent(payload, abortController.signal)) {
         if (event.type === 'report_ready') {
           record.status = 'completed';
           record.report = event.payload;
@@ -74,7 +95,7 @@ export class AnalysesService extends BaseService {
           record.finishedAt = new Date().toISOString();
         }
 
-        yield event;
+        writeEvent(event);
       }
     } catch (err) {
       record.status = 'error';
@@ -85,7 +106,9 @@ export class AnalysesService extends BaseService {
         exception: err,
         analysisId: record.id,
       });
-      throw err;
+      writeEvent({ type: 'error', payload: { message: 'Falha ao rodar a análise' } });
+    } finally {
+      res.end();
     }
   }
 

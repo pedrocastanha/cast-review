@@ -11,7 +11,7 @@ class ReviewModelsDto {
 
 class ApiKeysDto {
   @IsString()
-  anthropic!: string;
+  openai!: string;
 }
 
 export class RunAnalysisDto {

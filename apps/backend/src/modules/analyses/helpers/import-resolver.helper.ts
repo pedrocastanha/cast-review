@@ -2,11 +2,6 @@ const EXTENSION_FALLBACKS = ['.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.
 const RELATIVE_IMPORT_PATTERN =
   /(?:import[^'"]*from|require\()\s*['"](\.\.?\/[^'"]+)['"]/g;
 
-/**
- * Paths de import relativo encontrados no conteúdo de um arquivo, já resolvidos
- * a partir do diretório do arquivo (`../x` → path absoluto dentro do repo).
- * Heurística por regex, não AST.
- */
 export function extractRelativeImportPaths(
   changedFilePath: string,
   content: string,
@@ -18,7 +13,6 @@ export function extractRelativeImportPaths(
   return Array.from(new Set(resolved));
 }
 
-/** Candidatos a testar no GitHub: path como veio, ou com extensões comuns se não tiver uma. */
 export function candidatePathsFor(path: string): string[] {
   return path.includes('.') ? [path] : EXTENSION_FALLBACKS.map((ext) => `${path}${ext}`);
 }
