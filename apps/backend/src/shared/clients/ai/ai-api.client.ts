@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import type { AgentEvent, AgentRunRequest } from 'src/shared/types';
 
-const AI_API_URL = process.env.AI_API_URL ?? 'http://localhost:8000';
+const DEFAULT_AI_API_URL = 'http://localhost:8000';
+
+function resolveAiApiUrl(): string {
+  // dotenv hidrata process.env depois do import deste arquivo
+  return process.env.AI_API_URL?.trim() || DEFAULT_AI_API_URL;
+}
 
 @Injectable()
 export class AiApiClient {
@@ -12,7 +17,7 @@ export class AiApiClient {
     payload: AgentRunRequest,
     signal: AbortSignal,
   ): AsyncGenerator<AgentEvent> {
-    const response = await fetch(`${AI_API_URL}/agent/run`, {
+    const response = await fetch(`${resolveAiApiUrl()}/agent/run`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -53,7 +58,9 @@ export class AiApiClient {
   }
 
   private parseEvent(rawEvent: string): AgentEvent | null {
-    const dataLine = rawEvent.split('\n').find((line) => line.startsWith('data:'));
+    const dataLine = rawEvent
+      .split('\n')
+      .find((line) => line.startsWith('data:'));
     if (!dataLine) return null;
 
     try {
