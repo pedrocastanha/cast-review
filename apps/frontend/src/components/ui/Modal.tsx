@@ -29,7 +29,7 @@ export function Modal({ title, onClose, children, footer, wide = false }: ModalP
       role="presentation"
     >
       <div
-        className={`w-full ${wide ? 'max-w-160' : 'max-w-120'} max-h-[85vh] animate-modal-in overflow-y-auto rounded-lg border border-border-strong bg-surface-2 p-6 sm:max-h-[640px]`}
+        className={`w-full ${wide ? 'max-w-6xl' : 'max-w-120'} max-h-[90vh] animate-modal-in overflow-y-auto rounded-lg border border-border-strong bg-surface-2 p-5 sm:p-6`}
         role="dialog"
         aria-modal="true"
         aria-label={title}

@@ -292,7 +292,6 @@ export class RepositoriesService extends BaseService {
     };
   }
 
-  /** SHA da head no momento da chamada — createReview exige commit_id fresco. */
   async getPullHeadSha(
     repo: string,
     pullNumber: number,

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { PullRequest } from '../../types';
 import { PullRequestStatusBadge } from './PullRequestStatusBadge';
 
@@ -5,21 +6,21 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 
 
 interface PullRequestCardProps {
   pull: PullRequest;
-  onSelect: (pull: PullRequest) => void;
+  owner: string;
+  repo: string;
   analysisCount?: number;
 }
 
-export function PullRequestCard({ pull, onSelect, analysisCount = 0 }: PullRequestCardProps) {
+export function PullRequestCard({ pull, owner, repo, analysisCount = 0 }: PullRequestCardProps) {
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(pull)}
-      className="group flex w-full items-center justify-between gap-6 border-b border-border py-4 text-left transition-colors first:pt-0 last:border-0 hover:bg-surface-1/60"
+    <Link
+      to={`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pull.number}`}
+      className="group flex w-full items-center justify-between gap-4 rounded-md border border-border bg-surface-1/55 px-4 py-4 text-left transition-[background-color,border-color] duration-200 hover:border-border-strong hover:bg-surface-2 sm:gap-6 sm:px-5"
     >
       <div className="min-w-0">
         <div className="flex items-center gap-3">
           <span className="font-mono text-xs text-ink-faint">#{pull.number}</span>
-          <span className="truncate text-sm text-ink group-hover:text-accent">{pull.title}</span>
+          <span className="truncate text-sm text-ink transition-colors group-hover:text-accent">{pull.title}</span>
         </div>
         <div className="mt-1.5 flex items-center gap-2 font-mono text-xs text-ink-faint">
           <PullRequestStatusBadge pull={pull} />
@@ -39,9 +40,9 @@ export function PullRequestCard({ pull, onSelect, analysisCount = 0 }: PullReque
         </div>
       </div>
 
-      <div className="shrink-0 font-mono text-xs text-ink-faint">
+      <div className="hidden shrink-0 font-mono text-xs text-ink-faint sm:block">
         {dateFormatter.format(new Date(pull.updatedAt))}
       </div>
-    </button>
+    </Link>
   );
 }

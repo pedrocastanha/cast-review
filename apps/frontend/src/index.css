@@ -84,16 +84,31 @@ html {
 
 body {
   background-color: var(--color-surface);
-  background-image: radial-gradient(
-    circle at 12% -8%,
-    color-mix(in oklch, var(--color-accent) 7%, transparent),
-    transparent 42%
-  );
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--color-ink) 2.5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--color-ink) 2.5%, transparent) 1px, transparent 1px),
+    radial-gradient(circle at 12% -8%, color-mix(in oklch, var(--color-accent) 8%, transparent), transparent 42%);
+  background-size: 32px 32px, 32px 32px, auto;
   background-attachment: fixed;
   color: var(--color-ink);
   font-family: var(--font-body);
   font-weight: 350;
   -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }
 
 ::selection {

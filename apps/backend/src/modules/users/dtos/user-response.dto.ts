@@ -8,6 +8,7 @@ export class UserResponseDto {
   active: boolean;
   githubConnected: boolean;
   githubLogin: string | null;
+  githubTokenLastFour: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +22,7 @@ export function toUserResponse(user: User): UserResponseDto {
     active: user.active,
     githubConnected: Boolean(user.githubLogin),
     githubLogin: user.githubLogin ?? null,
+    githubTokenLastFour: user.githubTokenLastFour ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
