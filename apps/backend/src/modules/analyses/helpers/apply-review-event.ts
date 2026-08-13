@@ -1,9 +1,11 @@
 import type {
   AnalysisReview,
+  AnalysisUsage,
   ChangeAnalysis,
   ReviewComment,
   ReviewFinding,
   ReviewResult,
+  StepUsage,
 } from '../analyses.types';
 
 const FINDING_STATUS = new Set(['fail', 'warning', 'pass']);
@@ -26,15 +28,19 @@ export function applyReviewEvent(
   switch (type) {
     case 'change_analysis_done':
       next.changeAnalysis = normalizeChangeAnalysis(payload);
+      next.usage = upsertStepUsage(next.usage, payload.usage);
       break;
     case 'prd_generated':
-      next.prd = payload;
+      next.prd = omitUsage(payload);
+      next.usage = upsertStepUsage(next.usage, payload.usage);
       break;
     case 'spec_generated':
-      next.spec = payload;
+      next.spec = omitUsage(payload);
+      next.usage = upsertStepUsage(next.usage, payload.usage);
       break;
     case 'test_reviewer_done':
       next.results = upsertResult(next.results, 'test_reviewer', payload);
+      next.usage = upsertStepUsage(next.usage, payload.usage);
       break;
     case 'architecture_reviewer_done':
       next.results = upsertResult(
@@ -42,6 +48,7 @@ export function applyReviewEvent(
         'architecture_reviewer',
         payload,
       );
+      next.usage = upsertStepUsage(next.usage, payload.usage);
       break;
     case 'report_ready':
       if (isRecord(payload.prd) || payload.prd === null) {
@@ -61,7 +68,11 @@ export function applyReviewEvent(
       if (isRecord(payload.changeAnalysis)) {
         next.changeAnalysis = normalizeChangeAnalysis(payload.changeAnalysis);
       }
-      if (payload.verdict === 'approve' || payload.verdict === 'comment' || payload.verdict === 'request_changes') {
+      if (
+        payload.verdict === 'approve' ||
+        payload.verdict === 'comment' ||
+        payload.verdict === 'request_changes'
+      ) {
         next.verdict = payload.verdict;
       }
       if (typeof payload.overallScore === 'number') {
@@ -76,8 +87,15 @@ export function applyReviewEvent(
       if (typeof payload.headline === 'string') {
         next.headline = payload.headline;
       }
-      if (payload.conventionsSource === 'repo' || payload.conventionsSource === 'default') {
+      if (
+        payload.conventionsSource === 'repo' ||
+        payload.conventionsSource === 'default'
+      ) {
         next.conventionsSource = payload.conventionsSource;
+      }
+      // report_ready traz o agregado do Python; é a fonte de verdade do total.
+      if (isAnalysisUsage(payload.usage)) {
+        next.usage = payload.usage;
       }
       break;
     default:
@@ -116,17 +134,22 @@ export function hydrateReview(
     comments,
     markdown: typeof raw.markdown === 'string' ? raw.markdown : undefined,
     verdict:
-      raw.verdict === 'approve' || raw.verdict === 'comment' || raw.verdict === 'request_changes'
+      raw.verdict === 'approve' ||
+      raw.verdict === 'comment' ||
+      raw.verdict === 'request_changes'
         ? raw.verdict
         : undefined,
-    overallScore: typeof raw.overallScore === 'number' ? raw.overallScore : undefined,
+    overallScore:
+      typeof raw.overallScore === 'number' ? raw.overallScore : undefined,
     failCount: typeof raw.failCount === 'number' ? raw.failCount : undefined,
-    warningCount: typeof raw.warningCount === 'number' ? raw.warningCount : undefined,
+    warningCount:
+      typeof raw.warningCount === 'number' ? raw.warningCount : undefined,
     headline: typeof raw.headline === 'string' ? raw.headline : undefined,
     conventionsSource:
       raw.conventionsSource === 'repo' || raw.conventionsSource === 'default'
         ? raw.conventionsSource
         : undefined,
+    usage: isAnalysisUsage(raw.usage) ? raw.usage : undefined,
   };
 }
 
@@ -223,4 +246,102 @@ function isNonEmptyString(value: unknown): value is string {
 
 function optionalString(value: unknown): string | undefined {
   return isNonEmptyString(value) ? value : undefined;
+}
+
+const STEP_NAMES = new Set([
+  'change_analyzer',
+  'prd',
+  'implementation_spec',
+  'test_reviewer',
+  'architecture_reviewer',
+  'report_builder',
+]);
+
+const STEP_ORDER = [
+  'change_analyzer',
+  'prd',
+  'implementation_spec',
+  'test_reviewer',
+  'architecture_reviewer',
+  'report_builder',
+];
+
+function omitUsage(payload: Record<string, unknown>): Record<string, unknown> {
+  const { usage: _usage, ...rest } = payload;
+  return rest;
+}
+
+function upsertStepUsage(
+  current: AnalysisUsage | undefined,
+  raw: unknown,
+): AnalysisUsage | undefined {
+  const step = normalizeStepUsage(raw);
+  if (!step) return current;
+  const steps = [
+    ...(current?.steps ?? []).filter((item) => item.step !== step.step),
+    step,
+  ];
+  return sumUsage(steps, current?.pricingAsOf ?? '');
+}
+
+function sumUsage(steps: StepUsage[], pricingAsOf: string): AnalysisUsage {
+  const ordered = [...steps].sort(
+    (left, right) =>
+      STEP_ORDER.indexOf(left.step) - STEP_ORDER.indexOf(right.step),
+  );
+  const known = ordered
+    .map((item) => item.costUsd)
+    .filter((value): value is number => typeof value === 'number');
+  const incomplete = ordered.some(
+    (item) =>
+      !item.skipped && (item.costUsd === null || item.source === 'missing'),
+  );
+  return {
+    currency: 'USD',
+    promptTokens: ordered.reduce((sum, item) => sum + item.promptTokens, 0),
+    cachedTokens: ordered.reduce((sum, item) => sum + item.cachedTokens, 0),
+    completionTokens: ordered.reduce(
+      (sum, item) => sum + item.completionTokens,
+      0,
+    ),
+    totalTokens: ordered.reduce((sum, item) => sum + item.totalTokens, 0),
+    costUsd: known.length
+      ? known.reduce((sum, value) => sum + value, 0)
+      : incomplete
+        ? null
+        : 0,
+    costComplete: !incomplete,
+    pricingAsOf,
+    steps: ordered,
+  };
+}
+
+function normalizeStepUsage(value: unknown): StepUsage | null {
+  if (!isRecord(value) || !STEP_NAMES.has(String(value.step))) return null;
+  return {
+    step: value.step as StepUsage['step'],
+    label: isNonEmptyString(value.label) ? value.label : String(value.step),
+    model: isNonEmptyString(value.model) ? value.model : null,
+    promptTokens: asCount(value.promptTokens),
+    cachedTokens: asCount(value.cachedTokens),
+    completionTokens: asCount(value.completionTokens),
+    totalTokens: asCount(value.totalTokens),
+    costUsd:
+      typeof value.costUsd === 'number' && Number.isFinite(value.costUsd)
+        ? value.costUsd
+        : null,
+    skipped: Boolean(value.skipped),
+    source: value.source === 'missing' ? 'missing' : 'openai',
+  };
+}
+
+function isAnalysisUsage(value: unknown): value is AnalysisUsage {
+  if (!isRecord(value) || !Array.isArray(value.steps)) return false;
+  return value.steps.every((item) => normalizeStepUsage(item) !== null);
+}
+
+function asCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : 0;
 }

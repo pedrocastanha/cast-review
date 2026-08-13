@@ -123,4 +123,96 @@ describe('hydrateReview', () => {
   it('devolve null quando não há report', () => {
     expect(hydrateReview(null)).toBeNull();
   });
+
+  it('hidrata usage quando o snapshot já tem o agregado', () => {
+    const review = hydrateReview({
+      results: [],
+      usage: {
+        currency: 'USD',
+        promptTokens: 10,
+        cachedTokens: 2,
+        completionTokens: 4,
+        totalTokens: 14,
+        costUsd: 0.01,
+        costComplete: true,
+        pricingAsOf: '2026-08-13',
+        steps: [
+          {
+            step: 'prd',
+            label: 'PRD',
+            model: 'gpt-5.4-mini',
+            promptTokens: 10,
+            cachedTokens: 2,
+            completionTokens: 4,
+            totalTokens: 14,
+            costUsd: 0.01,
+            skipped: false,
+            source: 'openai',
+          },
+        ],
+      },
+    });
+
+    expect(review?.usage?.promptTokens).toBe(10);
+    expect(review?.usage?.steps[0]?.step).toBe('prd');
+  });
+});
+
+describe('applyReviewEvent usage', () => {
+  const step = {
+    step: 'prd',
+    label: 'PRD',
+    model: 'gpt-5.4-mini',
+    promptTokens: 100,
+    cachedTokens: 20,
+    completionTokens: 10,
+    totalTokens: 110,
+    costUsd: 0.002,
+    skipped: false,
+    source: 'openai',
+  };
+
+  it('acumula usage por etapa e tira usage do prd persistido', () => {
+    const review = applyReviewEvent(emptyReview(), 'prd_generated', {
+      title: 'Login',
+      usage: step,
+    });
+
+    expect(review.prd).toMatchObject({ title: 'Login' });
+    expect(review.prd).not.toHaveProperty('usage');
+    expect(review.usage?.steps).toHaveLength(1);
+    expect(review.usage?.promptTokens).toBe(100);
+    expect(review.usage?.cachedTokens).toBe(20);
+  });
+
+  it('report_ready substitui o agregado parcial', () => {
+    let review = applyReviewEvent(emptyReview(), 'prd_generated', {
+      title: 'X',
+      usage: step,
+    });
+    review = applyReviewEvent(review, 'report_ready', {
+      markdown: '# Relatório',
+      usage: {
+        currency: 'USD',
+        promptTokens: 200,
+        cachedTokens: 20,
+        completionTokens: 30,
+        totalTokens: 230,
+        costUsd: 0.01,
+        costComplete: true,
+        pricingAsOf: '2026-08-13',
+        steps: [step, { ...step, step: 'implementation_spec', label: 'Spec' }],
+      },
+    });
+
+    expect(review.usage?.promptTokens).toBe(200);
+    expect(review.usage?.steps).toHaveLength(2);
+  });
+
+  it('payload sem usage não inventa zero', () => {
+    const review = applyReviewEvent(emptyReview(), 'prd_generated', {
+      title: 'X',
+    });
+    expect(review.usage).toBeUndefined();
+  });
 });
