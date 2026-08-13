@@ -7,8 +7,10 @@ import { AnalysisPage } from './pages/AnalysisPage';
 import { AnalysisRecordPage } from './pages/AnalysisRecordPage';
 import { LoginPage } from './pages/LoginPage';
 import { PullRequestsPage } from './pages/PullRequestsPage';
+import { PullRequestReviewPage } from './pages/PullRequestReviewPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ReposPage } from './pages/ReposPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 function App() {
   return (
@@ -45,11 +47,31 @@ function App() {
             }
           />
           <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <SettingsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/repos/:owner/:repo/pulls"
             element={
               <ProtectedRoute>
                 <Layout>
                   <PullRequestsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/repos/:owner/:repo/pulls/:pullNumber"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PullRequestReviewPage />
                 </Layout>
               </ProtectedRoute>
             }
