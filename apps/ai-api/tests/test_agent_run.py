@@ -61,6 +61,8 @@ def test_run_emits_pipeline_events_with_mocked_llm(monkeypatch):
                 "userImpact": "importar x",
                 "constraints": [],
             }
+        if "Architecture Reviewer" in system:
+            return {"findings": []}
         return {
             "summary": "adiciona x",
             "newContracts": ["x"],
@@ -73,6 +75,10 @@ def test_run_emits_pipeline_events_with_mocked_llm(monkeypatch):
     )
     monkeypatch.setattr(
         "app.graph.agents.implementation_spec.agent.complete_json",
+        fake_complete_json,
+    )
+    monkeypatch.setattr(
+        "app.graph.agents.architecture_reviewer.agent.complete_json",
         fake_complete_json,
     )
 
@@ -104,11 +110,16 @@ def test_run_emits_pipeline_events_with_mocked_llm(monkeypatch):
     architecture = next(
         event for event in events if event["type"] == "architecture_reviewer_done"
     )
-    assert architecture["payload"] == {"score": 100, "findings": []}
+    assert architecture["payload"]["score"] == 100
+    assert architecture["payload"]["findings"] == []
+    assert architecture["payload"]["conventionsSource"] == "default"
 
     report = events[-1]["payload"]
     assert report["spec"]["summary"] == "adiciona x"
     assert report["prd"]["title"] == "Exporta x"
+    assert report["verdict"] == "comment"
+    assert report["overallScore"] == 85
+    assert report["conventionsSource"] == "default"
     assert "Relatório Cast Review" in report["markdown"]
     assert "Exporta x" in report["markdown"]
 
