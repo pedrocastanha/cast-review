@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { CurrentUser } from '../auth/utils/current-user-decorator';
@@ -50,7 +59,10 @@ export class AnalysesController {
   }
 
   @Get('analyses/:id')
-  getById(@Param('id') id: string, @CurrentUser() currentUser: CurrentUserData) {
+  getById(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: CurrentUserData,
+  ) {
     return this.analysesService.getByIdForUser(id, currentUser);
   }
 }

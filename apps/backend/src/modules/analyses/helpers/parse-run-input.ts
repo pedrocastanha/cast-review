@@ -17,7 +17,9 @@ export function parseOwner(raw: string | undefined): string {
   return owner;
 }
 
-export function parseOptionalPullNumber(raw: string | undefined): number | undefined {
+export function parseOptionalPullNumber(
+  raw: string | undefined,
+): number | undefined {
   if (raw === undefined || raw.trim() === '') return undefined;
   return parsePullNumber(raw);
 }
@@ -30,8 +32,14 @@ export function parseRunAnalysisBody(body: unknown): RunAnalysisDto {
   const models = body.models;
   const apiKeys = body.apiKeys;
 
-  if (!isRecord(models) || !isNonEmptyString(models.testReviewer) || !isNonEmptyString(models.architectureReviewer)) {
-    throw new BadRequestException('models.testReviewer e models.architectureReviewer são obrigatórios');
+  if (
+    !isRecord(models) ||
+    !isNonEmptyString(models.testReviewer) ||
+    !isNonEmptyString(models.architectureReviewer)
+  ) {
+    throw new BadRequestException(
+      'models.testReviewer e models.architectureReviewer são obrigatórios',
+    );
   }
 
   if (!isRecord(apiKeys) || !isNonEmptyString(apiKeys.openai)) {

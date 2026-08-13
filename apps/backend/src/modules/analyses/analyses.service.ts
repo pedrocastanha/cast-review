@@ -3,7 +3,11 @@
  * apiKeys nunca vão para o banco.
  */
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
@@ -13,7 +17,11 @@ import { RepositoriesService } from '../repositories/repositories.service';
 import type { AnalysisRecord, AnalysisReview } from './analyses.types';
 import { Analysis } from './analysis.entity';
 import { AnalysisRepository } from './analysis.repository';
-import { applyReviewEvent, emptyReview, hydrateReview } from './helpers/apply-review-event';
+import {
+  applyReviewEvent,
+  emptyReview,
+  hydrateReview,
+} from './helpers/apply-review-event';
 import { buildAgentRunRequest } from './helpers/context-builder.helper';
 import {
   parseOptionalPullNumber,
@@ -43,7 +51,15 @@ export class AnalysesService extends BaseService {
     super(logger);
   }
 
-  async run({ repo, pullNumber: pullNumberRaw, currentUser, body, owner, req, res }: RunInput) {
+  async run({
+    repo,
+    pullNumber: pullNumberRaw,
+    currentUser,
+    body,
+    owner,
+    req,
+    res,
+  }: RunInput) {
     if (!repo?.trim()) {
       throw new BadRequestException('repo é obrigatório');
     }
@@ -83,7 +99,10 @@ export class AnalysesService extends BaseService {
     let review: AnalysisReview = emptyReview();
     let lastThoughtPersist = 0;
 
-    const writeEvent = (event: { type: string; payload: Record<string, unknown> }) => {
+    const writeEvent = (event: {
+      type: string;
+      payload: Record<string, unknown>;
+    }) => {
       res.write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
@@ -91,11 +110,16 @@ export class AnalysesService extends BaseService {
       const now = Date.now();
       if (!force && now - lastThoughtPersist < 1500) return;
       lastThoughtPersist = now;
-      await this.analysisRepository.update(analysis.id, { thoughts, report: review });
+      await this.analysisRepository.update(analysis.id, {
+        thoughts,
+        report: review,
+      });
     };
 
     const persistReview = async (
-      extra: Partial<Pick<Analysis, 'status' | 'errorMessage' | 'finishedAt'>> = {},
+      extra: Partial<
+        Pick<Analysis, 'status' | 'errorMessage' | 'finishedAt'>
+      > = {},
     ) => {
       await this.analysisRepository.update(analysis.id, {
         report: review,
@@ -114,7 +138,10 @@ export class AnalysesService extends BaseService {
         owner,
       );
 
-      for await (const event of this.aiApiClient.runAgent(payload, abortController.signal)) {
+      for await (const event of this.aiApiClient.runAgent(
+        payload,
+        abortController.signal,
+      )) {
         if (event.type === 'thought') {
           const step = String(event.payload.step ?? '');
           const delta = String(event.payload.delta ?? '');
@@ -125,7 +152,9 @@ export class AnalysesService extends BaseService {
         } else if (event.type === 'error') {
           await persistReview({
             status: 'error',
-            errorMessage: String(event.payload.message ?? 'Falha no pipeline de agentes'),
+            errorMessage: String(
+              event.payload.message ?? 'Falha no pipeline de agentes',
+            ),
             finishedAt: new Date(),
           });
         } else {
@@ -149,14 +178,18 @@ export class AnalysesService extends BaseService {
         status: 'error',
         report: review,
         thoughts,
-        errorMessage: err instanceof Error ? err.message : 'Falha inesperada na análise',
+        errorMessage:
+          err instanceof Error ? err.message : 'Falha inesperada na análise',
         finishedAt: new Date(),
       });
       this.logger.error('Falha ao rodar análise', {
         exception: err,
         analysisId: analysis.id,
       });
-      writeEvent({ type: 'error', payload: { message: 'Falha ao rodar a análise' } });
+      writeEvent({
+        type: 'error',
+        payload: { message: 'Falha ao rodar a análise' },
+      });
     } finally {
       res.end();
     }
@@ -195,7 +228,10 @@ export class AnalysesService extends BaseService {
     return rows.map((row) => this.toRecord(row));
   }
 
-  async getByIdForUser(id: string, currentUser: CurrentUserData): Promise<AnalysisRecord> {
+  async getByIdForUser(
+    id: string,
+    currentUser: CurrentUserData,
+  ): Promise<AnalysisRecord> {
     const row = await this.analysisRepository.findOne({
       where: { id, requestedBy: currentUser.id },
     });

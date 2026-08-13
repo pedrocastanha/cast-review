@@ -37,7 +37,11 @@ export function applyReviewEvent(
       next.results = upsertResult(next.results, 'test_reviewer', payload);
       break;
     case 'architecture_reviewer_done':
-      next.results = upsertResult(next.results, 'architecture_reviewer', payload);
+      next.results = upsertResult(
+        next.results,
+        'architecture_reviewer',
+        payload,
+      );
       break;
     case 'report_ready':
       if (isRecord(payload.prd) || payload.prd === null) {
@@ -105,7 +109,9 @@ export function flattenComments(results: ReviewResult[]): ReviewComment[] {
   );
 }
 
-function normalizeChangeAnalysis(value: Record<string, unknown>): ChangeAnalysis {
+function normalizeChangeAnalysis(
+  value: Record<string, unknown>,
+): ChangeAnalysis {
   const files = Array.isArray(value.files)
     ? value.files.flatMap((item) => {
         if (!isRecord(item) || !isNonEmptyString(item.path)) return [];
@@ -138,11 +144,17 @@ function upsertResult(
   return results.map((item, current) => (current === index ? next : item));
 }
 
-function normalizeResult(value: unknown, fallbackName: string): ReviewResult | null {
+function normalizeResult(
+  value: unknown,
+  fallbackName: string,
+): ReviewResult | null {
   if (!isRecord(value)) return null;
   const name = isNonEmptyString(value.name) ? value.name : fallbackName;
   if (!name) return null;
-  const score = typeof value.score === 'number' && Number.isFinite(value.score) ? value.score : 0;
+  const score =
+    typeof value.score === 'number' && Number.isFinite(value.score)
+      ? value.score
+      : 0;
   const findings = Array.isArray(value.findings)
     ? value.findings
         .map((item) => normalizeFinding(item))
@@ -166,7 +178,8 @@ function normalizeFinding(value: unknown): ReviewFinding | null {
 
 function normalizeComment(value: unknown): ReviewComment | null {
   const finding = normalizeFinding(value);
-  if (!finding || !isRecord(value) || !isNonEmptyString(value.reviewer)) return null;
+  if (!finding || !isRecord(value) || !isNonEmptyString(value.reviewer))
+    return null;
   return { reviewer: value.reviewer, ...finding };
 }
 

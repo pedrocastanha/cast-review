@@ -1,4 +1,8 @@
-import { applyReviewEvent, emptyReview, hydrateReview } from './apply-review-event';
+import {
+  applyReviewEvent,
+  emptyReview,
+  hydrateReview,
+} from './apply-review-event';
 
 describe('applyReviewEvent', () => {
   it('acumula change analysis, prd, spec, reviewers e comments', () => {
@@ -9,7 +13,10 @@ describe('applyReviewEvent', () => {
       hasTests: false,
       hasMigration: false,
     });
-    review = applyReviewEvent(review, 'prd_generated', { title: 'Login', markdown: '# PRD' });
+    review = applyReviewEvent(review, 'prd_generated', {
+      title: 'Login',
+      markdown: '# PRD',
+    });
     review = applyReviewEvent(review, 'spec_generated', {
       summary: 'auth',
       newContracts: ['POST /login'],
@@ -45,7 +52,9 @@ describe('applyReviewEvent', () => {
   it('substitui o reviewer se o evento chegar de novo', () => {
     let review = applyReviewEvent(emptyReview(), 'architecture_reviewer_done', {
       score: 70,
-      findings: [{ status: 'warning', title: 'pasta', detail: 'fora do padrão' }],
+      findings: [
+        { status: 'warning', title: 'pasta', detail: 'fora do padrão' },
+      ],
     });
     review = applyReviewEvent(review, 'architecture_reviewer_done', {
       score: 100,
@@ -53,7 +62,10 @@ describe('applyReviewEvent', () => {
     });
 
     expect(review.results).toHaveLength(1);
-    expect(review.results[0]).toMatchObject({ name: 'architecture_reviewer', score: 100 });
+    expect(review.results[0]).toMatchObject({
+      name: 'architecture_reviewer',
+      score: 100,
+    });
     expect(review.comments).toEqual([]);
   });
 
@@ -101,7 +113,10 @@ describe('hydrateReview', () => {
     });
 
     expect(review?.comments).toEqual([
-      expect.objectContaining({ reviewer: 'architecture_reviewer', title: 'conv' }),
+      expect.objectContaining({
+        reviewer: 'architecture_reviewer',
+        title: 'conv',
+      }),
     ]);
   });
 
