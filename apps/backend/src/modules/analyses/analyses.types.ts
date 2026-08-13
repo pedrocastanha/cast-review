@@ -20,6 +20,9 @@ export interface ReviewFinding {
   detail: string;
   businessRule?: string;
   conventionRef?: string;
+  path?: string;
+  line?: number;
+  endLine?: number;
 }
 
 export interface ReviewResult {
@@ -57,6 +60,17 @@ export interface StepUsage {
   source: UsageSource;
 }
 
+export type GithubCommentsStatus = 'posted' | 'empty' | 'error';
+
+export interface GithubCommentsResult {
+  status: GithubCommentsStatus;
+  posted: number;
+  skipped: number;
+  reviewId: number | null;
+  htmlUrl: string | null;
+  errorMessage: string | null;
+}
+
 export interface AnalysisUsage {
   currency: 'USD';
   promptTokens: number;
@@ -83,6 +97,7 @@ export interface AnalysisReview {
   headline?: string;
   conventionsSource?: 'repo' | 'default';
   usage?: AnalysisUsage;
+  githubComments?: GithubCommentsResult;
 }
 
 export interface AnalysisRecord {

@@ -7,6 +7,7 @@ import { AnalysisStatusBadge } from '../components/analysis/AnalysisStatusBadge'
 import { ReportView } from '../components/analysis/ReportView';
 import { ThoughtLog } from '../components/analysis/ThoughtLog';
 import { Spinner } from '../components/ui/Spinner';
+import { GithubCommentsStatus } from '../components/analysis/GithubCommentsStatus';
 import { formatUsageHeadline } from '../lib/format-usage';
 import type { AnalysisRecord } from '../types';
 
@@ -113,6 +114,14 @@ export function AnalysisRecordPage() {
                 <dd className="mt-0.5 text-ink tabular-nums">
                   {formatUsageHeadline(record.report.usage)}
                   {record.status === 'error' && !record.report.usage.costComplete && ' · parcial'}
+                </dd>
+              </div>
+            )}
+            {record.report?.githubComments && (
+              <div className="col-span-2">
+                <dt className="text-ink-faint">GitHub</dt>
+                <dd className="mt-0.5">
+                  <GithubCommentsStatus result={record.report.githubComments} />
                 </dd>
               </div>
             )}

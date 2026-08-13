@@ -40,6 +40,12 @@ function CommentRow({ comment }: { comment: ReviewComment | (Finding & { reviewe
       {comment.conventionRef && (
         <p className="mt-1 font-mono text-xs text-ink-dim">ref: {comment.conventionRef}</p>
       )}
+      {comment.path && (
+        <p className="mt-1 font-mono text-xs text-ink-dim">
+          {comment.path}
+          {comment.line ? `:${comment.line}` : ''}
+        </p>
+      )}
     </li>
   );
 }

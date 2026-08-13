@@ -21,6 +21,9 @@ def normalize_findings(raw: object) -> list[Finding]:
                 detail=str(item.get("detail") or ""),
                 business_rule=_optional_str(item.get("businessRule") or item.get("business_rule")),
                 convention_ref=_optional_str(item.get("conventionRef") or item.get("convention_ref")),
+                path=_normalize_path(item.get("path")),
+                line=_positive_int(item.get("line")),
+                end_line=_positive_int(item.get("endLine") or item.get("end_line")),
             )
         )
     return findings
@@ -36,3 +39,26 @@ def _optional_str(value: object) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _normalize_path(value: object) -> str | None:
+    """Path relativo à raiz do repo. Recusa `..` e caminho absoluto."""
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip().replace("\\", "/")
+    while stripped.startswith("./"):
+        stripped = stripped[2:]
+    stripped = stripped.lstrip("/")
+    if not stripped or stripped.startswith("/") or ":" in stripped[:3]:
+        return None
+    parts = [part for part in stripped.split("/") if part not in ("", ".")]
+    if any(part == ".." for part in parts):
+        return None
+    return "/".join(parts) or None
+
+
+def _positive_int(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = int(value)
+    return number if number > 0 else None

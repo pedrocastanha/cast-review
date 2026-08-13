@@ -26,7 +26,8 @@ async def run_test_reviewer(
         return payload
 
     if not analysis["hasTests"]:
-        payload = review_payload([_missing_test(rule) for rule in business_rules])
+        path = _anchor_path(analysis, changed_files)
+        payload = review_payload([_missing_test(rule, path) for rule in business_rules])
         payload["usage"] = skipped_step("test_reviewer")
         return payload
 
@@ -39,7 +40,9 @@ async def run_test_reviewer(
         on_delta=lambda delta: emit_thought("test_reviewer", delta, run_id),
     )
     findings = normalize_findings(result.data.get("findings"))
-    findings = _ensure_every_rule_covered(business_rules, findings)
+    findings = _ensure_every_rule_covered(
+        business_rules, findings, _anchor_path(analysis, changed_files)
+    )
     payload = review_payload(findings)
     payload["usage"] = step_usage("test_reviewer", model, result.usage)
     return payload
@@ -55,17 +58,36 @@ async def node(state: GraphState) -> dict:
     )
     return {"test_review": review}
 
-def _missing_test(rule: str) -> Finding:
+def _missing_test(rule: str, path: str | None = None) -> Finding:
     return Finding(
         status="fail",
         title="Regra sem teste",
         detail=f"Nenhum arquivo de teste na PR cobre: {rule}",
         business_rule=rule,
+        path=path,
+        line=1 if path else None,
     )
 
-def _ensure_every_rule_covered(rules: list[str], findings: list[Finding]) -> list[Finding]:
+
+def _anchor_path(analysis: dict, changed_files: list[dict]) -> str | None:
+    """Primeiro source da análise; senão o primeiro arquivo da PR."""
+    for item in analysis.get("files") or []:
+        if item.get("kind") == "source" and item.get("path"):
+            return str(item["path"])
+    for file in changed_files:
+        path = file.get("path")
+        if path:
+            return str(path)
+    return None
+
+
+def _ensure_every_rule_covered(
+    rules: list[str],
+    findings: list[Finding],
+    path: str | None,
+) -> list[Finding]:
     covered = {finding.business_rule for finding in findings if finding.business_rule}
-    missing = [_missing_test(rule) for rule in rules if rule not in covered]
+    missing = [_missing_test(rule, path) for rule in rules if rule not in covered]
     return findings + missing
 
 def _user_prompt(rules: list[str], changed_files: list[dict], prd: dict | None) -> str:
