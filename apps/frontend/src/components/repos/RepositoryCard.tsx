@@ -7,11 +7,11 @@ export function RepositoryCard({ repo }: { repo: Repository }) {
   return (
     <Link
       to={`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/pulls`}
-      className="group flex items-center justify-between gap-6 border-b border-border py-4 transition-colors first:pt-0 last:border-0 hover:bg-surface-1/60"
+      className="group flex items-center justify-between gap-4 rounded-md border border-border bg-surface-1/55 px-4 py-4 transition-[background-color,border-color,transform] duration-200 hover:border-border-strong hover:bg-surface-2 sm:gap-6 sm:px-5"
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span className="truncate font-mono text-sm text-ink group-hover:text-accent">
+          <span className="truncate font-mono text-sm text-ink transition-colors group-hover:text-accent">
             {repo.fullName}
           </span>
           {repo.private && (
@@ -25,9 +25,9 @@ export function RepositoryCard({ repo }: { repo: Repository }) {
         )}
       </div>
 
-      <div className="shrink-0 text-right font-mono text-xs text-ink-faint">
-        <div>{repo.defaultBranch}</div>
-        <div>{dateFormatter.format(new Date(repo.updatedAt))}</div>
+      <div className="hidden shrink-0 text-right font-mono text-xs text-ink-faint sm:block">
+        <div className="text-ink-dim">{repo.defaultBranch}</div>
+        <div className="mt-1">{dateFormatter.format(new Date(repo.updatedAt))}</div>
       </div>
     </Link>
   );

@@ -8,13 +8,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-sm px-4.5 py-2.5 ' +
-  'text-sm font-semibold tracking-wide transition-colors duration-150 ' +
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-sm px-4.5 py-2.5 ' +
+  'text-sm font-semibold tracking-wide transition-[background-color,border-color,color,box-shadow,transform] duration-150 ' +
   'disabled:cursor-not-allowed disabled:opacity-45 active:not-disabled:translate-y-px';
 
 const variants: Record<Variant, string> = {
   primary:
-    'bg-accent text-accent-ink border border-accent hover:not-disabled:bg-accent-hover hover:not-disabled:border-accent-hover',
+    'bg-accent text-accent-ink border border-accent shadow-[0_6px_18px_oklch(38%_0.10_350_/_0.22)] hover:not-disabled:bg-accent-hover hover:not-disabled:border-accent-hover',
   secondary:
     'bg-transparent text-ink border border-border-strong hover:not-disabled:bg-surface-2 hover:not-disabled:border-ink-faint',
   ghost: 'bg-transparent text-ink-dim border border-transparent px-2 hover:not-disabled:text-ink',
