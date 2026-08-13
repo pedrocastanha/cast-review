@@ -1,6 +1,7 @@
 import pytest
 
 from app.graph.utils.loader import build_system_prompt, list_skills, load_prompt, summon
+from tests.llm_fakes import llm
 
 def test_load_prompt_reads_agent_markdown():
     prompt = load_prompt("implementation_spec")
@@ -43,7 +44,7 @@ async def test_implementation_spec_sends_prompt_and_summoned_skill(monkeypatch):
     async def fake_complete_json(*, system: str, user: str, model: str, api_key: str, **_kwargs):
         captured["system"] = system
         captured["user"] = user
-        return {"summary": "x", "newContracts": [], "businessRules": []}
+        return llm({"summary": "x", "newContracts": [], "businessRules": []})
 
     monkeypatch.setattr(
         "app.graph.agents.implementation_spec.agent.complete_json",

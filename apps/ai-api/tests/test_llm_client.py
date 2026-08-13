@@ -3,6 +3,7 @@ import json
 import pytest
 
 from app.infrastructure.llm.client import LlmError, complete_json, parse_json_object, sanitize_openai_error
+from app.infrastructure.llm.tokens import parse_openai_usage
 
 def test_parse_plain_object():
     assert parse_json_object('{"summary": "ok"}') == {"summary": "ok"}
@@ -49,8 +50,19 @@ async def test_complete_json_streams_openai_and_emits_deltas(monkeypatch):
             return None
 
         async def aiter_lines(self):
-            yield f"data: {json.dumps({'choices': [{'delta': {'content': '{\"ok\":'}}]})}"
-            yield f"data: {json.dumps({'choices': [{'delta': {'content': ' true}'}}]})}"
+            yield "data: " + json.dumps({"choices": [{"delta": {"content": '{"ok":'}}]})
+            yield "data: " + json.dumps({"choices": [{"delta": {"content": " true}"}}]})
+            yield "data: " + json.dumps(
+                {
+                    "choices": [],
+                    "usage": {
+                        "prompt_tokens": 10,
+                        "completion_tokens": 4,
+                        "total_tokens": 14,
+                        "prompt_tokens_details": {"cached_tokens": 3},
+                    },
+                }
+            )
             yield "data: [DONE]"
 
     class FakeClient:
@@ -86,11 +98,16 @@ async def test_complete_json_streams_openai_and_emits_deltas(monkeypatch):
         on_delta=collect,
     )
 
-    assert result == {"ok": True}
+    assert result.data == {"ok": True}
+    assert result.usage.prompt_tokens == 10
+    assert result.usage.cached_tokens == 3
+    assert result.usage.completion_tokens == 4
+    assert result.usage.source == "openai"
     assert "".join(deltas) == '{"ok": true}'
     assert captured["url"] == "https://api.openai.com/v1/chat/completions"
     assert captured["headers"]["authorization"] == "Bearer sk-test"
     assert captured["json"]["stream"] is True
+    assert captured["json"]["stream_options"] == {"include_usage": True}
     assert captured["json"]["max_tokens"] == 4096
 
 @pytest.mark.asyncio
@@ -107,7 +124,7 @@ async def test_gpt5_uses_max_completion_tokens(monkeypatch):
             return None
 
         async def aiter_lines(self):
-            yield f"data: {json.dumps({'choices': [{'delta': {'content': '{\"ok\": true}'}}]})}"
+            yield "data: " + json.dumps({"choices": [{"delta": {"content": '{"ok": true}'}}]})
             yield "data: [DONE]"
 
     class FakeClient:
@@ -128,3 +145,16 @@ async def test_gpt5_uses_max_completion_tokens(monkeypatch):
     await complete_json(system="json", user="x", model="gpt-5", api_key="sk-test")
     assert "max_completion_tokens" in captured["json"]
     assert "max_tokens" not in captured["json"]
+
+
+def test_parse_openai_usage_clamps_cache_and_missing_is_zero():
+    usage = parse_openai_usage(
+        {
+            "prompt_tokens": 10,
+            "completion_tokens": 2,
+            "total_tokens": 12,
+            "prompt_tokens_details": {"cached_tokens": 99},
+        }
+    )
+    assert usage.cached_tokens == 10
+    assert parse_openai_usage(None).source == "missing"
