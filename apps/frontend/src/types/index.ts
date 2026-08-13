@@ -6,6 +6,7 @@ export interface User {
   active: boolean;
   githubConnected: boolean;
   githubLogin: string | null;
+  githubTokenLastFour: string | null;
   createdAt: string;
   updatedAt: string;
 }
