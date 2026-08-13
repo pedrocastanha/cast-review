@@ -55,6 +55,7 @@ export class UserService extends BaseService {
       }
 
       patch.githubToken = token;
+      patch.githubTokenLastFour = token.slice(-4);
       patch.githubLogin = await this.validateGithubToken(token);
     }
 
@@ -75,7 +76,11 @@ export class UserService extends BaseService {
 
   async removeGithubToken(id: string): Promise<UserResponseDto> {
     const result = await this.safeExecute(() =>
-      this.userRepository.update(id, { githubToken: null, githubLogin: null }),
+      this.userRepository.update(id, {
+        githubToken: null,
+        githubTokenLastFour: null,
+        githubLogin: null,
+      }),
     );
 
     if (!result.affected) {
@@ -128,7 +133,20 @@ export class UserService extends BaseService {
   }
 
   async getByIdOrFail(id: string): Promise<UserResponseDto> {
-    const user = await this.getById(id);
+    const user = await this.userRepository.findOne({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        username: true,
+        active: true,
+        githubLogin: true,
+        githubTokenLastFour: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     if (!user) {
       throw new NotFoundException('Usuário não encontrado');

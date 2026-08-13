@@ -48,6 +48,15 @@ export class User extends DefaultEntity<User> {
   githubToken: string | null;
 
   @Column({
+    name: 'github_token_last_four',
+    type: 'varchar',
+    length: 4,
+    nullable: true,
+  })
+  @IsOptional()
+  githubTokenLastFour: string | null;
+
+  @Column({
     name: 'github_login',
     type: 'varchar',
     nullable: true,
