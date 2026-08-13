@@ -32,6 +32,8 @@ export interface ReviewComment extends ReviewFinding {
   reviewer: string;
 }
 
+export type ReviewVerdict = 'approve' | 'comment' | 'request_changes';
+
 export interface AnalysisReview {
   changeAnalysis?: ChangeAnalysis;
   prd?: Record<string, unknown> | null;
@@ -39,6 +41,12 @@ export interface AnalysisReview {
   results: ReviewResult[];
   comments: ReviewComment[];
   markdown?: string;
+  verdict?: ReviewVerdict;
+  overallScore?: number;
+  failCount?: number;
+  warningCount?: number;
+  headline?: string;
+  conventionsSource?: 'repo' | 'default';
 }
 
 export interface AnalysisRecord {

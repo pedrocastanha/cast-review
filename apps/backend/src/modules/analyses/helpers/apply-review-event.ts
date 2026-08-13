@@ -61,6 +61,24 @@ export function applyReviewEvent(
       if (isRecord(payload.changeAnalysis)) {
         next.changeAnalysis = normalizeChangeAnalysis(payload.changeAnalysis);
       }
+      if (payload.verdict === 'approve' || payload.verdict === 'comment' || payload.verdict === 'request_changes') {
+        next.verdict = payload.verdict;
+      }
+      if (typeof payload.overallScore === 'number') {
+        next.overallScore = payload.overallScore;
+      }
+      if (typeof payload.failCount === 'number') {
+        next.failCount = payload.failCount;
+      }
+      if (typeof payload.warningCount === 'number') {
+        next.warningCount = payload.warningCount;
+      }
+      if (typeof payload.headline === 'string') {
+        next.headline = payload.headline;
+      }
+      if (payload.conventionsSource === 'repo' || payload.conventionsSource === 'default') {
+        next.conventionsSource = payload.conventionsSource;
+      }
       break;
     default:
       return current;
@@ -97,6 +115,18 @@ export function hydrateReview(
     results,
     comments,
     markdown: typeof raw.markdown === 'string' ? raw.markdown : undefined,
+    verdict:
+      raw.verdict === 'approve' || raw.verdict === 'comment' || raw.verdict === 'request_changes'
+        ? raw.verdict
+        : undefined,
+    overallScore: typeof raw.overallScore === 'number' ? raw.overallScore : undefined,
+    failCount: typeof raw.failCount === 'number' ? raw.failCount : undefined,
+    warningCount: typeof raw.warningCount === 'number' ? raw.warningCount : undefined,
+    headline: typeof raw.headline === 'string' ? raw.headline : undefined,
+    conventionsSource:
+      raw.conventionsSource === 'repo' || raw.conventionsSource === 'default'
+        ? raw.conventionsSource
+        : undefined,
   };
 }
 
