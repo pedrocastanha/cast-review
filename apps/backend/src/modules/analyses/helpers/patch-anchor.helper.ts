@@ -72,3 +72,14 @@ export function resolveAnchor(
 
   return { path: file.filename, line: anchored };
 }
+
+/** Primeiro arquivo da PR com hunk RIGHT — usado quando o finding não trouxe path. */
+export function fallbackAnchor(files: PullFileForAnchor[]): ResolvedAnchor | null {
+  for (const file of files) {
+    if (file.status === 'removed' || !file.patch?.trim()) continue;
+    const rights = rightSideLines(file.patch);
+    if (rights.length === 0) continue;
+    return { path: file.filename, line: rights[0] };
+  }
+  return null;
+}

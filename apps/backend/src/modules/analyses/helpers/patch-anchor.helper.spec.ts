@@ -1,4 +1,4 @@
-import { resolveAnchor, rightSideLines } from './patch-anchor.helper';
+import { fallbackAnchor, resolveAnchor, rightSideLines } from './patch-anchor.helper';
 
 const SAMPLE_PATCH = `@@ -10,4 +10,5 @@ export function foo() {
      const a = 1
@@ -60,5 +60,11 @@ describe('resolveAnchor', () => {
 
   it('recusa path com parent directory', () => {
     expect(resolveAnchor('../secret.ts', 1, files)).toBeNull();
+  });
+});
+
+describe('fallbackAnchor', () => {
+  it('pega o primeiro arquivo com hunk RIGHT', () => {
+    expect(fallbackAnchor(files)).toEqual({ path: 'src/foo.ts', line: 10 });
   });
 });

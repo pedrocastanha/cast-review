@@ -4,6 +4,7 @@ import type {
   ReviewFinding,
 } from '../analyses.types';
 import {
+  fallbackAnchor,
   type PullFileForAnchor,
   type ResolvedAnchor,
   resolveAnchor,
@@ -105,12 +106,9 @@ export function planInlineComments(
   let skipped = 0;
 
   for (const finding of actionable) {
-    const anchor = resolveAnchor(
-      finding.path,
-      finding.line,
-      files,
-      finding.endLine,
-    );
+    const anchor =
+      resolveAnchor(finding.path, finding.line, files, finding.endLine) ??
+      (finding.path ? null : fallbackAnchor(files));
     if (!anchor) {
       skipped += 1;
       continue;

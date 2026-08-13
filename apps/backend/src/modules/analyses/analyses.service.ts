@@ -180,9 +180,17 @@ export class AnalysesService extends BaseService {
               currentUser,
               owner,
             });
-            review = applyReviewEvent(review, 'github_comments_done', github);
+            const githubPayload = { ...github } as Record<string, unknown>;
+            review = applyReviewEvent(
+              review,
+              'github_comments_done',
+              githubPayload,
+            );
             await persistReview();
-            writeEvent({ type: 'github_comments_done', payload: github });
+            writeEvent({
+              type: 'github_comments_done',
+              payload: githubPayload,
+            });
             continue;
           }
           await persistReview();

@@ -96,7 +96,7 @@ describe('planInlineComments', () => {
     expect(comments[0].body).toContain('porta fina');
   });
 
-  it('pula finding sem path ou fora da PR', () => {
+  it('finding sem path cai no primeiro arquivo da PR; path errado é skip', () => {
     const { comments, skipped } = planInlineComments(
       'an-1',
       review({
@@ -119,8 +119,9 @@ describe('planInlineComments', () => {
       }),
       files,
     );
-    expect(comments).toHaveLength(0);
-    expect(skipped).toBe(2);
+    expect(comments).toHaveLength(1);
+    expect(comments[0].path).toBe('src/a.ts');
+    expect(skipped).toBe(1);
   });
 
   it('dedupa o mesmo path+line e limita a 20', () => {
