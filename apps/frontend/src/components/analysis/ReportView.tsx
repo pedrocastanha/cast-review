@@ -150,7 +150,9 @@ const VERDICT_TONE = {
   request_changes: 'border-state-closed text-state-closed',
 } as const;
 
-export function ReportView({ report }: { report: ReportPayload }) {
+type ReportFocus = 'all' | 'prd' | 'spec' | 'test' | 'architecture' | 'comments';
+
+export function ReportView({ report, focus = 'all' }: { report: ReportPayload; focus?: ReportFocus }) {
   const results = report.results ?? [];
   const comments: ReviewComment[] = (
     report.comments?.length
@@ -165,11 +167,17 @@ export function ReportView({ report }: { report: ReportPayload }) {
   const files = report.changeAnalysis?.files ?? [];
   const visibleFiles = files.slice(0, 12);
   const hiddenFiles = Math.max(0, files.length - visibleFiles.length);
-  const actionable = comments.filter((item) => item.status !== 'pass');
+  const visibleResults = results.filter((result) =>
+    focus === 'test' ? result.name.toLowerCase().includes('test') : focus === 'architecture' ? result.name.toLowerCase().includes('architecture') : true,
+  );
+  const visibleComments = comments.filter((item) =>
+    focus === 'test' ? item.reviewer.toLowerCase().includes('test') : focus === 'architecture' ? item.reviewer.toLowerCase().includes('architecture') : true,
+  );
+  const visibleActionable = visibleComments.filter((item) => item.status !== 'pass');
 
   return (
     <div className="flex flex-col gap-8">
-      {(report.verdict || report.overallScore !== undefined) && (
+      {focus === 'all' && (report.verdict || report.overallScore !== undefined) && (
         <section className={`rounded-sm border px-4 py-4 ${report.verdict ? VERDICT_TONE[report.verdict] : 'border-border'}`}>
           <p className="font-mono text-[10px] tracking-wider uppercase">Veredito</p>
           <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
@@ -201,7 +209,7 @@ export function ReportView({ report }: { report: ReportPayload }) {
         </section>
       )}
 
-      {report.changeAnalysis && (
+      {focus === 'all' && report.changeAnalysis && (
         <section>
           <h3 className="mb-2 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
             Mudanças
@@ -234,9 +242,9 @@ export function ReportView({ report }: { report: ReportPayload }) {
         </section>
       )}
 
-      {results.length > 0 && (
+      {visibleResults.length > 0 && (focus === 'all' || focus === 'test' || focus === 'architecture') && (
         <div className="grid grid-cols-2 gap-3">
-          {results.map((result) => (
+          {visibleResults.map((result) => (
             <div key={result.name} className="rounded-sm border border-border px-4 py-3">
               <p className="font-mono text-[10px] tracking-wider text-ink-faint uppercase">
                 {reviewerLabel(result.name)}
@@ -249,7 +257,7 @@ export function ReportView({ report }: { report: ReportPayload }) {
         </div>
       )}
 
-      {report.usage && report.usage.steps.length > 0 && (
+      {focus === 'all' && report.usage && report.usage.steps.length > 0 && (
         <section>
           <h3 className="mb-2 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
             Custo por etapa
@@ -277,29 +285,29 @@ export function ReportView({ report }: { report: ReportPayload }) {
         </section>
       )}
 
-      {report.prd && <PrdBlock prd={report.prd} />}
-      {report.spec && <SpecBlock spec={report.spec} />}
+      {(focus === 'all' || focus === 'prd') && report.prd && <PrdBlock prd={report.prd} />}
+      {(focus === 'all' || focus === 'spec') && report.spec && <SpecBlock spec={report.spec} />}
 
-      {actionable.length > 0 && (
+      {(focus === 'all' || focus === 'comments' || focus === 'test' || focus === 'architecture') && visibleActionable.length > 0 && (
         <section>
           <h3 className="mb-2 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
             O que precisa de atenção
           </h3>
           <ul>
-            {actionable.map((comment, index) => (
+            {visibleActionable.map((comment, index) => (
               <CommentRow key={`${comment.reviewer}-${comment.title}-${index}`} comment={comment} />
             ))}
           </ul>
         </section>
       )}
 
-      {comments.some((item) => item.status === 'pass') && (
+      {(focus === 'all' || focus === 'comments' || focus === 'test' || focus === 'architecture') && visibleComments.some((item) => item.status === 'pass') && (
         <section>
           <h3 className="mb-2 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
             O que passou
           </h3>
           <ul>
-            {comments
+            {visibleComments
               .filter((item) => item.status === 'pass')
               .map((comment, index) => (
                 <CommentRow key={`pass-${comment.reviewer}-${comment.title}-${index}`} comment={comment} />
@@ -308,7 +316,7 @@ export function ReportView({ report }: { report: ReportPayload }) {
         </section>
       )}
 
-      {report.markdown && <ReportMarkdown markdown={report.markdown} />}
+      {focus === 'all' && report.markdown && <ReportMarkdown markdown={report.markdown} />}
     </div>
   );
 }
