@@ -1,0 +1,62 @@
+from app.config.settings import MAX_PROMPT_FILE_CHARS
+from app.graph.utils.files import files_block, prd_block
+from app.graph.utils.findings import normalize_findings, review_payload
+from app.graph.utils.loader import build_system_prompt
+from app.graph.state import GraphState
+from app.graph.thoughts import emit_thought
+from app.infrastructure.llm.client import complete_json
+
+async def run_architecture_reviewer(
+    *,
+    spec: dict,
+    changed_files: list[dict],
+    conventions: str,
+    model: str,
+    api_key: str,
+    prd: dict | None = None,
+    run_id: str | None = None,
+) -> dict:
+    if not conventions.strip():
+
+        return review_payload([])
+
+    system = build_system_prompt("architecture_reviewer", ["cite-convention"])
+    raw = await complete_json(
+        system=system,
+        user=_user_prompt(spec, changed_files, conventions, prd),
+        model=model,
+        api_key=api_key,
+        on_delta=lambda delta: emit_thought("architecture_reviewer", delta, run_id),
+    )
+    findings = [
+        finding
+        for finding in normalize_findings(raw.get("findings"))
+        if finding.convention_ref
+    ]
+    return review_payload(findings)
+
+async def node(state: GraphState) -> dict:
+    review = await run_architecture_reviewer(
+        spec=state["spec"],
+        changed_files=state["changed_files"],
+        conventions=state.get("conventions") or "",
+        model=state["models"]["architectureReviewer"],
+        api_key=state["api_keys"]["openai"],
+        prd=state.get("prd"),
+        run_id=state.get("run_id"),
+    )
+    return {"architecture_review": review}
+
+def _user_prompt(
+    spec: dict,
+    changed_files: list[dict],
+    conventions: str,
+    prd: dict | None,
+) -> str:
+    prefix = prd_block(prd)
+    head = f"{prefix}\n\n" if prefix else ""
+    return (
+        f"{head}spec:\n{spec}\n\n"
+        f"conventions.md:\n{conventions[:MAX_PROMPT_FILE_CHARS]}\n\n"
+        f"changed files:\n{files_block(changed_files)}"
+    )
