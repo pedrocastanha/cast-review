@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.graph.state import GraphState
+from app.graph.utils.usage import skipped_step
 
 TEST_DIR_MARKERS = ("/test/", "/tests/", "/__tests__/")
 TEST_NAME_MARKERS = (".test.", ".spec.", "_test.", "test_")
@@ -17,9 +18,9 @@ def analyze_changes(changed_files: list[dict], diff: str = "") -> dict:
     }
 
 async def node(state: GraphState) -> dict:
-    return {
-        "change_analysis": analyze_changes(state["changed_files"], state.get("diff", "")),
-    }
+    analysis = analyze_changes(state["changed_files"], state.get("diff", ""))
+    analysis["usage"] = skipped_step("change_analyzer")
+    return {"change_analysis": analysis}
 
 def _classify(path: str) -> dict:
     normalized = path.replace("\\", "/")

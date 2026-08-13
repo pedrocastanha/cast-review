@@ -2,6 +2,7 @@ from app.graph.state import GraphState
 from app.graph.thoughts import emit_thought
 from app.graph.utils.files import clip_diff, files_block
 from app.graph.utils.loader import build_system_prompt
+from app.graph.utils.usage import step_usage, without_usage
 from app.infrastructure.llm.client import complete_json
 
 async def generate_prd(
@@ -14,7 +15,7 @@ async def generate_prd(
     run_id: str | None = None,
 ) -> dict:
     system = build_system_prompt("prd", ["describe-shipped-change"])
-    raw = await complete_json(
+    result = await complete_json(
         system=system,
         user=(
             f"CHANGE_ANALYSIS:\n{change_analysis}\n\n"
@@ -25,6 +26,7 @@ async def generate_prd(
         api_key=api_key,
         on_delta=lambda delta: emit_thought("prd", delta, run_id),
     )
+    raw = result.data
     prd = {
         "title": str(raw.get("title") or "Mudança na PR").strip(),
         "problem": str(raw.get("problem") or "").strip(),
@@ -36,6 +38,7 @@ async def generate_prd(
     }
 
     prd["markdown"] = _to_markdown(prd)
+    prd["usage"] = step_usage("prd", model, result.usage)
     return prd
 
 async def node(state: GraphState) -> dict:
@@ -43,7 +46,7 @@ async def node(state: GraphState) -> dict:
     prd = await generate_prd(
         diff=state["diff"],
         changed_files=state["changed_files"],
-        change_analysis=state.get("change_analysis") or {},
+        change_analysis=without_usage(state.get("change_analysis") or {}),
         model=state["models"]["testReviewer"],
         api_key=state["api_keys"]["openai"],
         run_id=state.get("run_id"),

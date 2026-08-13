@@ -7,6 +7,7 @@ import { AnalysisStatusBadge } from '../components/analysis/AnalysisStatusBadge'
 import { ReportView } from '../components/analysis/ReportView';
 import { ThoughtLog } from '../components/analysis/ThoughtLog';
 import { Spinner } from '../components/ui/Spinner';
+import { formatUsageHeadline } from '../lib/format-usage';
 import type { AnalysisRecord } from '../types';
 
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
@@ -103,6 +104,15 @@ export function AnalysisRecordPage() {
                 <dt className="text-ink-faint">Modelos</dt>
                 <dd className="mt-0.5 text-ink">
                   {record.models.testReviewer} · {record.models.architectureReviewer}
+                </dd>
+              </div>
+            )}
+            {record.report?.usage && (
+              <div className="col-span-2">
+                <dt className="text-ink-faint">Custo</dt>
+                <dd className="mt-0.5 text-ink tabular-nums">
+                  {formatUsageHeadline(record.report.usage)}
+                  {record.status === 'error' && !record.report.usage.costComplete && ' · parcial'}
                 </dd>
               </div>
             )}

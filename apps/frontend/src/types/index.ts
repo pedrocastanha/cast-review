@@ -142,6 +142,41 @@ export interface SpecPayload {
 
 export type ReviewVerdict = 'approve' | 'comment' | 'request_changes';
 
+export type UsageSource = 'openai' | 'missing';
+
+export type UsageStepName =
+  | 'change_analyzer'
+  | 'prd'
+  | 'implementation_spec'
+  | 'test_reviewer'
+  | 'architecture_reviewer'
+  | 'report_builder';
+
+export interface StepUsage {
+  step: UsageStepName;
+  label: string;
+  model: string | null;
+  promptTokens: number;
+  cachedTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costUsd: number | null;
+  skipped: boolean;
+  source: UsageSource;
+}
+
+export interface AnalysisUsage {
+  currency: 'USD';
+  promptTokens: number;
+  cachedTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costUsd: number | null;
+  costComplete: boolean;
+  pricingAsOf: string;
+  steps: StepUsage[];
+}
+
 export interface ReportPayload {
   changeAnalysis?: ChangeAnalysis;
   prd?: PrdPayload | null;
@@ -155,6 +190,7 @@ export interface ReportPayload {
   warningCount?: number;
   headline?: string;
   conventionsSource?: 'repo' | 'default';
+  usage?: AnalysisUsage;
 }
 
 export type AnalysisStatus = 'running' | 'completed' | 'error';

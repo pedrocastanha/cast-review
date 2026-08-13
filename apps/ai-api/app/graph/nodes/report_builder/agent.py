@@ -1,5 +1,6 @@
 from app.graph.state import GraphState
 from app.graph.utils.conventions import resolve_conventions
+from app.graph.utils.usage import aggregate_usage, collect_steps_from_state, without_usage
 from app.graph.utils.verdict import decide_verdict
 
 VERDICT_LABEL = {
@@ -14,25 +15,30 @@ def build_report(
     results: list[dict],
     prd: dict | None = None,
     conventions_source: str = "repo",
+    usage: dict | None = None,
 ) -> dict:
     decision = decide_verdict(results)
-    headline = (prd or {}).get("title") or spec.get("summary") or "Review da PR"
+    clean_prd = without_usage(prd) if prd else None
+    clean_spec = without_usage(spec)
+    clean_results = [without_usage(item) for item in results]
+    headline = (clean_prd or {}).get("title") or clean_spec.get("summary") or "Review da PR"
     lines = [
         "# Relatório Cast Review",
         "",
         f"**Veredito:** {VERDICT_LABEL.get(decision['verdict'], decision['verdict'])}",
         f"**Nota geral:** {decision['overallScore']}",
         f"**Convenções:** {'do repositório' if conventions_source == 'repo' else 'padrão Cast Review'}",
+        *_cost_lines(usage),
         "",
     ]
 
-    if prd:
+    if clean_prd:
         lines.extend(
             [
                 "## PRD",
-                prd.get("title") or "_sem título_",
+                clean_prd.get("title") or "_sem título_",
                 "",
-                prd.get("whatChanged") or prd.get("problem") or "_sem resumo_",
+                clean_prd.get("whatChanged") or clean_prd.get("problem") or "_sem resumo_",
                 "",
             ]
         )
@@ -40,13 +46,13 @@ def build_report(
     lines.extend(
         [
             "## Implementation Spec",
-            spec.get("summary") or "_sem summary_",
+            clean_spec.get("summary") or "_sem summary_",
             "",
             "### Contratos novos",
-            *([f"- {item}" for item in spec.get("newContracts") or []] or ["- nenhum"]),
+            *([f"- {item}" for item in clean_spec.get("newContracts") or []] or ["- nenhum"]),
             "",
             "### Regras de negócio",
-            *([f"- {item}" for item in spec.get("businessRules") or []] or ["- nenhuma"]),
+            *([f"- {item}" for item in clean_spec.get("businessRules") or []] or ["- nenhuma"]),
             "",
             "## Reviewers",
         ]
@@ -69,10 +75,10 @@ def build_report(
             )
         lines.append("")
 
-    return {
-        "prd": prd,
-        "spec": spec,
-        "results": results,
+    report = {
+        "prd": clean_prd,
+        "spec": clean_spec,
+        "results": clean_results,
         "verdict": decision["verdict"],
         "overallScore": decision["overallScore"],
         "failCount": decision["failCount"],
@@ -81,6 +87,23 @@ def build_report(
         "conventionsSource": conventions_source,
         "markdown": "\n".join(lines).strip() + "\n",
     }
+    if usage:
+        report["usage"] = usage
+    return report
+
+
+def _cost_lines(usage: dict | None) -> list[str]:
+    if not usage:
+        return []
+    tokens = int(usage.get("totalTokens") or 0)
+    billed = sum(1 for step in usage.get("steps") or [] if not step.get("skipped"))
+    if usage.get("costComplete") and isinstance(usage.get("costUsd"), (int, float)):
+        cost = f"${float(usage['costUsd']):.4f}"
+    else:
+        cost = "preço não tabelado"
+    return [
+        f"**Custo:** {cost} · {tokens} tokens · {billed} etapa(s) com LLM",
+    ]
 
 
 async def node(state: GraphState) -> dict:
@@ -89,4 +112,7 @@ async def node(state: GraphState) -> dict:
         {"name": "architecture_reviewer", **state["architecture_review"]},
     ]
     _text, source = resolve_conventions(state.get("conventions") or "")
-    return {"report": build_report(state["spec"], results, state.get("prd"), source)}
+    usage = aggregate_usage(collect_steps_from_state(state))
+    return {
+        "report": build_report(state["spec"], results, state.get("prd"), source, usage),
+    }

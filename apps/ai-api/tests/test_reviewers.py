@@ -3,6 +3,7 @@ import pytest
 from app.graph.agents.architecture_reviewer import run_architecture_reviewer
 from app.graph.nodes.report_builder import build_report
 from app.graph.agents.test_reviewer import run_test_reviewer
+from tests.llm_fakes import llm
 
 @pytest.mark.asyncio
 async def test_no_tests_fails_every_business_rule_without_llm(monkeypatch):
@@ -27,6 +28,7 @@ async def test_no_tests_fails_every_business_rule_without_llm(monkeypatch):
         "arredonda half-up",
     }
     assert all(item["status"] == "fail" for item in result["findings"])
+    assert result["usage"]["skipped"] is True
 
 @pytest.mark.asyncio
 async def test_empty_rules_scores_100_without_llm(monkeypatch):
@@ -44,21 +46,25 @@ async def test_empty_rules_scores_100_without_llm(monkeypatch):
         model="gpt-4o",
         api_key="sk-test",
     )
-    assert result == {"score": 100, "findings": []}
+    assert result["score"] == 100
+    assert result["findings"] == []
+    assert result["usage"]["skipped"] is True
 
 @pytest.mark.asyncio
 async def test_covers_rules_the_llm_forgot(monkeypatch):
     async def fake_llm(**kwargs):
-        return {
-            "findings": [
-                {
-                    "status": "pass",
-                    "title": "ok",
-                    "detail": "tem teste",
-                    "businessRule": "cobra juros",
-                }
-            ]
-        }
+        return llm(
+            {
+                "findings": [
+                    {
+                        "status": "pass",
+                        "title": "ok",
+                        "detail": "tem teste",
+                        "businessRule": "cobra juros",
+                    }
+                ]
+            }
+        )
 
     monkeypatch.setattr(
         "app.graph.agents.test_reviewer.agent.complete_json",
@@ -83,16 +89,18 @@ async def test_empty_conventions_uses_default_and_calls_llm(monkeypatch):
 
     async def fake_llm(**kwargs):
         captured["user"] = kwargs["user"]
-        return {
-            "findings": [
-                {
-                    "status": "warning",
-                    "title": "controller gordo",
-                    "detail": "validação no controller",
-                    "conventionRef": "Controller HTTP é porta fina",
-                }
-            ]
-        }
+        return llm(
+            {
+                "findings": [
+                    {
+                        "status": "warning",
+                        "title": "controller gordo",
+                        "detail": "validação no controller",
+                        "conventionRef": "Controller HTTP é porta fina",
+                    }
+                ]
+            }
+        )
 
     monkeypatch.setattr(
         "app.graph.agents.architecture_reviewer.agent.complete_json",
@@ -115,21 +123,23 @@ async def test_empty_conventions_uses_default_and_calls_llm(monkeypatch):
 @pytest.mark.asyncio
 async def test_architecture_drops_findings_without_convention_ref(monkeypatch):
     async def fake_llm(**kwargs):
-        return {
-            "findings": [
-                {
-                    "status": "fail",
-                    "title": "float",
-                    "detail": "usou float",
-                    "conventionRef": "nunca usar float para dinheiro",
-                },
-                {
-                    "status": "warning",
-                    "title": "opinião",
-                    "detail": "eu não gostei do nome",
-                },
-            ]
-        }
+        return llm(
+            {
+                "findings": [
+                    {
+                        "status": "fail",
+                        "title": "float",
+                        "detail": "usou float",
+                        "conventionRef": "nunca usar float para dinheiro",
+                    },
+                    {
+                        "status": "warning",
+                        "title": "opinião",
+                        "detail": "eu não gostei do nome",
+                    },
+                ]
+            }
+        )
 
     monkeypatch.setattr(
         "app.graph.agents.architecture_reviewer.agent.complete_json",

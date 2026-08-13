@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.infrastructure.llm.client import LlmError
 from app.main import app
+from tests.llm_fakes import llm
 
 def _payload(**overrides):
     body = {
@@ -52,22 +53,30 @@ def test_run_emits_pipeline_events_with_mocked_llm(monkeypatch):
         assert api_key == "sk-test"
         assert model == "gpt-4o"
         if "Product Requirements" in system or "PRD Writer" in system:
-            return {
-                "title": "Exporta x",
-                "problem": "faltava o export",
-                "whatChanged": "adiciona x",
-                "goals": ["exportar x"],
-                "nonGoals": [],
-                "userImpact": "importar x",
-                "constraints": [],
-            }
+            return llm(
+                {
+                    "title": "Exporta x",
+                    "problem": "faltava o export",
+                    "whatChanged": "adiciona x",
+                    "goals": ["exportar x"],
+                    "nonGoals": [],
+                    "userImpact": "importar x",
+                    "constraints": [],
+                },
+                prompt=100,
+                completion=20,
+            )
         if "Architecture Reviewer" in system:
-            return {"findings": []}
-        return {
-            "summary": "adiciona x",
-            "newContracts": ["x"],
-            "businessRules": ["exporta x"],
-        }
+            return llm({"findings": []}, prompt=80, completion=10)
+        return llm(
+            {
+                "summary": "adiciona x",
+                "newContracts": ["x"],
+                "businessRules": ["exporta x"],
+            },
+            prompt=60,
+            completion=15,
+        )
 
     monkeypatch.setattr(
         "app.graph.agents.prd.agent.complete_json",
@@ -122,6 +131,27 @@ def test_run_emits_pipeline_events_with_mocked_llm(monkeypatch):
     assert report["conventionsSource"] == "default"
     assert "Relatório Cast Review" in report["markdown"]
     assert "Exporta x" in report["markdown"]
+
+    usage = report["usage"]
+    steps = {item["step"]: item for item in usage["steps"]}
+    assert set(steps) == {
+        "change_analyzer",
+        "prd",
+        "implementation_spec",
+        "test_reviewer",
+        "architecture_reviewer",
+        "report_builder",
+    }
+    assert steps["change_analyzer"]["skipped"] is True
+    assert steps["test_reviewer"]["skipped"] is True
+    assert steps["report_builder"]["skipped"] is True
+    assert steps["prd"]["promptTokens"] == 100
+    assert steps["implementation_spec"]["promptTokens"] == 60
+    assert steps["architecture_reviewer"]["promptTokens"] == 80
+    assert usage["promptTokens"] == 240
+    assert usage["completionTokens"] == 45
+    assert usage["costComplete"] is True
+    assert "Custo:" in report["markdown"]
 
 def test_llm_failure_emits_error_and_stops(monkeypatch):
     async def boom(**kwargs):

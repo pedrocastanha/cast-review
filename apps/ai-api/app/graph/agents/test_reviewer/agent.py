@@ -5,6 +5,7 @@ from app.graph.utils.loader import build_system_prompt
 from app.graph.state import GraphState
 from app.domain.agents.entities import Finding
 from app.graph.thoughts import emit_thought
+from app.graph.utils.usage import skipped_step, step_usage
 from app.infrastructure.llm.client import complete_json
 
 async def run_test_reviewer(
@@ -20,23 +21,28 @@ async def run_test_reviewer(
     analysis = analyze_changes(changed_files)
 
     if not business_rules:
-        return review_payload([])
+        payload = review_payload([])
+        payload["usage"] = skipped_step("test_reviewer")
+        return payload
 
     if not analysis["hasTests"]:
-
-        return review_payload([_missing_test(rule) for rule in business_rules])
+        payload = review_payload([_missing_test(rule) for rule in business_rules])
+        payload["usage"] = skipped_step("test_reviewer")
+        return payload
 
     system = build_system_prompt("test_reviewer", ["map-rule-to-test"])
-    raw = await complete_json(
+    result = await complete_json(
         system=system,
         user=_user_prompt(business_rules, changed_files, prd),
         model=model,
         api_key=api_key,
         on_delta=lambda delta: emit_thought("test_reviewer", delta, run_id),
     )
-    findings = normalize_findings(raw.get("findings"))
+    findings = normalize_findings(result.data.get("findings"))
     findings = _ensure_every_rule_covered(business_rules, findings)
-    return review_payload(findings)
+    payload = review_payload(findings)
+    payload["usage"] = step_usage("test_reviewer", model, result.usage)
+    return payload
 
 async def node(state: GraphState) -> dict:
     review = await run_test_reviewer(
