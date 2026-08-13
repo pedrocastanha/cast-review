@@ -29,6 +29,8 @@ async def test_no_tests_fails_every_business_rule_without_llm(monkeypatch):
     }
     assert all(item["status"] == "fail" for item in result["findings"])
     assert result["usage"]["skipped"] is True
+    assert all(item["path"] == "src/interest.ts" for item in result["findings"])
+    assert all(item["line"] == 1 for item in result["findings"])
 
 @pytest.mark.asyncio
 async def test_empty_rules_scores_100_without_llm(monkeypatch):

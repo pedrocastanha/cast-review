@@ -2,6 +2,7 @@ import type {
   AnalysisReview,
   AnalysisUsage,
   ChangeAnalysis,
+  GithubCommentsResult,
   ReviewComment,
   ReviewFinding,
   ReviewResult,
@@ -98,6 +99,9 @@ export function applyReviewEvent(
         next.usage = payload.usage;
       }
       break;
+    case 'github_comments_done':
+      next.githubComments = normalizeGithubComments(payload);
+      break;
     default:
       return current;
   }
@@ -150,6 +154,7 @@ export function hydrateReview(
         ? raw.conventionsSource
         : undefined,
     usage: isAnalysisUsage(raw.usage) ? raw.usage : undefined,
+    githubComments: normalizeGithubComments(raw.githubComments),
   };
 }
 
@@ -226,6 +231,9 @@ function normalizeFinding(value: unknown): ReviewFinding | null {
     detail: typeof value.detail === 'string' ? value.detail : '',
     businessRule: optionalString(value.businessRule ?? value.business_rule),
     conventionRef: optionalString(value.conventionRef ?? value.convention_ref),
+    path: optionalString(value.path),
+    line: asCount(value.line) || undefined,
+    endLine: asCount(value.endLine ?? value.end_line) || undefined,
   };
 }
 
@@ -344,4 +352,27 @@ function asCount(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? value
     : 0;
+}
+
+function normalizeGithubComments(
+  value: unknown,
+): GithubCommentsResult | undefined {
+  if (!isRecord(value)) return undefined;
+  if (
+    value.status !== 'posted' &&
+    value.status !== 'empty' &&
+    value.status !== 'error'
+  ) {
+    return undefined;
+  }
+  return {
+    status: value.status,
+    posted: asCount(value.posted),
+    skipped: asCount(value.skipped),
+    reviewId: typeof value.reviewId === 'number' ? value.reviewId : null,
+    htmlUrl: isNonEmptyString(value.htmlUrl) ? value.htmlUrl : null,
+    errorMessage: isNonEmptyString(value.errorMessage)
+      ? value.errorMessage
+      : null,
+  };
 }

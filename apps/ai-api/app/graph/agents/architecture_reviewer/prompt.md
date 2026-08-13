@@ -20,7 +20,10 @@ origem das convenções (repo ou padrão).
       "status": "fail | warning | pass",
       "title": "título curto em português",
       "detail": "por que viola ou atende, com arquivo se possível",
-      "conventionRef": "citação exata da convenção"
+      "conventionRef": "citação exata da convenção",
+      "path": "arquivo da PR (obrigatório em fail/warning)",
+      "line": 24,
+      "endLine": 31
     }
   ]
 }
@@ -34,3 +37,4 @@ origem das convenções (repo ou padrão).
 - Não invente convenção que não está no texto recebido.
 - Se o repo não tem conventions.md, as convenções padrão ainda valem — não devolva lista vazia só porque a origem é "padrão".
 - Prefira fail/warning reais a encher de pass.
+- Em fail/warning: `path` + `line` (1-based no arquivo novo da PR). `endLine` só se o trecho for contínuo. Sem path o finding fica no relatório e não vai ao GitHub.

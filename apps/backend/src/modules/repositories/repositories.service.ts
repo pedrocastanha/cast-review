@@ -21,7 +21,7 @@ type GithubPull = {
   updated_at: string;
   html_url: string;
   draft?: boolean;
-  head: { ref: string };
+  head: { ref: string; sha: string };
   base: { ref: string };
 };
 
@@ -287,7 +287,130 @@ export class RepositoriesService extends BaseService {
       htmlUrl: pull.html_url,
       draft: pull.draft ?? false,
       headRef: pull.head.ref,
+      headSha: pull.head.sha,
       baseRef: pull.base.ref,
     };
+  }
+
+  /** SHA da head no momento da chamada — createReview exige commit_id fresco. */
+  async getPullHeadSha(
+    repo: string,
+    pullNumber: number,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ): Promise<string> {
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
+
+    try {
+      const { data } = await session.octokit.pulls.get({
+        owner,
+        repo,
+        pull_number: pullNumber,
+      });
+      return data.head.sha;
+    } catch (err) {
+      this.handleGithubError(err);
+    }
+  }
+
+  async createPullReview(
+    repo: string,
+    pullNumber: number,
+    input: {
+      commitId: string;
+      body: string;
+      comments: {
+        path: string;
+        line: number;
+        startLine?: number;
+        body: string;
+      }[];
+    },
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ): Promise<{ id: number; htmlUrl: string | null }> {
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
+
+    try {
+      const { data } = await session.octokit.pulls.createReview({
+        owner,
+        repo,
+        pull_number: pullNumber,
+        commit_id: input.commitId,
+        event: 'COMMENT',
+        body: input.body,
+        ...(input.comments.length > 0
+          ? {
+              comments: input.comments.map((comment) => ({
+                path: comment.path,
+                body: comment.body,
+                line: comment.line,
+                side: 'RIGHT' as const,
+                ...(comment.startLine
+                  ? {
+                      start_line: comment.startLine,
+                      start_side: 'RIGHT' as const,
+                    }
+                  : {}),
+              })),
+            }
+          : {}),
+      });
+
+      return { id: data.id, htmlUrl: data.html_url ?? null };
+    } catch (err) {
+      this.handleGithubError(err);
+    }
+  }
+
+  async listPullReviewComments(
+    repo: string,
+    pullNumber: number,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ) {
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
+
+    try {
+      const comments = await session.octokit.paginate(
+        session.octokit.pulls.listReviewComments,
+        { owner, repo, pull_number: pullNumber, per_page: 100 },
+      );
+      return comments.map((comment) => ({
+        id: comment.id,
+        body: comment.body,
+        user: comment.user?.login ?? null,
+      }));
+    } catch (err) {
+      this.handleGithubError(err);
+    }
+  }
+
+  async deletePullReviewComment(
+    repo: string,
+    commentId: number,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ) {
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
+
+    try {
+      await session.octokit.pulls.deleteReviewComment({
+        owner,
+        repo,
+        comment_id: commentId,
+      });
+    } catch (err) {
+      this.handleGithubError(err);
+    }
+  }
+
+  async loginFor(currentUser: CurrentUserData): Promise<string> {
+    const session = await this.session(currentUser);
+    return session.owner;
   }
 }

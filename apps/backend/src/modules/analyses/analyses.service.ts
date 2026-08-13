@@ -10,7 +10,11 @@ import { AppLogger } from 'src/shared/logger/logger.service';
 import { BaseService } from 'src/shared/services/base.service';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { RepositoriesService } from '../repositories/repositories.service';
-import type { AnalysisRecord, AnalysisReview } from './analyses.types';
+import type {
+  AnalysisRecord,
+  AnalysisReview,
+  GithubCommentsResult,
+} from './analyses.types';
 import { Analysis } from './analysis.entity';
 import { AnalysisRepository } from './analysis.repository';
 import {
@@ -19,6 +23,13 @@ import {
   hydrateReview,
 } from './helpers/apply-review-event';
 import { buildAgentRunRequest } from './helpers/context-builder.helper';
+import {
+  buildReviewBody,
+  collectActionable,
+  emptyGithubComments,
+  isCastReviewComment,
+  planInlineComments,
+} from './helpers/github-review.helper';
 import {
   parseOptionalPullNumber,
   parsePullNumber,
@@ -159,9 +170,22 @@ export class AnalysesService extends BaseService {
               status: 'completed',
               finishedAt: new Date(),
             });
-          } else {
+            writeEvent(event);
+
+            const github = await this.publishGithubComments({
+              analysisId: analysis.id,
+              review,
+              repo,
+              pullNumber,
+              currentUser,
+              owner,
+            });
+            review = applyReviewEvent(review, 'github_comments_done', github);
             await persistReview();
+            writeEvent({ type: 'github_comments_done', payload: github });
+            continue;
           }
+          await persistReview();
         }
 
         writeEvent(event);
@@ -214,7 +238,9 @@ export class AnalysesService extends BaseService {
     const query = this.analysisRepository
       .createQueryBuilder('analysis')
       .where('analysis.requestedBy = :userId', { userId: input.currentUser.id })
-      .andWhere('LOWER(analysis.repo) = LOWER(:repo)', { repo: input.repo.trim() })
+      .andWhere('LOWER(analysis.repo) = LOWER(:repo)', {
+        repo: input.repo.trim(),
+      })
       .orderBy('analysis.createdAt', 'DESC');
 
     if (owner) {
@@ -245,6 +271,104 @@ export class AnalysesService extends BaseService {
     }
 
     return this.toRecord(row);
+  }
+
+  private async publishGithubComments(input: {
+    analysisId: string;
+    review: AnalysisReview;
+    repo: string;
+    pullNumber: number;
+    currentUser: CurrentUserData;
+    owner?: string;
+  }): Promise<GithubCommentsResult> {
+    try {
+      if (collectActionable(input.review).length === 0) {
+        return emptyGithubComments();
+      }
+
+      const [files, headSha, login] = await Promise.all([
+        this.repositoriesService.listPullFiles(
+          input.repo,
+          input.pullNumber,
+          input.currentUser,
+          input.owner,
+        ),
+        this.repositoriesService.getPullHeadSha(
+          input.repo,
+          input.pullNumber,
+          input.currentUser,
+          input.owner,
+        ),
+        this.repositoriesService.loginFor(input.currentUser),
+      ]);
+
+      const { comments, skipped } = planInlineComments(
+        input.analysisId,
+        input.review,
+        files,
+      );
+
+      const existing = await this.repositoriesService.listPullReviewComments(
+        input.repo,
+        input.pullNumber,
+        input.currentUser,
+        input.owner,
+      );
+      for (const comment of existing) {
+        if (comment.user === login && isCastReviewComment(comment.body)) {
+          await this.repositoriesService.deletePullReviewComment(
+            input.repo,
+            comment.id,
+            input.currentUser,
+            input.owner,
+          );
+        }
+      }
+
+      const created = await this.repositoriesService.createPullReview(
+        input.repo,
+        input.pullNumber,
+        {
+          commitId: headSha,
+          body: buildReviewBody(
+            input.analysisId,
+            input.review,
+            comments.length,
+          ),
+          comments: comments.map((comment) => ({
+            path: comment.path,
+            line: comment.line,
+            startLine: comment.startLine,
+            body: comment.body,
+          })),
+        },
+        input.currentUser,
+        input.owner,
+      );
+
+      return {
+        status: 'posted',
+        posted: comments.length,
+        skipped,
+        reviewId: created.id,
+        htmlUrl: created.htmlUrl,
+        errorMessage: null,
+      };
+    } catch (err) {
+      this.logger.error('Falha ao comentar na PR', {
+        exception: err,
+        analysisId: input.analysisId,
+      });
+      return {
+        status: 'error',
+        posted: 0,
+        skipped: 0,
+        reviewId: null,
+        htmlUrl: null,
+        errorMessage:
+          err instanceof Error ? err.message : 'Falha ao comentar na PR',
+      };
+    }
   }
 
   private toRecord(row: Analysis): AnalysisRecord {

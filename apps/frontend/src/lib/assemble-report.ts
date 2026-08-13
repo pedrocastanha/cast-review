@@ -58,5 +58,8 @@ export function assembleReport(events: AgentEvent[]): ReportPayload | undefined 
     headline: ready?.headline,
     conventionsSource: ready?.conventionsSource,
     usage: usageFromEvents(events) ?? ready?.usage,
+    githubComments:
+      (latest(events, 'github_comments_done')?.payload as ReportPayload['githubComments']) ??
+      ready?.githubComments,
   };
 }

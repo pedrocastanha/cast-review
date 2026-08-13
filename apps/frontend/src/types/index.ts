@@ -75,6 +75,7 @@ export type AgentEventType =
   | 'test_reviewer_done'
   | 'architecture_reviewer_done'
   | 'report_ready'
+  | 'github_comments_done'
   | 'thought'
   | 'error';
 
@@ -99,6 +100,9 @@ export interface Finding {
   detail: string;
   businessRule?: string;
   conventionRef?: string;
+  path?: string;
+  line?: number;
+  endLine?: number;
 }
 
 export interface ReviewResult {
@@ -191,6 +195,18 @@ export interface ReportPayload {
   headline?: string;
   conventionsSource?: 'repo' | 'default';
   usage?: AnalysisUsage;
+  githubComments?: GithubCommentsResult;
+}
+
+export type GithubCommentsStatus = 'posted' | 'empty' | 'error';
+
+export interface GithubCommentsResult {
+  status: GithubCommentsStatus;
+  posted: number;
+  skipped: number;
+  reviewId: number | null;
+  htmlUrl: string | null;
+  errorMessage: string | null;
 }
 
 export type AnalysisStatus = 'running' | 'completed' | 'error';

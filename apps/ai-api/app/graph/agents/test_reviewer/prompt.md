@@ -20,7 +20,9 @@ PRD (contexto), `businessRules` da spec, changed files (incluindo *.test / *.spe
       "status": "fail | warning | pass",
       "title": "título curto em português",
       "detail": "qual teste cobre, ou por que não cobre",
-      "businessRule": "texto exato da businessRule"
+      "businessRule": "texto exato da businessRule",
+      "path": "arquivo da PR (obrigatório em fail/warning)",
+      "line": 12
     }
   ]
 }
@@ -33,3 +35,4 @@ PRD (contexto), `businessRules` da spec, changed files (incluindo *.test / *.spe
 - Não acrescente regra que não está na spec.
 - Copie o texto de `businessRule` exatamente.
 - Não revise arquitetura.
+- Em fail/warning: `path` é um arquivo da PR (o source que ficou sem teste, ou o spec). `line` é 1-based no arquivo novo. Sem path o finding vale no relatório, mas não vai ao GitHub.

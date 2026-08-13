@@ -216,3 +216,22 @@ describe('applyReviewEvent usage', () => {
     expect(review.usage).toBeUndefined();
   });
 });
+
+describe('applyReviewEvent github comments', () => {
+  it('grava o resultado do post na PR', () => {
+    const review = applyReviewEvent(emptyReview(), 'github_comments_done', {
+      status: 'posted',
+      posted: 2,
+      skipped: 1,
+      reviewId: 99,
+      htmlUrl: 'https://github.com/o/r/pull/1#pullrequestreview-99',
+      errorMessage: null,
+    });
+    expect(review.githubComments).toMatchObject({
+      status: 'posted',
+      posted: 2,
+      skipped: 1,
+      reviewId: 99,
+    });
+  });
+});

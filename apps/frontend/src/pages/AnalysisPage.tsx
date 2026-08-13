@@ -6,6 +6,7 @@ import { AgentStepper } from '../components/analysis/AgentStepper';
 import { AnalysisHistoryList } from '../components/analysis/AnalysisHistoryList';
 import { ReportView } from '../components/analysis/ReportView';
 import { ThoughtLog } from '../components/analysis/ThoughtLog';
+import { GithubCommentsStatus } from '../components/analysis/GithubCommentsStatus';
 import { UsageStrip } from '../components/analysis/UsageStrip';
 import { Button } from '../components/ui/Button';
 import { Field } from '../components/ui/Field';
@@ -141,6 +142,12 @@ export function AnalysisPage() {
       {report?.usage && (
         <div className="mb-8">
           <UsageStrip usage={report.usage} />
+        </div>
+      )}
+
+      {report?.githubComments && (
+        <div className="mb-8">
+          <GithubCommentsStatus result={report.githubComments} />
         </div>
       )}
 
