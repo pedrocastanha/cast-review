@@ -13,12 +13,15 @@ const styles: Record<AnalysisStatus, string> = {
 };
 
 export function AnalysisStatusBadge({ status }: { status: AnalysisStatus }) {
+  const label = labels[status] ?? status;
+  const tone = styles[status] ?? styles.running;
+
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 font-mono text-xs font-medium tracking-wide uppercase ${styles[status]}`}
+      className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 font-mono text-xs font-medium tracking-wide uppercase ${tone}`}
     >
       <span className="size-1.5 rounded-full bg-current" />
-      {labels[status]}
+      {label}
     </span>
   );
 }

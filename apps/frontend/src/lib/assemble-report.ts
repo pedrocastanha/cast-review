@@ -11,6 +11,18 @@ function asReview(name: string, payload: Record<string, unknown> | undefined): R
   return { name, score, findings };
 }
 
+export function hasReviewContent(report: ReportPayload | null | undefined): boolean {
+  if (!report) return false;
+  return Boolean(
+    report.markdown ||
+      report.prd ||
+      report.spec ||
+      report.changeAnalysis ||
+      (report.results && report.results.length > 0) ||
+      (report.comments && report.comments.length > 0),
+  );
+}
+
 export function assembleReport(events: AgentEvent[]): ReportPayload | undefined {
   const ready = latest(events, 'report_ready')?.payload as ReportPayload | undefined;
   const changeAnalysis = latest(events, 'change_analysis_done')?.payload as ReportPayload['changeAnalysis'];

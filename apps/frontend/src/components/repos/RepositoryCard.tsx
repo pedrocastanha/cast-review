@@ -6,7 +6,7 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 
 export function RepositoryCard({ repo }: { repo: Repository }) {
   return (
     <Link
-      to={`/repos/${repo.owner}/${repo.name}/pulls`}
+      to={`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/pulls`}
       className="group flex items-center justify-between gap-6 border-b border-border py-4 transition-colors first:pt-0 last:border-0 hover:bg-surface-1/60"
     >
       <div className="min-w-0">

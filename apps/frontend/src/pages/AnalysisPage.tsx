@@ -11,6 +11,7 @@ import { Field } from '../components/ui/Field';
 import { Spinner } from '../components/ui/Spinner';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
 import { useRepoAnalyses } from '../hooks/useRepoAnalyses';
+import { hasReviewContent } from '../lib/assemble-report';
 import type { PullRequest } from '../types';
 
 const DEFAULT_MODEL = 'gpt-4o';
@@ -19,11 +20,15 @@ export function AnalysisPage() {
   const { owner = '', repo = '', pullNumber = '' } = useParams();
   const number = Number(pullNumber);
   const { phase, events, errorMessage, start, reset, report, thoughts } = useAnalysisRun();
-  const { analyses, loading: analysesLoading } = useRepoAnalyses(
+  const { analyses, loading: analysesLoading, reload: reloadAnalyses } = useRepoAnalyses(
     owner,
     repo,
     Number.isFinite(number) ? number : undefined,
   );
+
+  useEffect(() => {
+    if (phase === 'completed' || phase === 'error') reloadAnalyses();
+  }, [phase, reloadAnalyses]);
 
   const [pull, setPull] = useState<PullRequest | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -49,6 +54,10 @@ export function AnalysisPage() {
 
   const canStart = openaiKey.trim().length > 0 && phase !== 'running';
   const pullsPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`;
+  const saved = analyses?.find((item) => hasReviewContent(item.report));
+  const visibleReport =
+    report ?? (phase === 'idle' && hasReviewContent(saved?.report) ? saved?.report : undefined);
+  const visibleThoughts = phase === 'idle' && !report ? (saved?.thoughts ?? {}) : thoughts;
 
   const onSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -135,12 +144,12 @@ export function AnalysisPage() {
         </div>
       )}
 
-      {(phase === 'running' || Object.keys(thoughts).length > 0) && (
+      {(phase === 'running' || Object.keys(visibleThoughts).length > 0) && (
         <div className="mb-8">
           <h2 className="mb-3 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
             Pensamento
           </h2>
-          <ThoughtLog thoughts={thoughts} running={phase === 'running'} />
+          <ThoughtLog thoughts={visibleThoughts} running={phase === 'running'} />
         </div>
       )}
 
@@ -150,9 +159,9 @@ export function AnalysisPage() {
         </p>
       )}
 
-      {report && <ReportView report={report} />}
+      {visibleReport && <ReportView report={visibleReport} />}
 
-      {!analysesLoading && analyses && analyses.length > 0 && phase === 'idle' && (
+      {!analysesLoading && analyses && phase === 'idle' && (
         <section className="mt-4">
           <h2 className="mb-4 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
             Análises anteriores desta PR
@@ -162,6 +171,7 @@ export function AnalysisPage() {
             repo={repo}
             analyses={analyses}
             emptyTitle="Nenhuma análise anterior"
+            emptyDescription="Rode a primeira análise para o review ficar salvo nesta PR."
           />
         </section>
       )}

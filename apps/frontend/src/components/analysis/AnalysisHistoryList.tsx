@@ -18,7 +18,16 @@ function scoresLabel(record: AnalysisRecord) {
 
 function commentsCount(record: AnalysisRecord) {
   if (record.report?.comments?.length) return record.report.comments.length;
-  return record.report?.results?.reduce((sum, result) => sum + result.findings.length, 0) ?? 0;
+  return (
+    record.report?.results?.reduce((sum, result) => sum + (result.findings?.length ?? 0), 0) ?? 0
+  );
+}
+
+function formatWhen(value: string | undefined) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return dateTimeFormatter.format(date);
 }
 
 interface AnalysisHistoryListProps {
@@ -72,7 +81,7 @@ export function AnalysisHistoryList({
               </p>
             </div>
             <div className="shrink-0 font-mono text-xs text-ink-faint">
-              {dateTimeFormatter.format(new Date(analysis.createdAt))}
+              {formatWhen(analysis.createdAt)}
             </div>
           </Link>
         );

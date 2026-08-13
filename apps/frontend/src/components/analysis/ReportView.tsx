@@ -43,8 +43,17 @@ function CommentRow({ comment }: { comment: ReviewComment | (Finding & { reviewe
   );
 }
 
-function stringList(items: string[] | undefined) {
-  return items?.filter((item) => item.trim().length > 0) ?? [];
+function stringList(items: unknown) {
+  if (typeof items === 'string' && items.trim()) return [items.trim()];
+  if (!Array.isArray(items)) return [];
+  return items.flatMap((item) => {
+    if (typeof item === 'string' && item.trim()) return [item.trim()];
+    if (item && typeof item === 'object' && 'title' in item) {
+      const title = (item as { title?: unknown }).title;
+      return typeof title === 'string' && title.trim() ? [title.trim()] : [];
+    }
+    return [];
+  });
 }
 
 function PrdBlock({ prd }: { prd: PrdPayload }) {
@@ -128,7 +137,7 @@ export function ReportView({ report }: { report: ReportPayload }) {
     report.comments?.length
       ? report.comments
       : results.flatMap((result) =>
-          result.findings.map((finding) => ({ reviewer: result.name, ...finding })),
+          (result.findings ?? []).map((finding) => ({ reviewer: result.name, ...finding })),
         );
   const files = report.changeAnalysis?.files ?? [];
 

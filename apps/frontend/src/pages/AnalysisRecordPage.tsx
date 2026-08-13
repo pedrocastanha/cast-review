@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { analysesApi } from '../api/analyses.api';
 import { ApiError } from '../api/http';
+import { hasReviewContent } from '../lib/assemble-report';
 import { AnalysisStatusBadge } from '../components/analysis/AnalysisStatusBadge';
 import { ReportView } from '../components/analysis/ReportView';
 import { ThoughtLog } from '../components/analysis/ThoughtLog';
@@ -91,7 +92,11 @@ export function AnalysisRecordPage() {
             </div>
             <div>
               <dt className="text-ink-faint">Quando</dt>
-              <dd className="mt-1.5 text-ink">{dateTimeFormatter.format(new Date(record.createdAt))}</dd>
+              <dd className="mt-1.5 text-ink">
+                {Number.isNaN(new Date(record.createdAt).getTime())
+                  ? '—'
+                  : dateTimeFormatter.format(new Date(record.createdAt))}
+              </dd>
             </div>
             {record.models && (
               <div className="col-span-2">
@@ -118,7 +123,9 @@ export function AnalysisRecordPage() {
             </section>
           )}
 
-          {record.report && <ReportView report={record.report} />}
+          {hasReviewContent(record.report) && record.report && (
+            <ReportView report={record.report} />
+          )}
 
           {!record.report?.markdown &&
             !record.report?.results?.length &&
