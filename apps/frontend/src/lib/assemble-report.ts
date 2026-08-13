@@ -1,4 +1,5 @@
 import type { AgentEvent, AgentEventType, Finding, ReportPayload, ReviewResult } from '../types';
+import { usageFromEvents } from './format-usage';
 
 function latest(events: AgentEvent[], type: AgentEventType) {
   return [...events].reverse().find((event) => event.type === type);
@@ -56,5 +57,6 @@ export function assembleReport(events: AgentEvent[]): ReportPayload | undefined 
     warningCount: ready?.warningCount,
     headline: ready?.headline,
     conventionsSource: ready?.conventionsSource,
+    usage: usageFromEvents(events) ?? ready?.usage,
   };
 }

@@ -1,4 +1,5 @@
 import type { Finding, PrdPayload, ReportPayload, ReviewComment, SpecPayload } from '../../types';
+import { formatTokens, formatUsd } from '../../lib/format-usage';
 import { ReportMarkdown } from './ReportMarkdown';
 
 function scoreTone(score: number) {
@@ -177,11 +178,19 @@ export function ReportView({ report }: { report: ReportPayload }) {
                 </p>
               )}
             </div>
-            {report.overallScore !== undefined && (
-              <p className={`font-display text-4xl font-semibold ${scoreTone(report.overallScore)}`}>
-                {report.overallScore}
-              </p>
-            )}
+            <div className="text-right">
+              {report.overallScore !== undefined && (
+                <p className={`font-display text-4xl font-semibold ${scoreTone(report.overallScore)}`}>
+                  {report.overallScore}
+                </p>
+              )}
+              {report.usage && (
+                <p className="mt-1 font-mono text-[10px] tracking-wide text-ink-faint tabular-nums uppercase">
+                  {formatUsd(report.usage.costUsd, false)} · {formatTokens(report.usage.totalTokens)} tok
+                  {!report.usage.costComplete && ' · parcial'}
+                </p>
+              )}
+            </div>
           </div>
         </section>
       )}
@@ -232,6 +241,34 @@ export function ReportView({ report }: { report: ReportPayload }) {
             </div>
           ))}
         </div>
+      )}
+
+      {report.usage && report.usage.steps.length > 0 && (
+        <section>
+          <h3 className="mb-2 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
+            Custo por etapa
+          </h3>
+          <ul className="flex flex-col border-y border-border">
+            {report.usage.steps.map((step) => (
+              <li
+                key={step.step}
+                className={`flex items-baseline justify-between gap-4 border-b border-border py-2 last:border-0 font-mono text-xs tabular-nums ${
+                  step.skipped ? 'text-ink-faint' : 'text-ink'
+                }`}
+              >
+                <span>
+                  {step.label}
+                  <span className="ml-2 text-ink-faint">{step.model ?? '—'}</span>
+                </span>
+                <span>
+                  {step.skipped
+                    ? 'sem LLM'
+                    : `${formatTokens(step.promptTokens)} in / ${formatTokens(step.completionTokens)} out · ${formatUsd(step.costUsd)}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {report.prd && <PrdBlock prd={report.prd} />}

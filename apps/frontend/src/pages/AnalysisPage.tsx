@@ -6,6 +6,7 @@ import { AgentStepper } from '../components/analysis/AgentStepper';
 import { AnalysisHistoryList } from '../components/analysis/AnalysisHistoryList';
 import { ReportView } from '../components/analysis/ReportView';
 import { ThoughtLog } from '../components/analysis/ThoughtLog';
+import { UsageStrip } from '../components/analysis/UsageStrip';
 import { Button } from '../components/ui/Button';
 import { Field } from '../components/ui/Field';
 import { Spinner } from '../components/ui/Spinner';
@@ -134,6 +135,12 @@ export function AnalysisPage() {
       {phase !== 'idle' && (
         <div className="mb-8">
           <AgentStepper events={events} running={phase === 'running'} failed={phase === 'error'} />
+        </div>
+      )}
+
+      {report?.usage && (
+        <div className="mb-8">
+          <UsageStrip usage={report.usage} />
         </div>
       )}
 

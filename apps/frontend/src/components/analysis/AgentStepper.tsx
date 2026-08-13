@@ -1,4 +1,5 @@
 import type { AgentEvent, AgentEventType } from '../../types';
+import { formatStepUsage, stepUsageFromEvents } from '../../lib/format-usage';
 
 const STEPS: { type: AgentEventType; label: string }[] = [
   { type: 'change_analysis_done', label: 'Change Analyzer' },
@@ -60,17 +61,19 @@ export function AgentStepper({ events, running, failed }: AgentStepperProps) {
     <ol className="grid gap-2 sm:grid-cols-2">
       {STEPS.map((step, index) => {
         const state = stepState(step.type, done, failed, running);
+        const usage = stepUsageFromEvents(events, step.type);
         return (
           <li
             key={step.type}
+            title={usage?.model ?? undefined}
             className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 ${tones[state]}`}
           >
             <span className="font-mono text-xs tabular-nums">
               {String(index + 1).padStart(2, '0')}
             </span>
             <span className="text-sm">{step.label}</span>
-            <span className="ml-auto font-mono text-[10px] tracking-wider uppercase">
-              {state === 'done' && 'ok'}
+            <span className="ml-auto font-mono text-[10px] tracking-wider uppercase tabular-nums">
+              {state === 'done' && (usage ? formatStepUsage(usage) : 'ok')}
               {state === 'current' && '…'}
               {state === 'error' && 'erro'}
             </span>

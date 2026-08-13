@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { AnalysisRecord } from '../../types';
+import { formatUsageChip } from '../../lib/format-usage';
 import { EmptyState } from '../ui/EmptyState';
 import { AnalysisStatusBadge } from './AnalysisStatusBadge';
 
@@ -65,6 +66,7 @@ export function AnalysisHistoryList({
       {analyses.map((analysis) => {
         const scores = scoresLabel(analysis);
         const comments = commentsCount(analysis);
+        const cost = formatUsageChip(analysis.report?.usage);
         const href = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/analyses/${analysis.id}`;
 
         return (
@@ -79,6 +81,9 @@ export function AnalysisHistoryList({
                 <AnalysisStatusBadge status={analysis.status} />
                 {scores && (
                   <span className="font-mono text-xs tabular-nums text-ink">{scores}</span>
+                )}
+                {cost && (
+                  <span className="font-mono text-xs tabular-nums text-ink-faint">{cost}</span>
                 )}
               </div>
               <p className="mt-1.5 font-mono text-xs text-ink-faint">
