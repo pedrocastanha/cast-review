@@ -1,3 +1,5 @@
+from langchain_core.runnables import RunnableConfig
+
 from app.graph.state import GraphState
 from app.graph.thoughts import emit_thought
 from app.graph.utils.files import clip_diff, files_block
@@ -13,15 +15,22 @@ async def generate_prd(
     model: str,
     api_key: str,
     run_id: str | None = None,
+    prior_prd: dict | None = None,
+    revision_notes: list[dict] | None = None,
 ) -> dict:
     system = build_system_prompt("prd", ["describe-shipped-change"])
-    result = await complete_json(
-        system=system,
-        user=(
+    user = (
+        _build_revision_prompt(diff, changed_files, change_analysis, prior_prd, revision_notes)
+        if revision_notes
+        else (
             f"CHANGE_ANALYSIS:\n{change_analysis}\n\n"
             f"DIFF:\n{clip_diff(diff)}\n\n"
             f"FILES:\n{files_block(changed_files)}"
-        ),
+        )
+    )
+    result = await complete_json(
+        system=system,
+        user=user,
         model=model,
         api_key=api_key,
         on_delta=lambda delta: emit_thought("prd", delta, run_id),
@@ -41,17 +50,41 @@ async def generate_prd(
     prd["usage"] = step_usage("prd", model, result.usage)
     return prd
 
-async def node(state: GraphState) -> dict:
+async def node(state: GraphState, config: RunnableConfig) -> dict:
 
     prd = await generate_prd(
         diff=state["diff"],
         changed_files=state["changed_files"],
         change_analysis=without_usage(state.get("change_analysis") or {}),
         model=state["models"]["testReviewer"],
-        api_key=state["api_keys"]["openai"],
+        api_key=config["configurable"]["api_keys"]["openai"],
         run_id=state.get("run_id"),
+        prior_prd=state.get("prd"),
+        revision_notes=state.get("revision_notes"),
     )
     return {"prd": prd}
+
+def _build_revision_prompt(
+    diff: str,
+    changed_files: list[dict],
+    change_analysis: dict,
+    prior_prd: dict | None,
+    revision_notes: list[dict],
+) -> str:
+    notes_block = "\n\n".join(
+        f"- Trecho: {note.get('excerpt', '')}\n  Observação: {note.get('note', '')}"
+        for note in revision_notes
+    )
+    prior_content = (prior_prd or {}).get("markdown") or ""
+    return (
+        f"PRD_ANTERIOR:\n{prior_content}\n\n"
+        f"FEEDBACK_DE_REVISAO:\n{notes_block}\n\n"
+        f"CHANGE_ANALYSIS:\n{change_analysis}\n\n"
+        f"DIFF:\n{clip_diff(diff)}\n\n"
+        f"FILES:\n{files_block(changed_files)}\n\n"
+        "Instrução: revise o PRD anterior incorporando o feedback de revisão listado "
+        "acima, mantendo o formato JSON definido no system prompt."
+    )
 
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):

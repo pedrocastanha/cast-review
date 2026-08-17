@@ -9,6 +9,7 @@ AgentEventType = Literal[
     "test_reviewer_done",
     "architecture_reviewer_done",
     "report_ready",
+    "awaiting_approval",
     "thought",
     "error",
 ]
@@ -35,12 +36,38 @@ class ApiKeys(BaseModel):
     openai: str
 
 
+class Policies(BaseModel):
+    prd: Literal["manual", "auto"] = "manual"
+    spec: Literal["manual", "auto"] = "manual"
+
+
 class AgentRunRequest(BaseModel):
+    analysisId: str
     diff: str
     changedFiles: list[ChangedFileContext]
     conventions: str = ""
     models: ReviewModels
     apiKeys: ApiKeys
+    policies: Policies = Field(default_factory=Policies)
+
+
+class Annotation(BaseModel):
+    excerpt: str
+    note: str
+
+
+class ApprovalDecision(BaseModel):
+    stage: Literal["prd", "spec"]
+    action: Literal["approve", "reject"]
+    annotations: list[Annotation] | None = None
+
+
+class AgentResumeRequest(BaseModel):
+    analysisId: str
+    models: ReviewModels
+    apiKeys: ApiKeys
+    policies: Policies
+    decision: ApprovalDecision | None = None
 
 
 class AgentEvent(BaseModel):
