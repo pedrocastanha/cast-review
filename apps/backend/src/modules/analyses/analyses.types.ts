@@ -1,4 +1,4 @@
-export type AnalysisStatus = 'running' | 'completed' | 'error';
+export type AnalysisStatus = 'running' | 'completed' | 'error' | 'awaiting_approval';
 
 export type FindingStatus = 'fail' | 'warning' | 'pass';
 
@@ -100,6 +100,23 @@ export interface AnalysisReview {
   githubComments?: GithubCommentsResult;
 }
 
+export interface Annotation {
+  excerpt: string;
+  note: string;
+}
+
+export interface PublishPolicy {
+  prd: 'manual' | 'auto';
+  spec: 'manual' | 'auto';
+  publish: 'manual' | 'auto_safe' | 'auto';
+}
+
+export interface Iteration {
+  content: Record<string, unknown>;
+  annotations: Annotation[] | null;
+  createdAt: string;
+}
+
 export interface AnalysisRecord {
   id: string;
   requestedBy: string;
@@ -113,4 +130,9 @@ export interface AnalysisRecord {
   models: { testReviewer: string; architectureReviewer: string } | null;
   createdAt: string;
   finishedAt: string | null;
+  approvalStage: 'prd' | 'spec' | 'publish' | null;
+  publishPolicy: PublishPolicy | null;
+  prdIterations: Iteration[];
+  specIterations: Iteration[];
+  resumedCount: number;
 }

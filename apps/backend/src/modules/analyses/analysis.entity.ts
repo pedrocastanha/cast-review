@@ -1,6 +1,11 @@
 import { DefaultEntity } from 'src/shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
-import type { AnalysisReview, AnalysisStatus } from './analyses.types';
+import type {
+  AnalysisReview,
+  AnalysisStatus,
+  Iteration,
+  PublishPolicy,
+} from './analyses.types';
 
 @Entity({ name: 'analyses' })
 @Index('IDX_analyses_user_repo', ['requestedBy', 'owner', 'repo'])
@@ -35,4 +40,19 @@ export class Analysis extends DefaultEntity<Analysis> {
 
   @Column({ name: 'finished_at', type: 'timestamptz', nullable: true })
   finishedAt: Date | null;
+
+  @Column({ name: 'approval_stage', type: 'varchar', nullable: true })
+  approvalStage: 'prd' | 'spec' | 'publish' | null;
+
+  @Column({ name: 'publish_policy', type: 'jsonb', nullable: true })
+  publishPolicy: PublishPolicy | null;
+
+  @Column({ name: 'prd_iterations', type: 'jsonb', default: () => "'[]'" })
+  prdIterations: Iteration[];
+
+  @Column({ name: 'spec_iterations', type: 'jsonb', default: () => "'[]'" })
+  specIterations: Iteration[];
+
+  @Column({ name: 'resumed_count', type: 'int', default: 0 })
+  resumedCount: number;
 }
