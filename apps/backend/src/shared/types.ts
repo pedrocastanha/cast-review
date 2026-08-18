@@ -28,6 +28,7 @@ export type AgentEventType =
   | 'test_reviewer_done'
   | 'architecture_reviewer_done'
   | 'report_ready'
+  | 'awaiting_approval'
   | 'github_comments_done'
   | 'thought'
   | 'error';
@@ -37,7 +38,13 @@ export interface AgentEvent {
   payload: Record<string, unknown>;
 }
 
+export interface Policies {
+  prd: 'manual' | 'auto';
+  spec: 'manual' | 'auto';
+}
+
 export interface AgentRunRequest {
+  analysisId: string;
   diff: string;
   changedFiles: ChangedFileContext[];
   conventions: string;
@@ -48,4 +55,29 @@ export interface AgentRunRequest {
   apiKeys: {
     openai: string;
   };
+  policies?: Policies;
+}
+
+export interface Annotation {
+  excerpt: string;
+  note: string;
+}
+
+export interface ApprovalDecision {
+  stage: 'prd' | 'spec';
+  action: 'approve' | 'reject';
+  annotations?: Annotation[] | null;
+}
+
+export interface AgentResumeRequest {
+  analysisId: string;
+  models: {
+    testReviewer: string;
+    architectureReviewer: string;
+  };
+  apiKeys: {
+    openai: string;
+  };
+  policies: Policies;
+  decision?: ApprovalDecision | null;
 }

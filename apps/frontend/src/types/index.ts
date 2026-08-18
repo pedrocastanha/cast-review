@@ -76,6 +76,7 @@ export type AgentEventType =
   | 'test_reviewer_done'
   | 'architecture_reviewer_done'
   | 'report_ready'
+  | 'awaiting_approval'
   | 'github_comments_done'
   | 'thought'
   | 'error';
@@ -83,6 +84,35 @@ export type AgentEventType =
 export interface AgentEvent {
   type: AgentEventType;
   payload: Record<string, unknown>;
+}
+
+export interface Policies {
+  prd: 'manual' | 'auto';
+  spec: 'manual' | 'auto';
+  publish: 'manual' | 'auto_safe' | 'auto';
+}
+
+export interface Annotation {
+  excerpt: string;
+  note: string;
+}
+
+export interface ApprovalDecision {
+  stage: 'prd' | 'spec';
+  action: 'approve' | 'reject';
+  annotations?: Annotation[] | null;
+}
+
+export interface PublishPolicy {
+  prd: 'manual' | 'auto';
+  spec: 'manual' | 'auto';
+  publish: 'manual' | 'auto_safe' | 'auto';
+}
+
+export interface Iteration {
+  content: Record<string, unknown>;
+  annotations: Annotation[] | null;
+  createdAt: string;
 }
 
 export interface RunAnalysisPayload {
@@ -93,6 +123,7 @@ export interface RunAnalysisPayload {
   apiKeys: {
     openai: string;
   };
+  policies: Policies;
 }
 
 export interface Finding {
@@ -210,7 +241,7 @@ export interface GithubCommentsResult {
   errorMessage: string | null;
 }
 
-export type AnalysisStatus = 'running' | 'completed' | 'error';
+export type AnalysisStatus = 'running' | 'completed' | 'error' | 'awaiting_approval';
 
 export interface AnalysisRecord {
   id: string;
@@ -225,4 +256,9 @@ export interface AnalysisRecord {
   models: { testReviewer: string; architectureReviewer: string } | null;
   createdAt: string;
   finishedAt: string | null;
+  approvalStage: 'prd' | 'spec' | 'publish' | null;
+  publishPolicy: PublishPolicy | null;
+  prdIterations: Iteration[];
+  specIterations: Iteration[];
+  resumedCount: number;
 }

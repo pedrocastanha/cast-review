@@ -3,6 +3,8 @@ from app.graph.utils.conventions import resolve_conventions
 from app.graph.utils.files import files_block, prd_block
 from app.graph.utils.findings import normalize_findings, review_payload
 from app.graph.utils.loader import build_system_prompt
+from langchain_core.runnables import RunnableConfig
+
 from app.graph.state import GraphState
 from app.graph.thoughts import emit_thought
 from app.graph.utils.usage import skipped_step, step_usage
@@ -45,13 +47,13 @@ async def run_architecture_reviewer(
     return payload
 
 
-async def node(state: GraphState) -> dict:
+async def node(state: GraphState, config: RunnableConfig) -> dict:
     review = await run_architecture_reviewer(
         spec=state["spec"],
         changed_files=state["changed_files"],
         conventions=state.get("conventions") or "",
         model=state["models"]["architectureReviewer"],
-        api_key=state["api_keys"]["openai"],
+        api_key=config["configurable"]["api_keys"]["openai"],
         prd=state.get("prd"),
         run_id=state.get("run_id"),
     )

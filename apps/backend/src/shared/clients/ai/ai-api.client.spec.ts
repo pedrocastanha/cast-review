@@ -1,5 +1,5 @@
 import type { AppLogger } from 'src/shared/logger/logger.service';
-import type { AgentRunRequest } from 'src/shared/types';
+import type { AgentResumeRequest, AgentRunRequest } from 'src/shared/types';
 import { AiApiClient } from './ai-api.client';
 
 const payload: AgentRunRequest = {
@@ -8,6 +8,14 @@ const payload: AgentRunRequest = {
   conventions: '',
   models: { testReviewer: 'gpt-4o', architectureReviewer: 'gpt-4o' },
   apiKeys: { openai: 'sk-test' },
+};
+
+const resumePayload: AgentResumeRequest = {
+  analysisId: 'analysis-1',
+  models: { testReviewer: 'gpt-4o', architectureReviewer: 'gpt-4o' },
+  apiKeys: { openai: 'sk-test' },
+  policies: { prd: 'manual', spec: 'manual' },
+  decision: { stage: 'prd', action: 'approve' },
 };
 
 function emptyStreamResponse(): Response {
@@ -19,6 +27,37 @@ function emptyStreamResponse(): Response {
         releaseLock: () => undefined,
       }),
     },
+  } as unknown as Response;
+}
+
+function sseStreamResponse(events: Array<Record<string, unknown>>): Response {
+  const encoder = new TextEncoder();
+  const body = events
+    .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+    .join('');
+  const chunk = encoder.encode(body);
+  let read = false;
+
+  return {
+    ok: true,
+    body: {
+      getReader: () => ({
+        read: async () => {
+          if (read) return { done: true, value: undefined };
+          read = true;
+          return { done: false, value: chunk };
+        },
+        releaseLock: () => undefined,
+      }),
+    },
+  } as unknown as Response;
+}
+
+function notOkResponse(status: number): Response {
+  return {
+    ok: false,
+    status,
+    body: null,
   } as unknown as Response;
 }
 
@@ -64,5 +103,65 @@ describe('AiApiClient', () => {
       'http://localhost:8000/agent/run',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+});
+
+describe('AiApiClient.resumeAgent', () => {
+  const originalUrl = process.env.AI_API_URL;
+  const fetchMock = jest.fn();
+  const logger = { error: jest.fn() } as unknown as AppLogger;
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterAll(() => {
+    if (originalUrl === undefined) {
+      delete process.env.AI_API_URL;
+    } else {
+      process.env.AI_API_URL = originalUrl;
+    }
+  });
+
+  it('faz POST em /agent/resume e emite os eventos SSE parseados', async () => {
+    process.env.AI_API_URL = 'http://localhost:8000';
+    fetchMock.mockResolvedValue(
+      sseStreamResponse([
+        { type: 'spec_generated', payload: { foo: 'bar' } },
+        { type: 'report_ready', payload: {} },
+      ]),
+    );
+    const client = new AiApiClient(logger);
+
+    const events: unknown[] = [];
+    for await (const event of client.resumeAgent(
+      resumePayload,
+      new AbortController().signal,
+    )) {
+      events.push(event);
+    }
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8000/agent/resume',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(resumePayload),
+      }),
+    );
+    expect(events).toEqual([
+      { type: 'spec_generated', payload: { foo: 'bar' } },
+      { type: 'report_ready', payload: {} },
+    ]);
+  });
+
+  it('lança erro quando a resposta não é ok', async () => {
+    process.env.AI_API_URL = 'http://localhost:8000';
+    fetchMock.mockResolvedValue(notOkResponse(500));
+    const client = new AiApiClient(logger);
+
+    await expect(
+      client.resumeAgent(resumePayload, new AbortController().signal).next(),
+    ).rejects.toThrow('ai-api indisponível (status 500)');
   });
 });

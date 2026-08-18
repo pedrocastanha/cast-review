@@ -4,6 +4,7 @@ from app.graph.utils.findings import normalize_findings, review_payload
 from app.graph.utils.loader import build_system_prompt
 from app.graph.state import GraphState
 from app.domain.agents.entities import Finding
+from langchain_core.runnables import RunnableConfig
 from app.graph.thoughts import emit_thought
 from app.graph.utils.usage import skipped_step, step_usage
 from app.infrastructure.llm.client import complete_json
@@ -47,12 +48,12 @@ async def run_test_reviewer(
     payload["usage"] = step_usage("test_reviewer", model, result.usage)
     return payload
 
-async def node(state: GraphState) -> dict:
+async def node(state: GraphState, config: RunnableConfig) -> dict:
     review = await run_test_reviewer(
         spec=state["spec"],
         changed_files=state["changed_files"],
         model=state["models"]["testReviewer"],
-        api_key=state["api_keys"]["openai"],
+        api_key=config["configurable"]["api_keys"]["openai"],
         prd=state.get("prd"),
         run_id=state.get("run_id"),
     )

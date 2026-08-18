@@ -1,4 +1,4 @@
-import type { AgentEvent, AnalysisRecord, RunAnalysisPayload } from '../types';
+import type { AgentEvent, Annotation, AnalysisRecord, RunAnalysisPayload } from '../types';
 import { authorizedFetch, request } from './http';
 
 function parseSseChunk(rawEvent: string): AgentEvent | null {
@@ -9,6 +9,61 @@ function parseSseChunk(rawEvent: string): AgentEvent | null {
   } catch {
     return null;
   }
+}
+
+async function* consumeSseStream(response: Response): AsyncGenerator<AgentEvent> {
+  if (!response.body) {
+    throw new Error('Resposta sem corpo (SSE).');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const rawEvents = buffer.split('\n\n');
+      buffer = rawEvents.pop() ?? '';
+
+      for (const rawEvent of rawEvents) {
+        const event = parseSseChunk(rawEvent);
+        if (event) yield event;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export interface ResumeAnalysisPayload {
+  models: {
+    testReviewer: string;
+    architectureReviewer: string;
+  };
+  apiKeys: {
+    openai: string;
+  };
+}
+
+export interface ApproveStagePayload {
+  stage: 'prd' | 'spec';
+  decision: 'approve' | 'reject';
+  annotations?: Annotation[];
+  models: {
+    testReviewer: string;
+    architectureReviewer: string;
+  };
+  apiKeys: {
+    openai: string;
+  };
+}
+
+export interface ApprovePublishPayload {
+  decision: 'approve' | 'reject';
 }
 
 export const analysesApi = {
@@ -45,30 +100,48 @@ export const analysesApi = {
       signal,
     });
 
-    if (!response.body) {
-      throw new Error('Resposta sem corpo (SSE).');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const rawEvents = buffer.split('\n\n');
-        buffer = rawEvents.pop() ?? '';
-
-        for (const rawEvent of rawEvents) {
-          const event = parseSseChunk(rawEvent);
-          if (event) yield event;
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
+    yield* consumeSseStream(response);
   },
+
+  async *resume(
+    analysisId: string,
+    payload: ResumeAnalysisPayload,
+    signal: AbortSignal,
+  ): AsyncGenerator<AgentEvent> {
+    const response = await authorizedFetch(`/analyses/${encodeURIComponent(analysisId)}/resume`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    yield* consumeSseStream(response);
+  },
+
+  async *approveStage(
+    analysisId: string,
+    payload: ApproveStagePayload,
+    signal: AbortSignal,
+  ): AsyncGenerator<AgentEvent> {
+    const response = await authorizedFetch(`/analyses/${encodeURIComponent(analysisId)}/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    yield* consumeSseStream(response);
+  },
+
+  approvePublish: (analysisId: string, payload: ApprovePublishPayload) =>
+    request<AnalysisRecord>(`/analyses/${encodeURIComponent(analysisId)}/approve`, {
+      method: 'POST',
+      body: { stage: 'publish', ...payload },
+    }),
 };

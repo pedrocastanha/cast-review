@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,15 +9,20 @@ import type { Request, Response } from 'express';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import { BaseService } from 'src/shared/services/base.service';
+import type { AgentEvent, AgentResumeRequest } from 'src/shared/types';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { RepositoriesService } from '../repositories/repositories.service';
 import type {
   AnalysisRecord,
   AnalysisReview,
   GithubCommentsResult,
+  Iteration,
+  PublishPolicy,
 } from './analyses.types';
 import { Analysis } from './analysis.entity';
 import { AnalysisRepository } from './analysis.repository';
+import type { ApproveAnalysisDto } from './dtos/approve-analysis.dto';
+import type { ResumeAnalysisDto } from './dtos/resume-analysis.dto';
 import {
   applyReviewEvent,
   emptyReview,
@@ -72,6 +78,11 @@ export class AnalysesService extends BaseService {
 
     const pullNumber = parsePullNumber(pullNumberRaw);
     const dto = parseRunAnalysisBody(body);
+    const publishPolicy: PublishPolicy = {
+      prd: dto.policies?.prd ?? 'manual',
+      spec: dto.policies?.spec ?? 'manual',
+      publish: dto.policies?.publish ?? 'manual',
+    };
 
     const analysis = await this.analysisRepository.save(
       this.analysisRepository.create({
@@ -86,6 +97,7 @@ export class AnalysesService extends BaseService {
         errorMessage: null,
         models: dto.models,
         finishedAt: null,
+        publishPolicy,
       }),
     );
 
@@ -101,8 +113,267 @@ export class AnalysesService extends BaseService {
     });
     res.flushHeaders();
 
-    const thoughts: Record<string, string> = {};
-    let review: AnalysisReview = emptyReview();
+    try {
+      const payload = await buildAgentRunRequest(
+        this.repositoriesService,
+        repo,
+        pullNumber,
+        currentUser,
+        dto,
+        analysis.id,
+        owner,
+      );
+
+      await this.streamLeg(
+        analysis,
+        this.aiApiClient.runAgent(payload, abortController.signal),
+        res,
+      );
+    } catch (err) {
+      await this.analysisRepository.update(analysis.id, {
+        status: 'error',
+        errorMessage:
+          err instanceof Error ? err.message : 'Falha inesperada na análise',
+        finishedAt: new Date(),
+      });
+      this.logger.error('Falha ao rodar análise', {
+        exception: err,
+        analysisId: analysis.id,
+      });
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'error',
+          payload: { message: 'Falha ao rodar a análise' },
+        })}\n\n`,
+      );
+      res.end();
+    }
+  }
+
+  async resume(
+    analysisId: string,
+    currentUser: CurrentUserData,
+    dto: ResumeAnalysisDto,
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const analysis = await this.analysisRepository.findOne({
+      where: { id: analysisId, requestedBy: currentUser.id },
+    });
+
+    if (!analysis) {
+      throw new NotFoundException('Análise não encontrada');
+    }
+
+    if (analysis.status !== 'running' && analysis.status !== 'error') {
+      throw new ConflictException(
+        'Análise não pode ser retomada neste status',
+      );
+    }
+
+    await this.analysisRepository.update(analysisId, {
+      resumedCount: analysis.resumedCount + 1,
+    });
+
+    const abortController = new AbortController();
+    req.on('close', () => abortController.abort());
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+      'X-Analysis-Id': analysis.id,
+    });
+    res.flushHeaders();
+
+    const payload: AgentResumeRequest = {
+      analysisId: analysis.id,
+      models: dto.models,
+      apiKeys: dto.apiKeys,
+      policies: analysis.publishPolicy
+        ? { prd: analysis.publishPolicy.prd, spec: analysis.publishPolicy.spec }
+        : { prd: 'manual', spec: 'manual' },
+      decision: null,
+    };
+
+    await this.streamLeg(
+      analysis,
+      this.aiApiClient.resumeAgent(payload, abortController.signal),
+      res,
+    );
+  }
+
+  async approve(
+    analysisId: string,
+    currentUser: CurrentUserData,
+    dto: ApproveAnalysisDto,
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const analysis = await this.analysisRepository.findOne({
+      where: { id: analysisId, requestedBy: currentUser.id },
+    });
+
+    if (!analysis) {
+      throw new NotFoundException('Análise não encontrada');
+    }
+
+    if (dto.stage === 'publish') {
+      await this.approvePublish(analysis, dto, currentUser, res);
+      return;
+    }
+
+    await this.approveStage(analysis, dto, req, res);
+  }
+
+  private async approvePublish(
+    analysis: Analysis,
+    dto: ApproveAnalysisDto,
+    currentUser: CurrentUserData,
+    res: Response,
+  ): Promise<void> {
+    const review = hydrateReview(analysis.report) ?? emptyReview();
+    const finishedAt = new Date();
+
+    if (dto.decision === 'reject') {
+      const errorMessage = 'Publicação rejeitada pelo usuário';
+      await this.analysisRepository.update(analysis.id, {
+        status: 'error',
+        errorMessage,
+        finishedAt,
+      });
+      analysis.status = 'error';
+      analysis.errorMessage = errorMessage;
+      analysis.finishedAt = finishedAt;
+      res.json(this.toRecord(analysis));
+      return;
+    }
+
+    const github = await this.publishGithubComments({
+      analysisId: analysis.id,
+      review,
+      repo: analysis.repo,
+      pullNumber: analysis.pullNumber,
+      currentUser,
+      owner: analysis.owner,
+    });
+    const updatedReview = applyReviewEvent(review, 'github_comments_done', {
+      ...github,
+    });
+
+    await this.analysisRepository.update(analysis.id, {
+      status: 'completed',
+      report: updatedReview,
+      finishedAt,
+    });
+
+    analysis.status = 'completed';
+    analysis.report = updatedReview;
+    analysis.finishedAt = finishedAt;
+    res.json(this.toRecord(analysis));
+  }
+
+  private async approveStage(
+    analysis: Analysis,
+    dto: ApproveAnalysisDto,
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const stage = dto.stage as 'prd' | 'spec';
+    const iterationsField =
+      stage === 'prd' ? 'prdIterations' : 'specIterations';
+
+    if (dto.decision === 'reject') {
+      const currentContent =
+        stage === 'prd' ? analysis.report?.prd : analysis.report?.spec;
+      const currentMarkdown =
+        currentContent && typeof currentContent.markdown === 'string'
+          ? currentContent.markdown
+          : '';
+
+      for (const annotation of dto.annotations ?? []) {
+        if (!currentMarkdown.includes(annotation.excerpt)) {
+          throw new BadRequestException(
+            `Trecho não encontrado no conteúdo atual de ${stage}: "${annotation.excerpt}"`,
+          );
+        }
+      }
+
+      const iteration: Iteration = {
+        content: currentContent ?? {},
+        annotations: dto.annotations ?? null,
+        createdAt: new Date().toISOString(),
+      };
+      const iterations = [...(analysis[iterationsField] ?? []), iteration];
+
+      await this.analysisRepository.update(analysis.id, {
+        [iterationsField]: iterations,
+      });
+      analysis[iterationsField] = iterations;
+    }
+
+    const abortController = new AbortController();
+    req.on('close', () => abortController.abort());
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+      'X-Analysis-Id': analysis.id,
+    });
+    res.flushHeaders();
+
+    try {
+      const payload: AgentResumeRequest = {
+        analysisId: analysis.id,
+        apiKeys: dto.apiKeys!,
+        models: dto.models!,
+        policies: analysis.publishPolicy
+          ? { prd: analysis.publishPolicy.prd, spec: analysis.publishPolicy.spec }
+          : { prd: 'manual', spec: 'manual' },
+        decision: {
+          stage,
+          action: dto.decision,
+          annotations: dto.annotations ?? null,
+        },
+      };
+
+      await this.streamLeg(
+        analysis,
+        this.aiApiClient.resumeAgent(payload, abortController.signal),
+        res,
+      );
+    } catch (err) {
+      await this.analysisRepository.update(analysis.id, {
+        status: 'error',
+        errorMessage:
+          err instanceof Error ? err.message : 'Falha inesperada na análise',
+        finishedAt: new Date(),
+      });
+      this.logger.error('Falha ao rodar análise', {
+        exception: err,
+        analysisId: analysis.id,
+      });
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'error',
+          payload: { message: 'Falha ao rodar a análise' },
+        })}\n\n`,
+      );
+      res.end();
+    }
+  }
+
+  private async streamLeg(
+    analysis: Analysis,
+    events: AsyncGenerator<AgentEvent>,
+    res: Response,
+  ): Promise<void> {
+    const thoughts: Record<string, string> = { ...(analysis.thoughts ?? {}) };
+    let review: AnalysisReview =
+      hydrateReview(analysis.report) ?? emptyReview();
     let lastThoughtPersist = 0;
 
     const writeEvent = (event: {
@@ -124,7 +395,10 @@ export class AnalysesService extends BaseService {
 
     const persistReview = async (
       extra: Partial<
-        Pick<Analysis, 'status' | 'errorMessage' | 'finishedAt'>
+        Pick<
+          Analysis,
+          'status' | 'errorMessage' | 'finishedAt' | 'approvalStage'
+        >
       > = {},
     ) => {
       await this.analysisRepository.update(analysis.id, {
@@ -134,20 +408,14 @@ export class AnalysesService extends BaseService {
       });
     };
 
-    try {
-      const payload = await buildAgentRunRequest(
-        this.repositoriesService,
-        repo,
-        pullNumber,
-        currentUser,
-        dto,
-        owner,
-      );
+    const publishingUser: CurrentUserData = {
+      id: analysis.requestedBy,
+      username: null,
+      email: '',
+    };
 
-      for await (const event of this.aiApiClient.runAgent(
-        payload,
-        abortController.signal,
-      )) {
+    try {
+      for await (const event of events) {
         if (event.type === 'thought') {
           const step = String(event.payload.step ?? '');
           const delta = String(event.payload.delta ?? '');
@@ -163,35 +431,59 @@ export class AnalysesService extends BaseService {
             ),
             finishedAt: new Date(),
           });
+        } else if (event.type === 'awaiting_approval') {
+          const rawStage = event.payload.stage;
+          const stage =
+            rawStage === 'prd' || rawStage === 'spec' ? rawStage : null;
+          await persistReview({
+            status: 'awaiting_approval',
+            approvalStage: stage,
+          });
+          writeEvent(event);
+          return;
         } else {
           review = applyReviewEvent(review, event.type, event.payload);
           if (event.type === 'report_ready') {
+            if (analysis.publishPolicy?.publish === 'auto') {
+              await persistReview({
+                status: 'completed',
+                finishedAt: new Date(),
+              });
+              writeEvent(event);
+
+              const github = await this.publishGithubComments({
+                analysisId: analysis.id,
+                review,
+                repo: analysis.repo,
+                pullNumber: analysis.pullNumber,
+                currentUser: publishingUser,
+                owner: analysis.owner,
+              });
+              const githubPayload = { ...github } as Record<string, unknown>;
+              review = applyReviewEvent(
+                review,
+                'github_comments_done',
+                githubPayload,
+              );
+              await persistReview();
+              writeEvent({
+                type: 'github_comments_done',
+                payload: githubPayload,
+              });
+              continue;
+            }
+
             await persistReview({
-              status: 'completed',
+              status: 'awaiting_approval',
+              approvalStage: 'publish',
               finishedAt: new Date(),
             });
             writeEvent(event);
-
-            const github = await this.publishGithubComments({
-              analysisId: analysis.id,
-              review,
-              repo,
-              pullNumber,
-              currentUser,
-              owner,
-            });
-            const githubPayload = { ...github } as Record<string, unknown>;
-            review = applyReviewEvent(
-              review,
-              'github_comments_done',
-              githubPayload,
-            );
-            await persistReview();
             writeEvent({
-              type: 'github_comments_done',
-              payload: githubPayload,
+              type: 'awaiting_approval',
+              payload: { stage: 'publish' },
             });
-            continue;
+            return;
           }
           await persistReview();
         }
@@ -393,6 +685,11 @@ export class AnalysesService extends BaseService {
       models: row.models,
       createdAt: row.createdAt.toISOString(),
       finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
+      approvalStage: row.approvalStage,
+      publishPolicy: row.publishPolicy,
+      prdIterations: row.prdIterations,
+      specIterations: row.specIterations,
+      resumedCount: row.resumedCount,
     };
   }
 }

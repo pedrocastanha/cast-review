@@ -10,16 +10,17 @@ const STEPS: { type: AgentEventType; label: string }[] = [
   { type: 'report_ready', label: 'Relatório' },
 ];
 
-type StepState = 'pending' | 'current' | 'done' | 'error';
+type StepState = 'pending' | 'current' | 'done' | 'error' | 'awaiting';
 
 function stepState(
   type: AgentEventType,
   done: Set<AgentEventType>,
   failed: boolean,
   running: boolean,
+  awaitingApproval: boolean,
 ): StepState {
   if (done.has(type)) return 'done';
-  if (!running && !failed) return 'pending';
+  if (!running && !failed && !awaitingApproval) return 'pending';
 
   const firstPending = STEPS.find((step) => !done.has(step.type));
   const reviewersPending =
@@ -33,6 +34,7 @@ function stepState(
       !done.has(type));
 
   if (isCurrent && failed) return 'error';
+  if (isCurrent && awaitingApproval) return 'awaiting';
   if (isCurrent) return 'current';
   return 'pending';
 }
@@ -42,15 +44,23 @@ const tones: Record<StepState, string> = {
   current: 'border-accent text-accent',
   done: 'border-state-open text-state-open',
   error: 'border-state-closed text-state-closed',
+  awaiting: 'border-state-draft text-state-draft',
 };
 
 interface AgentStepperProps {
   events: AgentEvent[];
   running: boolean;
   failed: boolean;
+  /** Run is paused on the current stage awaiting human approval (HITL gate). */
+  awaitingApproval?: boolean;
 }
 
-export function AgentStepper({ events, running, failed }: AgentStepperProps) {
+export function AgentStepper({
+  events,
+  running,
+  failed,
+  awaitingApproval = false,
+}: AgentStepperProps) {
   const done = new Set(
     events
       .filter((event) => event.type !== 'error' && event.type !== 'thought')
@@ -60,7 +70,7 @@ export function AgentStepper({ events, running, failed }: AgentStepperProps) {
   return (
     <ol className="grid gap-2 sm:grid-cols-2">
       {STEPS.map((step, index) => {
-        const state = stepState(step.type, done, failed, running);
+        const state = stepState(step.type, done, failed, running, awaitingApproval);
         const usage = stepUsageFromEvents(events, step.type);
         return (
           <li
@@ -75,6 +85,7 @@ export function AgentStepper({ events, running, failed }: AgentStepperProps) {
             <span className="ml-auto font-mono text-[10px] tracking-wider uppercase tabular-nums">
               {state === 'done' && (usage ? formatStepUsage(usage) : 'ok')}
               {state === 'current' && '…'}
+              {state === 'awaiting' && 'aguardando'}
               {state === 'error' && 'erro'}
             </span>
           </li>

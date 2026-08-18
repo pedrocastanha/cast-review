@@ -17,6 +17,7 @@ export async function buildAgentRunRequest(
   pullNumber: number,
   currentUser: CurrentUserData,
   dto: RunAnalysisDto,
+  analysisId: string,
   owner?: string,
 ): Promise<AgentRunRequest> {
   const pull = await repositoriesService.getPullByNumber(repo, pullNumber, currentUser, owner);
@@ -34,11 +35,16 @@ export async function buildAgentRunRequest(
   );
 
   return {
+    analysisId,
     diff,
     changedFiles,
     conventions,
     models: dto.models,
     apiKeys: dto.apiKeys,
+    policies: {
+      prd: dto.policies?.prd ?? 'manual',
+      spec: dto.policies?.spec ?? 'manual',
+    },
   };
 }
 
