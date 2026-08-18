@@ -17,5 +17,22 @@ services:
       timeout: 3s
       retries: 5
 
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: portfolio-redis
+    restart: unless-stopped
+    environment:
+      REDIS_ARGS: "--appendonly yes --maxmemory-policy noeviction"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres_data:
+  redis_data:
