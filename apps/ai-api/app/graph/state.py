@@ -15,5 +15,5 @@ class GraphState(TypedDict, total=False):
     revision_notes: list[dict] | None
     prd_iteration: int
     spec_iteration: int
-    _prd_decision: str  # routing-only: "approve" | "reject", read by T11's conditional edge
-    _spec_decision: str  # routing-only: "approve" | "reject", read by T11's conditional edge
+    _prd_decision: str
+    _spec_decision: str

@@ -132,10 +132,6 @@ async def resume_pipeline(
     policies: Policies,
     decision: ApprovalDecision | None,
 ) -> AsyncIterator[AgentEvent]:
-    # `models` isn't re-fed as state here: `Command(resume=...)` replaces the state
-    # input entirely, and the checkpoint already carries `models` from the leg that
-    # started the run. Accepted as a parameter per the AgentResumeRequest contract
-    # (kept for interface parity / future crash-recovery use), unused for now.
     del models
     resume_input = Command(resume=decision.model_dump()) if decision is not None else None
     config = _build_config(analysis_id, api_keys, policies)
