@@ -17,6 +17,7 @@ import type {
   AnalysisReview,
   GithubCommentsResult,
   Iteration,
+  PublishPolicy,
 } from './analyses.types';
 import { Analysis } from './analysis.entity';
 import { AnalysisRepository } from './analysis.repository';
@@ -77,6 +78,11 @@ export class AnalysesService extends BaseService {
 
     const pullNumber = parsePullNumber(pullNumberRaw);
     const dto = parseRunAnalysisBody(body);
+    const publishPolicy: PublishPolicy = {
+      prd: dto.policies?.prd ?? 'manual',
+      spec: dto.policies?.spec ?? 'manual',
+      publish: dto.policies?.publish ?? 'manual',
+    };
 
     const analysis = await this.analysisRepository.save(
       this.analysisRepository.create({
@@ -91,6 +97,7 @@ export class AnalysesService extends BaseService {
         errorMessage: null,
         models: dto.models,
         finishedAt: null,
+        publishPolicy,
       }),
     );
 

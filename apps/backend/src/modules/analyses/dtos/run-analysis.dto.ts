@@ -22,6 +22,10 @@ export class PoliciesDto {
   @IsOptional()
   @IsIn(['manual', 'auto'])
   spec?: 'manual' | 'auto';
+
+  @IsOptional()
+  @IsIn(['manual', 'auto_safe', 'auto'])
+  publish?: 'manual' | 'auto_safe' | 'auto';
 }
 
 export class RunAnalysisDto {

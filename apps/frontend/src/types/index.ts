@@ -89,6 +89,7 @@ export interface AgentEvent {
 export interface Policies {
   prd: 'manual' | 'auto';
   spec: 'manual' | 'auto';
+  publish: 'manual' | 'auto_safe' | 'auto';
 }
 
 export interface Annotation {

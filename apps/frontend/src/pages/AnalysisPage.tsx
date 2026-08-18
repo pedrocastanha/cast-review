@@ -119,7 +119,7 @@ export function AnalysisPage() {
     void start(repo, number, owner, {
       models: { testReviewer: testModel, architectureReviewer: archModel },
       apiKeys: { openai: openaiKey.trim() },
-      policies: { prd: prdPolicy, spec: specPolicy },
+      policies: { prd: prdPolicy, spec: specPolicy, publish: publishPolicy },
     });
   };
 

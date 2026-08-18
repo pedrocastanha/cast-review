@@ -58,6 +58,7 @@ function parsePolicies(
 
   const prd = raw.prd;
   const spec = raw.spec;
+  const publish = raw.publish;
   if (prd !== undefined && prd !== 'manual' && prd !== 'auto') {
     throw new BadRequestException('policies.prd deve ser "manual" ou "auto"');
   }
@@ -66,10 +67,21 @@ function parsePolicies(
       'policies.spec deve ser "manual" ou "auto"',
     );
   }
+  if (
+    publish !== undefined &&
+    publish !== 'manual' &&
+    publish !== 'auto_safe' &&
+    publish !== 'auto'
+  ) {
+    throw new BadRequestException(
+      'policies.publish deve ser "manual", "auto_safe" ou "auto"',
+    );
+  }
 
   return {
     prd: prd as 'manual' | 'auto' | undefined,
     spec: spec as 'manual' | 'auto' | undefined,
+    publish: publish as 'manual' | 'auto_safe' | 'auto' | undefined,
   };
 }
 
