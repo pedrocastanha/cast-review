@@ -4,12 +4,14 @@ const labels: Record<AnalysisStatus, string> = {
   running: 'Rodando',
   completed: 'Concluída',
   error: 'Erro',
+  awaiting_approval: 'Aguardando aprovação',
 };
 
 const styles: Record<AnalysisStatus, string> = {
   running: 'text-accent bg-accent-quiet/40',
   completed: 'text-state-open bg-state-open-dim',
   error: 'text-state-closed bg-state-closed-dim',
+  awaiting_approval: 'text-state-draft bg-state-draft-dim',
 };
 
 export function AnalysisStatusBadge({ status }: { status: AnalysisStatus }) {
