@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
-import { IsString, ValidateNested } from 'class-validator';
+import { IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
 
-class ReviewModelsDto {
+export class ReviewModelsDto {
   @IsString()
   testReviewer!: string;
 
@@ -9,9 +9,19 @@ class ReviewModelsDto {
   architectureReviewer!: string;
 }
 
-class ApiKeysDto {
+export class ApiKeysDto {
   @IsString()
   openai!: string;
+}
+
+export class PoliciesDto {
+  @IsOptional()
+  @IsIn(['manual', 'auto'])
+  prd?: 'manual' | 'auto';
+
+  @IsOptional()
+  @IsIn(['manual', 'auto'])
+  spec?: 'manual' | 'auto';
 }
 
 export class RunAnalysisDto {
@@ -22,4 +32,9 @@ export class RunAnalysisDto {
   @ValidateNested()
   @Type(() => ApiKeysDto)
   apiKeys!: ApiKeysDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PoliciesDto)
+  policies?: PoliciesDto;
 }

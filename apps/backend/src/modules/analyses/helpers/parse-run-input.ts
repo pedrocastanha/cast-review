@@ -44,7 +44,33 @@ export function parseRunAnalysisBody(body: unknown): RunAnalysisDto {
       architectureReviewer: models.architectureReviewer,
     },
     apiKeys: { openai: apiKeys.openai },
+    policies: parsePolicies(body.policies),
   } as RunAnalysisDto;
+}
+
+function parsePolicies(
+  raw: unknown,
+): RunAnalysisDto['policies'] | undefined {
+  if (raw === undefined) return undefined;
+  if (!isRecord(raw)) {
+    throw new BadRequestException('policies deve ser um objeto');
+  }
+
+  const prd = raw.prd;
+  const spec = raw.spec;
+  if (prd !== undefined && prd !== 'manual' && prd !== 'auto') {
+    throw new BadRequestException('policies.prd deve ser "manual" ou "auto"');
+  }
+  if (spec !== undefined && spec !== 'manual' && spec !== 'auto') {
+    throw new BadRequestException(
+      'policies.spec deve ser "manual" ou "auto"',
+    );
+  }
+
+  return {
+    prd: prd as 'manual' | 'auto' | undefined,
+    spec: spec as 'manual' | 'auto' | undefined,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
