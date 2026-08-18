@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { AppLogger } from 'src/shared/logger/logger.service';
-import type { AgentEvent, AgentRunRequest } from 'src/shared/types';
+import type {
+  AgentEvent,
+  AgentResumeRequest,
+  AgentRunRequest,
+} from 'src/shared/types';
 
 const DEFAULT_AI_API_URL = 'http://localhost:8000';
 
@@ -29,6 +33,50 @@ export class AiApiClient {
 
     if (!response.ok || !response.body) {
       this.logger.error('ai-api respondeu com falha ao iniciar o agente', {
+        status: response.status,
+      });
+      throw new Error(`ai-api indisponível (status ${response.status})`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const rawEvents = buffer.split('\n\n');
+        buffer = rawEvents.pop() ?? '';
+
+        for (const rawEvent of rawEvents) {
+          const event = this.parseEvent(rawEvent);
+          if (event) yield event;
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  async *resumeAgent(
+    payload: AgentResumeRequest,
+    signal: AbortSignal,
+  ): AsyncGenerator<AgentEvent> {
+    const response = await fetch(`${resolveAiApiUrl()}/agent/resume`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'text/event-stream',
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      this.logger.error('ai-api respondeu com falha ao retomar o agente', {
         status: response.status,
       });
       throw new Error(`ai-api indisponível (status ${response.status})`);
