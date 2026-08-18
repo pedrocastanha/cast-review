@@ -12,6 +12,8 @@ import type { Request, Response } from 'express';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { CurrentUser } from '../auth/utils/current-user-decorator';
 import { AnalysesService } from './analyses.service';
+import { ApproveAnalysisDto } from './dtos/approve-analysis.dto';
+import { ResumeAnalysisDto } from './dtos/resume-analysis.dto';
 
 @Controller()
 export class AnalysesController {
@@ -64,5 +66,27 @@ export class AnalysesController {
     @CurrentUser() currentUser: CurrentUserData,
   ) {
     return this.analysesService.getByIdForUser(id, currentUser);
+  }
+
+  @Post('analyses/:id/resume')
+  resume(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: CurrentUserData,
+    @Body() dto: ResumeAnalysisDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    return this.analysesService.resume(id, currentUser, dto, req, res);
+  }
+
+  @Post('analyses/:id/approve')
+  approve(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: CurrentUserData,
+    @Body() dto: ApproveAnalysisDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    return this.analysesService.approve(id, currentUser, dto, req, res);
   }
 }
