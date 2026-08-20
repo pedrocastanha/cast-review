@@ -56,6 +56,8 @@ export interface AgentRunRequest {
     openai: string;
   };
   policies?: Policies;
+  repoId?: string;
+  sha?: string;
 }
 
 export interface Annotation {
@@ -90,6 +92,26 @@ export interface IndexBuildResult {
 export interface IndexStatusResult {
   indexed: boolean;
   sha: string | null;
+}
+
+export interface VizNode {
+  id: string;
+  label: string;
+  kind: string;
+  path: string;
+  count: number;
+}
+
+export interface VizEdge {
+  source: string;
+  target: string;
+  kind: string;
+}
+
+export interface VizGraph {
+  nodes: VizNode[];
+  edges: VizEdge[];
+  stats: { indexed: boolean; truncated?: boolean };
 }
 
 export interface AgentResumeRequest {

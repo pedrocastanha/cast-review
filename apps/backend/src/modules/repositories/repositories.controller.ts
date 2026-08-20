@@ -66,4 +66,23 @@ export class RepositoriesController {
       owner,
     );
   }
+
+  @Get(':repo/graph')
+  async getGraph(
+    @Param('repo') repo: string,
+    @CurrentUser() currentUser: CurrentUserData,
+    @Query('owner') owner?: string,
+    @Query('sha') sha?: string,
+    @Query('focus') focus?: string,
+    @Query('depth') depth?: string,
+  ) {
+    return this.repositoriesService.getRepositoryGraph(
+      repo,
+      currentUser,
+      owner,
+      sha,
+      focus,
+      depth !== undefined ? Number(depth) : undefined,
+    );
+  }
 }

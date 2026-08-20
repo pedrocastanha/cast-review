@@ -483,6 +483,25 @@ export class RepositoriesService extends BaseService {
     }
   }
 
+  async getRepositoryGraph(
+    repo: string,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+    sha?: string,
+    focus?: string,
+    depth?: number,
+  ) {
+    const owner = ownerOverride?.trim() || (await this.loginFor(currentUser));
+    const repoId = `${owner}/${repo}`;
+
+    const resolvedSha = sha ?? (await this.aiApiClient.getIndexStatus(repoId)).sha;
+    if (!resolvedSha) {
+      return { nodes: [], edges: [], stats: { indexed: false } };
+    }
+
+    return this.aiApiClient.getGraph(repoId, resolvedSha, focus, depth);
+  }
+
   private async resolveDefaultBranchSha(
     octokit: Octokit,
     owner: string,
