@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useRepositoryIndexStatus } from '../../hooks/useRepositoryIndexStatus';
 import type { Repository } from '../../types';
 import { Button } from '../ui/Button';
@@ -32,6 +32,7 @@ function IndexBadge({
 }
 
 export function RepositoryCard({ repo }: { repo: Repository }) {
+  const navigate = useNavigate();
   const { status, error, triggering, trigger } = useRepositoryIndexStatus(
     repo.name,
     repo.owner,
@@ -71,6 +72,19 @@ export function RepositoryCard({ repo }: { repo: Repository }) {
           <div className="text-ink-dim">{repo.defaultBranch}</div>
           <div className="mt-1">{dateFormatter.format(new Date(repo.updatedAt))}</div>
         </div>
+        {status?.status === 'indexed' && (
+          <button
+            type="button"
+            className="text-xs text-ink-faint underline decoration-dotted transition-colors hover:text-accent"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/graph`);
+            }}
+          >
+            Ver grafo
+          </button>
+        )}
         <Button
           type="button"
           variant="secondary"

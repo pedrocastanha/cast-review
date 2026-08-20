@@ -3,6 +3,7 @@ import type {
   PullRequest,
   Repository,
   RepositoryIndexStatus,
+  VizGraph,
 } from '../types';
 import { request } from './http';
 
@@ -29,4 +30,11 @@ export const repositoriesApi = {
     request<RepositoryIndexStatus>(
       `/repositories/${encodeURIComponent(repo)}/index/status?owner=${encodeURIComponent(owner)}`,
     ),
+
+  getGraph: (repo: string, owner: string, focus?: string, depth?: number) => {
+    const params = new URLSearchParams({ owner: owner });
+    if (focus) params.set('focus', focus);
+    if (depth !== undefined) params.set('depth', String(depth));
+    return request<VizGraph>(`/repositories/${encodeURIComponent(repo)}/graph?${params.toString()}`);
+  },
 };
