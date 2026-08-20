@@ -20,6 +20,7 @@ async def run_architecture_reviewer(
     api_key: str,
     prd: dict | None = None,
     run_id: str | None = None,
+    related_context: dict | None = None,
 ) -> dict:
     text, source = resolve_conventions(conventions)
     if not text:
@@ -31,7 +32,7 @@ async def run_architecture_reviewer(
     system = build_system_prompt("architecture_reviewer", ["cite-convention"])
     result = await complete_json(
         system=system,
-        user=_user_prompt(spec, changed_files, text, source, prd),
+        user=_user_prompt(spec, changed_files, text, source, prd, related_context),
         model=model,
         api_key=api_key,
         on_delta=lambda delta: emit_thought("architecture_reviewer", delta, run_id),
@@ -56,6 +57,7 @@ async def node(state: GraphState, config: RunnableConfig) -> dict:
         api_key=config["configurable"]["api_keys"]["openai"],
         prd=state.get("prd"),
         run_id=state.get("run_id"),
+        related_context=(state.get("change_analysis") or {}).get("relatedContext"),
     )
     return {"architecture_review": review}
 
@@ -66,6 +68,7 @@ def _user_prompt(
     conventions: str,
     source: str,
     prd: dict | None,
+    related_context: dict | None = None,
 ) -> str:
     prefix = prd_block(prd)
     head = f"{prefix}\n\n" if prefix else ""
@@ -74,5 +77,5 @@ def _user_prompt(
         f"{head}spec:\n{spec}\n\n"
         f"origem das convenções: {origin}\n"
         f"conventions.md:\n{conventions[:MAX_PROMPT_FILE_CHARS]}\n\n"
-        f"changed files:\n{files_block(changed_files)}"
+        f"changed files:\n{files_block(changed_files, related_context)}"
     )

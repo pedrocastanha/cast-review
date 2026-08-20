@@ -17,6 +17,7 @@ async def generate_implementation_spec(
     run_id: str | None = None,
     revision_notes: list[dict] | None = None,
     previous_spec: dict | None = None,
+    related_context: dict | None = None,
 ) -> dict:
     system = build_system_prompt("implementation_spec", ["extract-observable-rules"])
     context = prd_block(prd)
@@ -26,10 +27,10 @@ async def generate_implementation_spec(
             f"{prefix}REVISION REQUEST — refine the previous spec below using the reviewer notes.\n\n"
             f"PREVIOUS SPEC:\n{_spec_block(previous_spec)}\n\n"
             f"REVIEWER NOTES:\n{_revision_notes_block(revision_notes)}\n\n"
-            f"DIFF:\n{clip_diff(diff)}\n\nFILES:\n{files_block(changed_files)}"
+            f"DIFF:\n{clip_diff(diff)}\n\nFILES:\n{files_block(changed_files, related_context)}"
         )
     else:
-        user = f"{prefix}DIFF:\n{clip_diff(diff)}\n\nFILES:\n{files_block(changed_files)}"
+        user = f"{prefix}DIFF:\n{clip_diff(diff)}\n\nFILES:\n{files_block(changed_files, related_context)}"
     result = await complete_json(
         system=system,
         user=user,
@@ -55,6 +56,7 @@ async def node(state: GraphState, config: RunnableConfig) -> dict:
         run_id=state.get("run_id"),
         revision_notes=state.get("revision_notes"),
         previous_spec=state.get("spec"),
+        related_context=(state.get("change_analysis") or {}).get("relatedContext"),
     )
     return {"spec": spec}
 
