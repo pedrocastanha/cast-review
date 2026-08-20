@@ -205,3 +205,57 @@ describe('RepositoriesService.getRepositoryIndexStatus', () => {
     expect(result.status).toBe('queued');
   });
 });
+
+describe('RepositoriesService.getRepositoryGraph', () => {
+  beforeEach(() => {
+    octokitInstance.repos.get.mockResolvedValue({ data: { default_branch: 'main' } });
+  });
+
+  it('uses the provided sha directly, without calling getIndexStatus', async () => {
+    const aiApiClient = fakeAiApiClient();
+    aiApiClient.getGraph = jest.fn().mockResolvedValue({ nodes: [], edges: [], stats: { indexed: true } });
+    const service = new RepositoriesService(
+      fakeUserService(),
+      fakeQueue(null),
+      aiApiClient,
+      fakeLogger(),
+    );
+
+    await service.getRepositoryGraph('hello-world', currentUser, undefined, 'sha1', 'focus-id', 2);
+
+    expect(aiApiClient.getIndexStatus).not.toHaveBeenCalled();
+    expect(aiApiClient.getGraph).toHaveBeenCalledWith('octocat/hello-world', 'sha1', 'focus-id', 2);
+  });
+
+  it('falls back to the latest indexed sha when none is provided', async () => {
+    const aiApiClient = fakeAiApiClient({ indexed: true, sha: 'latest-sha' });
+    aiApiClient.getGraph = jest.fn().mockResolvedValue({ nodes: [], edges: [], stats: { indexed: true } });
+    const service = new RepositoriesService(
+      fakeUserService(),
+      fakeQueue(null),
+      aiApiClient,
+      fakeLogger(),
+    );
+
+    await service.getRepositoryGraph('hello-world', currentUser);
+
+    expect(aiApiClient.getIndexStatus).toHaveBeenCalledWith('octocat/hello-world');
+    expect(aiApiClient.getGraph).toHaveBeenCalledWith('octocat/hello-world', 'latest-sha', undefined, undefined);
+  });
+
+  it('returns an empty not-indexed graph without calling getGraph when repo was never indexed', async () => {
+    const aiApiClient = fakeAiApiClient({ indexed: false, sha: null });
+    aiApiClient.getGraph = jest.fn();
+    const service = new RepositoriesService(
+      fakeUserService(),
+      fakeQueue(null),
+      aiApiClient,
+      fakeLogger(),
+    );
+
+    const result = await service.getRepositoryGraph('hello-world', currentUser);
+
+    expect(aiApiClient.getGraph).not.toHaveBeenCalled();
+    expect(result).toEqual({ nodes: [], edges: [], stats: { indexed: false } });
+  });
+});

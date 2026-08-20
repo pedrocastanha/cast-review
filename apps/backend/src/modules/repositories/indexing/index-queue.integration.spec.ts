@@ -54,7 +54,12 @@ describe('code-index queue (real Redis)', () => {
     const stored = await queue.getJob(jobId);
     expect(stored?.data.sha).toBe('sha1');
 
-    await stored?.remove();
+    // `queue.remove(jobId)`, não `job.remove()` — `Job.remove()` lança "locked by
+    // another worker" de forma consistente quando o `Queue`/`Worker` vem de
+    // `@nestjs/bullmq` via `Test.createTestingModule` (não reproduz com BullMQ puro,
+    // fora do NestJS testing module — não investigado a fundo, não é o código de
+    // produto sendo testado aqui). `queue.remove()` funciona nos dois casos.
+    await queue.remove(jobId);
   });
 
   it('allows re-adding the same jobId after the previous job was removed', async () => {
@@ -66,12 +71,12 @@ describe('code-index queue (real Redis)', () => {
       userId: 'user-1',
     };
 
-    const first = await queue.add('build', data, { jobId });
-    await first.remove();
+    await queue.add('build', data, { jobId });
+    await queue.remove(jobId);
 
     const second = await queue.add('build', data, { jobId });
     expect(second.id).toBe(jobId);
 
-    await second.remove();
+    await queue.remove(jobId);
   });
 });

@@ -5,11 +5,12 @@ import { buildAgentRunRequest } from './context-builder.helper';
 
 function fakeRepositoriesService(): RepositoriesService {
   return {
-    getPullByNumber: jest.fn().mockResolvedValue({ headRef: 'main' }),
+    getPullByNumber: jest.fn().mockResolvedValue({ headRef: 'main', headSha: 'sha-abc123' }),
     getPullDiff: jest.fn().mockResolvedValue('diff --git a/a b/a'),
     listPullFiles: jest.fn().mockResolvedValue([]),
     getConventions: jest.fn().mockResolvedValue('conventions'),
     getFileContent: jest.fn().mockResolvedValue(''),
+    loginFor: jest.fn().mockResolvedValue('octocat'),
   } as unknown as RepositoriesService;
 }
 
@@ -88,5 +89,39 @@ describe('buildAgentRunRequest', () => {
     );
 
     expect(payload.policies).toEqual({ prd: 'manual', spec: 'auto' });
+  });
+
+  it('includes repoId (owner/repo, via loginFor session owner) and sha (PR head) for the code graph', async () => {
+    const repositoriesService = fakeRepositoriesService();
+
+    const payload = await buildAgentRunRequest(
+      repositoriesService,
+      'my-repo',
+      42,
+      currentUser,
+      baseDto(),
+      'analysis-123',
+    );
+
+    expect(repositoriesService.loginFor).toHaveBeenCalledWith(currentUser);
+    expect(payload.repoId).toBe('octocat/my-repo');
+    expect(payload.sha).toBe('sha-abc123');
+  });
+
+  it('uses the owner override instead of calling loginFor when provided', async () => {
+    const repositoriesService = fakeRepositoriesService();
+
+    const payload = await buildAgentRunRequest(
+      repositoriesService,
+      'my-repo',
+      42,
+      currentUser,
+      baseDto(),
+      'analysis-123',
+      'some-org',
+    );
+
+    expect(repositoriesService.loginFor).not.toHaveBeenCalled();
+    expect(payload.repoId).toBe('some-org/my-repo');
   });
 });
