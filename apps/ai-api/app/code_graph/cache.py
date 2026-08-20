@@ -49,7 +49,8 @@ class IndexCache:
                     CREATE (n:Symbol {
                         id: $id, repoId: $repoId, sha: $sha, kind: $kind, path: $path,
                         name: $name, line: $line, endLine: $endLine, signature: $signature,
-                        decorators: $decorators
+                        body: $body, decorators: $decorators, contentHash: $contentHash,
+                        parentId: $parentId
                     })
                     """,
                     id=symbol.id,
@@ -61,7 +62,10 @@ class IndexCache:
                     line=symbol.line,
                     endLine=symbol.end_line,
                     signature=symbol.signature,
+                    body=symbol.body,
                     decorators=symbol.decorators,
+                    contentHash=symbol.content_hash,
+                    parentId=symbol.parent_id,
                 )
             for edge in graph.edges:
                 rel_type = RELATIONSHIP_TYPE_BY_KIND[edge.kind]
@@ -115,7 +119,10 @@ class IndexCache:
                     line=props["line"],
                     end_line=props["endLine"],
                     signature=props["signature"],
+                    body=props.get("body", ""),
                     decorators=list(props.get("decorators", [])),
+                    content_hash=props.get("contentHash", ""),
+                    parent_id=props.get("parentId"),
                 )
             if not nodes:
                 return None

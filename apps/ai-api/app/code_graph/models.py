@@ -14,7 +14,10 @@ class Symbol(BaseModel):
     line: int
     end_line: int
     signature: str
+    body: str = ""
     decorators: list[str] = Field(default_factory=list)
+    parent_id: str | None = None
+    content_hash: str = ""
 
 
 class Edge(BaseModel):
@@ -48,6 +51,19 @@ class SymbolRef(BaseModel):
     body: str | None = None
 
 
+class ScoredNode(BaseModel):
+    symbol_id: str
+    score: float
+
+
+class DeadCodeResult(BaseModel):
+    """Internal only (input to `assemble_related_context`, T14) — never serialized
+    directly to HTTP, so snake_case like `Symbol`/`Edge`/`Graph`."""
+
+    dead: list[Symbol] = Field(default_factory=list)
+    only_tested: list[Symbol] = Field(default_factory=list)
+
+
 class IndexStats(BaseModel):
     """Crosses the HTTP boundary as part of `RelatedContext`/`IndexResult` — field names
     are camelCase to match this project's convention for anything JSON-facing
@@ -74,16 +90,31 @@ class RelatedContext(BaseModel):
     stats: IndexStats
 
 
-class DeadCodeResult(BaseModel):
-    """Internal only (input to `assemble_related_context`, T14) — never serialized
-    directly to HTTP, so snake_case like `Symbol`/`Edge`/`Graph`."""
-
-    dead: list[Symbol] = Field(default_factory=list)
-    only_tested: list[Symbol] = Field(default_factory=list)
-
-
 class IndexResult(BaseModel):
     indexId: str
     indexedFiles: int
     skippedFiles: int
+    reusedFiles: int = 0
+    truncated: bool = False
     durationMs: int
+
+
+class VizNode(BaseModel):
+    id: str
+    label: str
+    kind: str
+    path: str
+    count: int = 1
+    parentId: str | None = None
+
+
+class VizEdge(BaseModel):
+    source: str
+    target: str
+    kind: str
+
+
+class VizGraph(BaseModel):
+    nodes: list[VizNode] = Field(default_factory=list)
+    edges: list[VizEdge] = Field(default_factory=list)
+    stats: IndexStats

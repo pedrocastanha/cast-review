@@ -100,10 +100,7 @@ def _collect_decorators(def_node: Node, source: bytes) -> list[str]:
     def_index = next((i for i, c in enumerate(siblings) if c.id == def_node.id), None)
     if def_index is None:
         return decorators
-    # Walk backward skipping unnamed tokens (e.g. the `export` keyword between a
-    # decorator and the class it decorates in `export_statement`), but stop at the
-    # first *named* sibling that isn't a decorator — that's the previous method/class
-    # in a body with multiple members, and its decorators must not leak onto this one.
+
     collected: list[str] = []
     i = def_index - 1
     while i >= 0:
@@ -142,6 +139,7 @@ def parse_file(path: str, content: str) -> ParsedSymbols:
 
     symbols: list[Symbol] = []
     symbol_by_def_node_id: dict[int, Symbol] = {}
+    definition_nodes: dict[int, Node] = {}
     call_matches: list[dict] = []
     imports: list[str] = []
 
@@ -164,6 +162,7 @@ def parse_file(path: str, content: str) -> ParsedSymbols:
                 )
                 symbols.append(symbol)
                 symbol_by_def_node_id[def_node.id] = symbol
+                definition_nodes[def_node.id] = def_node
 
         if "call.node" in captures:
             call_node = captures["call.node"][0]
@@ -191,6 +190,15 @@ def parse_file(path: str, content: str) -> ParsedSymbols:
         RawCall(caller_symbol_id=_enclosing_symbol_id(call["node"]), callee_name=call["name"])
         for call in call_matches
     ]
+
+    for def_node_id, symbol in symbol_by_def_node_id.items():
+        current = definition_nodes[def_node_id].parent
+        while current is not None:
+            parent_symbol = symbol_by_def_node_id.get(current.id)
+            if parent_symbol is not None:
+                symbol.parent_id = parent_symbol.id
+                break
+            current = current.parent
 
     return ParsedSymbols(path=path, symbols=symbols, calls=calls, imports=imports)
 

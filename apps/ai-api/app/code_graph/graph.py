@@ -13,22 +13,37 @@ def is_test_path(path: str) -> bool:
     )
 
 
-def _file_symbol(path: str) -> Symbol:
+def _file_symbol(path: str, content_hash: str = "") -> Symbol:
     name = path.rsplit("/", 1)[-1]
-    return Symbol(id=path, kind="file", path=path, name=name, line=1, end_line=1, signature=path)
+    return Symbol(
+        id=path, kind="file", path=path, name=name, line=1, end_line=1, signature=path, content_hash=content_hash
+    )
 
 
 def build_graph(
     parsed_files: list[ParsedSymbols],
     tsconfig_paths: dict[str, list[str]] | None = None,
+    file_hashes: dict[str, str] | None = None,
+    reused_symbols: list[Symbol] | None = None,
 ) -> Graph:
-    known_paths = {p.path for p in parsed_files}
+    """`reused_symbols` (incremental reindex, CGC-13): symbols kept from the previous
+    build for files whose content hash didn't change — seeded into `symbol_by_name`/
+    `known_paths` so a *changed* file's calls/imports can still resolve into them, but
+    they don't get new `defines` edges here (those already exist in the old graph and
+    are merged back in by the caller — see `code_graph/incremental.py`). Without this,
+    a changed file calling into an untouched file would silently fail to link."""
+    reused = reused_symbols or []
+    known_paths = {p.path for p in parsed_files} | {s.path for s in reused}
     nodes: dict[str, Symbol] = {}
     edges: list[Edge] = []
     symbol_by_name: dict[str, list[Symbol]] = {}
 
+    for symbol in reused:
+        nodes[symbol.id] = symbol
+        symbol_by_name.setdefault(symbol.name, []).append(symbol)
+
     for parsed in parsed_files:
-        file_symbol = _file_symbol(parsed.path)
+        file_symbol = _file_symbol(parsed.path, (file_hashes or {}).get(parsed.path, ""))
         nodes[file_symbol.id] = file_symbol
         for symbol in parsed.symbols:
             nodes[symbol.id] = symbol
