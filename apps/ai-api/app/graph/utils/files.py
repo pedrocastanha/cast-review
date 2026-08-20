@@ -11,7 +11,7 @@ SKIP_NAME = (
     ".min.css",
 )
 
-def files_block(files: list[dict]) -> str:
+def files_block(files: list[dict], related_context: dict | None = None) -> str:
     budget = MAX_PROMPT_TOTAL_CHARS
     chunks: list[str] = []
 
@@ -26,7 +26,52 @@ def files_block(files: list[dict]) -> str:
         chunks.append(piece)
         budget -= len(piece)
 
+    related_piece = _related_context_block(related_context, budget)
+    if related_piece:
+        chunks.append(related_piece)
+
     return "\n\n".join(chunks)
+
+
+def _related_context_block(related_context: dict | None, budget: int) -> str:
+    """`MAX_PROMPT_TOTAL_CHARS` is the managed budget end to end — this block competes
+    for the same char budget as file content, it isn't extra on top (CGC-11: "orçamento
+    gerenciado", not "corte cego" — the actual token-level budgeting already happened
+    in `budget.py`/`context.py`; this just renders what survived that selection,
+    respecting whatever char budget is left after the changed-file blocks)."""
+    if not related_context or budget <= 0:
+        return ""
+
+    sections: list[str] = []
+
+    callers = related_context.get("callers") or []
+    if callers:
+        caller_text = "\n\n".join(f"### caller {c['path']}::{c['name']}\n{c.get('body') or c['signature']}" for c in callers)
+        sections.append(f"## Callers (quem chama o código alterado)\n{caller_text}")
+
+    callees = related_context.get("callees") or []
+    if callees:
+        callee_text = "\n\n".join(f"### callee {c['path']}::{c['name']}\n{c.get('body') or c['signature']}" for c in callees)
+        sections.append(f"## Callees (o que o código alterado chama)\n{callee_text}")
+
+    tests = related_context.get("tests") or []
+    if tests:
+        test_text = "\n\n".join(f"### test {t['path']}::{t['name']}\n{t.get('body') or t['signature']}" for t in tests)
+        sections.append(f"## Tests (testes que cobrem o código alterado)\n{test_text}")
+
+    dead = related_context.get("deadCodeCandidates") or []
+    if dead:
+        dead_text = "\n".join(f"- {d['path']}::{d['name']} — sem caller conhecido no repo" for d in dead)
+        sections.append(f"## Possível código morto\n{dead_text}")
+
+    repo_map = related_context.get("repoMap") or ""
+    if repo_map:
+        sections.append(f"## Repo map (assinaturas de vizinhos, sem corpo)\n{repo_map}")
+
+    if not sections:
+        return ""
+
+    return "\n\n".join(sections)[:budget]
 
 def clip_diff(diff: str) -> str:
     if len(diff) <= MAX_DIFF_CHARS:
