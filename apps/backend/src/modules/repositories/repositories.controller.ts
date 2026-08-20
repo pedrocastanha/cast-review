@@ -1,4 +1,12 @@
-import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { CurrentUser } from '../auth/utils/current-user-decorator';
 import { RepositoriesService } from './repositories.service';
@@ -31,6 +39,29 @@ export class RepositoriesController {
     return this.repositoriesService.getPullByNumber(
       repo,
       pullNumber,
+      currentUser,
+      owner,
+    );
+  }
+
+  @Post(':repo/index')
+  @HttpCode(202)
+  async indexRepository(
+    @Param('repo') repo: string,
+    @CurrentUser() currentUser: CurrentUserData,
+    @Query('owner') owner?: string,
+  ) {
+    return this.repositoriesService.enqueueIndexJob(repo, currentUser, owner);
+  }
+
+  @Get(':repo/index/status')
+  async getIndexStatus(
+    @Param('repo') repo: string,
+    @CurrentUser() currentUser: CurrentUserData,
+    @Query('owner') owner?: string,
+  ) {
+    return this.repositoriesService.getRepositoryIndexStatus(
+      repo,
       currentUser,
       owner,
     );

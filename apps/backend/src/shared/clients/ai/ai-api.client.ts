@@ -4,6 +4,9 @@ import type {
   AgentEvent,
   AgentResumeRequest,
   AgentRunRequest,
+  IndexBuildRequest,
+  IndexBuildResult,
+  IndexStatusResult,
 } from 'src/shared/types';
 
 const DEFAULT_AI_API_URL = 'http://localhost:8000';
@@ -103,6 +106,40 @@ export class AiApiClient {
     } finally {
       reader.releaseLock();
     }
+  }
+
+  async buildIndex(payload: IndexBuildRequest): Promise<IndexBuildResult> {
+    const response = await fetch(`${resolveAiApiUrl()}/index/build`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      this.logger.error('ai-api respondeu com falha ao indexar repositório', {
+        status: response.status,
+        repoId: payload.repoId,
+      });
+      throw new Error(`ai-api indisponível (status ${response.status})`);
+    }
+
+    return (await response.json()) as IndexBuildResult;
+  }
+
+  async getIndexStatus(repoId: string): Promise<IndexStatusResult> {
+    const response = await fetch(
+      `${resolveAiApiUrl()}/index/status?repoId=${encodeURIComponent(repoId)}`,
+    );
+
+    if (!response.ok) {
+      this.logger.error('ai-api respondeu com falha ao consultar status de índice', {
+        status: response.status,
+        repoId,
+      });
+      throw new Error(`ai-api indisponível (status ${response.status})`);
+    }
+
+    return (await response.json()) as IndexStatusResult;
   }
 
   private parseEvent(rawEvent: string): AgentEvent | null {

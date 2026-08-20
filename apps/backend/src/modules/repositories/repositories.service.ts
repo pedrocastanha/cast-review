@@ -1,3 +1,4 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   ForbiddenException,
   Injectable,
@@ -6,10 +7,26 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Octokit } from '@octokit/rest';
+import type { Queue } from 'bullmq';
+import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import { BaseService } from 'src/shared/services/base.service';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { UserService } from '../users/user.service';
+import {
+  buildIndexJobId,
+  CODE_INDEX_QUEUE,
+  IndexJobData,
+} from './indexing/index-queue.constants';
+
+export type IndexStatus = 'not_indexed' | 'queued' | 'indexing' | 'indexed';
+
+export interface RepositoryIndexStatus {
+  status: IndexStatus;
+  sha: string | null;
+  stale: boolean;
+  progress?: number;
+}
 
 type GithubPull = {
   id: number;
@@ -42,6 +59,8 @@ const REPO_AFFILIATION = 'owner,collaborator,organization_member';
 export class RepositoriesService extends BaseService {
   constructor(
     private readonly userService: UserService,
+    @InjectQueue(CODE_INDEX_QUEUE) private readonly indexQueue: Queue<IndexJobData>,
+    private readonly aiApiClient: AiApiClient,
     logger: AppLogger,
   ) {
     super(logger);
@@ -133,7 +152,6 @@ export class RepositoriesService extends BaseService {
     }
   }
 
-  /** Diff bruto da PR (patch unificado), usado como contexto pro Change Analyzer. */
   async getPullDiff(
     repo: string,
     pullNumber: number,
@@ -157,7 +175,6 @@ export class RepositoriesService extends BaseService {
     }
   }
 
-  /** Arquivos alterados na PR (path + patch por arquivo), base do Context Builder. */
   async listPullFiles(
     repo: string,
     pullNumber: number,
@@ -183,11 +200,6 @@ export class RepositoriesService extends BaseService {
     }
   }
 
-  /**
-   * Conteúdo completo de um arquivo numa ref (branch/sha) específica.
-   * Devolve `null` em vez de lançar quando o arquivo não existe na ref
-   * (path advinhado pela heurística de imports errou, ou arquivo foi deletado).
-   */
   async getFileContent(
     repo: string,
     path: string,
@@ -219,7 +231,6 @@ export class RepositoriesService extends BaseService {
     }
   }
 
-  /** `conventions.md` na raiz do repo, na ref da PR. String vazia se não existir. */
   async getConventions(
     repo: string,
     ref: string,
@@ -406,6 +417,84 @@ export class RepositoriesService extends BaseService {
     } catch (err) {
       this.handleGithubError(err);
     }
+  }
+
+  async enqueueIndexJob(
+    repo: string,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ): Promise<{ jobId: string; status: 'queued' }> {
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
+
+    try {
+      const sha = await this.resolveDefaultBranchSha(session.octokit, owner, repo);
+      const jobId = buildIndexJobId(owner, repo, sha);
+      await this.indexQueue.add(
+        'build',
+        { owner, repo, sha, userId: currentUser.id },
+
+        { jobId, removeOnComplete: true, removeOnFail: true },
+      );
+
+      return { jobId, status: 'queued' };
+    } catch (err) {
+      this.handleGithubError(err);
+    }
+  }
+
+  async getRepositoryIndexStatus(
+    repo: string,
+    currentUser: CurrentUserData,
+    ownerOverride?: string,
+  ): Promise<RepositoryIndexStatus> {
+    const session = await this.session(currentUser);
+    const owner = ownerOverride?.trim() || session.owner;
+
+    try {
+      const headSha = await this.resolveDefaultBranchSha(
+        session.octokit,
+        owner,
+        repo,
+      );
+      const jobId = buildIndexJobId(owner, repo, headSha);
+      const job = await this.indexQueue.getJob(jobId);
+
+      if (job) {
+        const state = await job.getState();
+        return {
+          status: state === 'active' ? 'indexing' : 'queued',
+          sha: null,
+          stale: false,
+          progress: typeof job.progress === 'number' ? job.progress : 0,
+        };
+      }
+
+      const repoId = `${owner}/${repo}`;
+      const { indexed, sha } = await this.aiApiClient.getIndexStatus(repoId);
+
+      return {
+        status: indexed ? 'indexed' : 'not_indexed',
+        sha,
+        stale: indexed && sha !== headSha,
+      };
+    } catch (err) {
+      this.handleGithubError(err);
+    }
+  }
+
+  private async resolveDefaultBranchSha(
+    octokit: Octokit,
+    owner: string,
+    repo: string,
+  ): Promise<string> {
+    const { data: repoData } = await octokit.repos.get({ owner, repo });
+    const { data: ref } = await octokit.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${repoData.default_branch}`,
+    });
+    return ref.object.sha;
   }
 
   async loginFor(currentUser: CurrentUserData): Promise<string> {

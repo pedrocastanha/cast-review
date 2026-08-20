@@ -69,6 +69,29 @@ export interface ApprovalDecision {
   annotations?: Annotation[] | null;
 }
 
+export interface IndexBuildFile {
+  path: string;
+  content: string;
+}
+
+export interface IndexBuildRequest {
+  repoId: string;
+  sha: string;
+  files: IndexBuildFile[];
+}
+
+export interface IndexBuildResult {
+  indexId: string;
+  indexedFiles: number;
+  skippedFiles: number;
+  durationMs: number;
+}
+
+export interface IndexStatusResult {
+  indexed: boolean;
+  sha: string | null;
+}
+
 export interface AgentResumeRequest {
   analysisId: string;
   models: {
