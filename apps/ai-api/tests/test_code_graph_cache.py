@@ -34,7 +34,16 @@ def _sample_graph() -> Graph:
     # `MATCH` in Cypher, so a fixture missing this node under-counts edges after roundtrip.
     file_symbol = Symbol(id="a.ts", kind="file", path="a.ts", name="a.ts", line=1, end_line=1, signature="a.ts")
     foo = Symbol(id="a.ts::foo@0", kind="function", path="a.ts", name="foo", line=1, end_line=1, signature="function foo()")
-    bar = Symbol(id="a.ts::bar@10", kind="function", path="a.ts", name="bar", line=2, end_line=2, signature="function bar()")
+    bar = Symbol(
+        id="a.ts::bar@10",
+        kind="function",
+        path="a.ts",
+        name="bar",
+        line=2,
+        end_line=2,
+        signature="function bar()",
+        parent_id=foo.id,
+    )
     return Graph(
         nodes={file_symbol.id: file_symbol, foo.id: foo, bar.id: bar},
         edges=[
@@ -64,6 +73,7 @@ async def test_build_and_store_then_lookup_roundtrip(driver, redis_client, repo_
     ref_edge = next(e for e in recovered.edges if e.kind == "references")
     assert ref_edge.from_id == "a.ts::foo@0"
     assert ref_edge.to_id == "a.ts::bar@10"
+    assert recovered.nodes["a.ts::bar@10"].parent_id == "a.ts::foo@0"
 
     await _cleanup(driver, repo_id)
 

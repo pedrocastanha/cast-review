@@ -56,6 +56,9 @@ class Baz {
     parsed = parse_file("src/baz.ts", content)
     kinds = {s.name: s.kind for s in parsed.symbols}
     assert kinds == {"Baz": "class", "method1": "method"}
+    baz = next(s for s in parsed.symbols if s.name == "Baz")
+    method = next(s for s in parsed.symbols if s.name == "method1")
+    assert method.parent_id == baz.id
 
 
 def test_parse_file_ts_extracts_import_source():
@@ -86,8 +89,10 @@ def foo(x):
     assert kinds["foo"] == "function"
 
     method1 = next(s for s in parsed.symbols if s.name == "method1")
+    baz = next(s for s in parsed.symbols if s.name == "Baz")
     call = next(c for c in parsed.calls if c.callee_name == "foo")
     assert call.caller_symbol_id == method1.id
+    assert method1.parent_id == baz.id
 
 
 def test_parse_file_python_extracts_imports():
