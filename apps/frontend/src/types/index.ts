@@ -36,6 +36,20 @@ export interface UpdateUserPayload {
   githubToken?: string;
 }
 
+export type RepositoryIndexStatusValue = 'not_indexed' | 'queued' | 'indexing' | 'indexed';
+
+export interface RepositoryIndexStatus {
+  status: RepositoryIndexStatusValue;
+  sha: string | null;
+  stale: boolean;
+  progress?: number;
+}
+
+export interface IndexJobEnqueued {
+  jobId: string;
+  status: 'queued';
+}
+
 export interface Repository {
   id: number;
   name: string;
