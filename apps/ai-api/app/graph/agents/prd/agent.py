@@ -18,6 +18,7 @@ async def generate_prd(
     prior_prd: dict | None = None,
     revision_notes: list[dict] | None = None,
 ) -> dict:
+    related_context = change_analysis.get("relatedContext")
     system = build_system_prompt("prd", ["describe-shipped-change"])
     user = (
         _build_revision_prompt(diff, changed_files, change_analysis, prior_prd, revision_notes)
@@ -25,7 +26,7 @@ async def generate_prd(
         else (
             f"CHANGE_ANALYSIS:\n{change_analysis}\n\n"
             f"DIFF:\n{clip_diff(diff)}\n\n"
-            f"FILES:\n{files_block(changed_files)}"
+            f"FILES:\n{files_block(changed_files, related_context)}"
         )
     )
     result = await complete_json(
@@ -76,12 +77,13 @@ def _build_revision_prompt(
         for note in revision_notes
     )
     prior_content = (prior_prd or {}).get("markdown") or ""
+    related_context = change_analysis.get("relatedContext")
     return (
         f"PRD_ANTERIOR:\n{prior_content}\n\n"
         f"FEEDBACK_DE_REVISAO:\n{notes_block}\n\n"
         f"CHANGE_ANALYSIS:\n{change_analysis}\n\n"
         f"DIFF:\n{clip_diff(diff)}\n\n"
-        f"FILES:\n{files_block(changed_files)}\n\n"
+        f"FILES:\n{files_block(changed_files, related_context)}\n\n"
         "Instrução: revise o PRD anterior incorporando o feedback de revisão listado "
         "acima, mantendo o formato JSON definido no system prompt."
     )

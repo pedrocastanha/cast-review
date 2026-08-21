@@ -1,3 +1,4 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -10,11 +11,13 @@ import { RepositoriesModule } from './modules/repositories/repositories.module';
 import { UsersModule } from './modules/users/user.module';
 import { PostgresModule } from './shared/database/postgres/postgres.module';
 import { LoggerModule } from './shared/logger/logger.module';
+import { resolveRedisConnection } from './shared/queue/redis-connection';
 
 @Module({
   imports: [
     LoggerModule,
     PostgresModule,
+    BullModule.forRoot({ connection: resolveRedisConnection() }),
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,

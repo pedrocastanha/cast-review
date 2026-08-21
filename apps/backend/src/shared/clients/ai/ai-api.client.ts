@@ -4,6 +4,10 @@ import type {
   AgentEvent,
   AgentResumeRequest,
   AgentRunRequest,
+  IndexBuildRequest,
+  IndexBuildResult,
+  IndexStatusResult,
+  VizGraph,
 } from 'src/shared/types';
 
 const DEFAULT_AI_API_URL = 'http://localhost:8000';
@@ -103,6 +107,63 @@ export class AiApiClient {
     } finally {
       reader.releaseLock();
     }
+  }
+
+  async buildIndex(payload: IndexBuildRequest): Promise<IndexBuildResult> {
+    const response = await fetch(`${resolveAiApiUrl()}/index/build`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      this.logger.error('ai-api respondeu com falha ao indexar repositório', {
+        status: response.status,
+        repoId: payload.repoId,
+      });
+      throw new Error(`ai-api indisponível (status ${response.status})`);
+    }
+
+    return (await response.json()) as IndexBuildResult;
+  }
+
+  async getIndexStatus(repoId: string): Promise<IndexStatusResult> {
+    const response = await fetch(
+      `${resolveAiApiUrl()}/index/status?repoId=${encodeURIComponent(repoId)}`,
+    );
+
+    if (!response.ok) {
+      this.logger.error('ai-api respondeu com falha ao consultar status de índice', {
+        status: response.status,
+        repoId,
+      });
+      throw new Error(`ai-api indisponível (status ${response.status})`);
+    }
+
+    return (await response.json()) as IndexStatusResult;
+  }
+
+  async getGraph(
+    repoId: string,
+    sha: string,
+    focus?: string,
+    depth?: number,
+  ): Promise<VizGraph> {
+    const params = new URLSearchParams({ repoId, sha });
+    if (focus) params.set('focus', focus);
+    if (depth !== undefined) params.set('depth', String(depth));
+
+    const response = await fetch(`${resolveAiApiUrl()}/index/graph?${params.toString()}`);
+
+    if (!response.ok) {
+      this.logger.error('ai-api respondeu com falha ao buscar grafo de visualização', {
+        status: response.status,
+        repoId,
+      });
+      throw new Error(`ai-api indisponível (status ${response.status})`);
+    }
+
+    return (await response.json()) as VizGraph;
   }
 
   private parseEvent(rawEvent: string): AgentEvent | null {

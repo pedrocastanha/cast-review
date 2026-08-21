@@ -56,6 +56,8 @@ export interface AgentRunRequest {
     openai: string;
   };
   policies?: Policies;
+  repoId?: string;
+  sha?: string;
 }
 
 export interface Annotation {
@@ -67,6 +69,49 @@ export interface ApprovalDecision {
   stage: 'prd' | 'spec';
   action: 'approve' | 'reject';
   annotations?: Annotation[] | null;
+}
+
+export interface IndexBuildFile {
+  path: string;
+  content: string;
+}
+
+export interface IndexBuildRequest {
+  repoId: string;
+  sha: string;
+  files: IndexBuildFile[];
+}
+
+export interface IndexBuildResult {
+  indexId: string;
+  indexedFiles: number;
+  skippedFiles: number;
+  durationMs: number;
+}
+
+export interface IndexStatusResult {
+  indexed: boolean;
+  sha: string | null;
+}
+
+export interface VizNode {
+  id: string;
+  label: string;
+  kind: string;
+  path: string;
+  count: number;
+}
+
+export interface VizEdge {
+  source: string;
+  target: string;
+  kind: string;
+}
+
+export interface VizGraph {
+  nodes: VizNode[];
+  edges: VizEdge[];
+  stats: { indexed: boolean; truncated?: boolean };
 }
 
 export interface AgentResumeRequest {

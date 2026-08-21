@@ -22,10 +22,11 @@ export async function buildAgentRunRequest(
 ): Promise<AgentRunRequest> {
   const pull = await repositoriesService.getPullByNumber(repo, pullNumber, currentUser, owner);
 
-  const [diff, files, conventions] = await Promise.all([
+  const [diff, files, conventions, resolvedOwner] = await Promise.all([
     repositoriesService.getPullDiff(repo, pullNumber, currentUser, owner),
     repositoriesService.listPullFiles(repo, pullNumber, currentUser, owner),
     repositoriesService.getConventions(repo, pull.headRef, currentUser, owner),
+    owner?.trim() || repositoriesService.loginFor(currentUser),
   ]);
 
   const changedFiles = await Promise.all(
@@ -45,6 +46,8 @@ export async function buildAgentRunRequest(
       prd: dto.policies?.prd ?? 'manual',
       spec: dto.policies?.spec ?? 'manual',
     },
+    repoId: `${resolvedOwner}/${repo}`,
+    sha: pull.headSha,
   };
 }
 

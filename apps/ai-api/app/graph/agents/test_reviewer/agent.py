@@ -17,6 +17,7 @@ async def run_test_reviewer(
     api_key: str,
     prd: dict | None = None,
     run_id: str | None = None,
+    related_context: dict | None = None,
 ) -> dict:
     business_rules = [rule for rule in spec.get("businessRules") or [] if isinstance(rule, str)]
     analysis = analyze_changes(changed_files)
@@ -35,7 +36,7 @@ async def run_test_reviewer(
     system = build_system_prompt("test_reviewer", ["map-rule-to-test"])
     result = await complete_json(
         system=system,
-        user=_user_prompt(business_rules, changed_files, prd),
+        user=_user_prompt(business_rules, changed_files, prd, related_context),
         model=model,
         api_key=api_key,
         on_delta=lambda delta: emit_thought("test_reviewer", delta, run_id),
@@ -56,6 +57,7 @@ async def node(state: GraphState, config: RunnableConfig) -> dict:
         api_key=config["configurable"]["api_keys"]["openai"],
         prd=state.get("prd"),
         run_id=state.get("run_id"),
+        related_context=(state.get("change_analysis") or {}).get("relatedContext"),
     )
     return {"test_review": review}
 
@@ -91,12 +93,17 @@ def _ensure_every_rule_covered(
     missing = [_missing_test(rule, path) for rule in rules if rule not in covered]
     return findings + missing
 
-def _user_prompt(rules: list[str], changed_files: list[dict], prd: dict | None) -> str:
+def _user_prompt(
+    rules: list[str],
+    changed_files: list[dict],
+    prd: dict | None,
+    related_context: dict | None = None,
+) -> str:
     prefix = prd_block(prd)
     head = f"{prefix}\n\n" if prefix else ""
     return (
         f"{head}businessRules:\n"
         + "\n".join(f"- {rule}" for rule in rules)
         + "\n\nchanged files (path, diff, fullContent):\n"
-        + files_block(changed_files)
+        + files_block(changed_files, related_context)
     )

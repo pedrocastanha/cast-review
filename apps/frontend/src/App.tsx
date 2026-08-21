@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage';
 import { PullRequestsPage } from './pages/PullRequestsPage';
 import { PullRequestReviewPage } from './pages/PullRequestReviewPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { RepoGraphPage } from './pages/RepoGraphPage';
 import { ReposPage } from './pages/ReposPage';
 import { SettingsPage } from './pages/SettingsPage';
 
@@ -82,6 +83,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <AnalysisRecordPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/repos/:owner/:repo/graph"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <RepoGraphPage />
                 </Layout>
               </ProtectedRoute>
             }

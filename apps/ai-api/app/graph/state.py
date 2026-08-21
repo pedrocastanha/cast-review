@@ -5,6 +5,8 @@ class GraphState(TypedDict, total=False):
     diff: str
     changed_files: list[dict]
     conventions: str
+    repo_id: str | None
+    sha: str | None
     models: dict[str, str]
     change_analysis: dict[str, Any]
     prd: dict[str, Any]
