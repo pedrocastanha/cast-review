@@ -12,6 +12,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { RepoGraphPage } from './pages/RepoGraphPage';
 import { ReposPage } from './pages/ReposPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { BenchmarksPage } from './pages/BenchmarksPage';
 
 function App() {
   return (
@@ -43,6 +44,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ReposPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/benchmarks"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <BenchmarksPage />
                 </Layout>
               </ProtectedRoute>
             }
