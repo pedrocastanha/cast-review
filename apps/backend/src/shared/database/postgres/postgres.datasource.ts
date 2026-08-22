@@ -1,6 +1,9 @@
 import 'dotenv/config';
 
 import { Analysis } from 'src/modules/analyses/analysis.entity';
+import { AnalysisContextSnapshotEntity } from 'src/modules/analyses/analysis-context-snapshot.entity';
+import { BenchmarkCase } from 'src/modules/benchmarks/benchmark-case.entity';
+import { BenchmarkRun } from 'src/modules/benchmarks/benchmark-run.entity';
 import { User } from 'src/modules/users/user.entity';
 import { DataSource } from 'typeorm';
 
@@ -11,7 +14,13 @@ export default new DataSource({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  entities: [User, Analysis],
+  entities: [
+    User,
+    Analysis,
+    AnalysisContextSnapshotEntity,
+    BenchmarkCase,
+    BenchmarkRun,
+  ],
   synchronize: false,
   migrations: [`${__dirname}/migrations/**/*{.ts,.js}`],
   migrationsTableName: 'migrations',
