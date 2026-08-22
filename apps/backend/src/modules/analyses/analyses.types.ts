@@ -1,4 +1,8 @@
-export type AnalysisStatus = 'running' | 'completed' | 'error' | 'awaiting_approval';
+export type AnalysisStatus =
+  | 'running'
+  | 'completed'
+  | 'error'
+  | 'awaiting_approval';
 
 export type FindingStatus = 'fail' | 'warning' | 'pass';
 
@@ -12,6 +16,93 @@ export interface ChangeAnalysis {
   files: ChangeAnalysisFile[];
   hasTests: boolean;
   hasMigration: boolean;
+}
+
+export type GraphRelation =
+  | 'changed'
+  | 'caller'
+  | 'callee'
+  | 'test'
+  | 'dead_code';
+export type GraphConfidence = 'confirmed' | 'inferred' | 'unresolved' | 'stale';
+
+export interface GraphSnapshotNode {
+  id: string;
+  kind: string;
+  path: string;
+  name: string;
+  signature: string;
+  body: string | null;
+  line: number;
+  endLine: number;
+  contentHash: string | null;
+  relation: GraphRelation;
+  distance: number | null;
+  score: number | null;
+  confidence: GraphConfidence;
+  reason: string;
+}
+
+export interface GraphSnapshotEdge {
+  fromId: string;
+  toId: string;
+  kind: 'defines' | 'references' | 'imports' | 'tests';
+  weight: number;
+  confidence: 'confirmed' | 'inferred' | 'stale';
+}
+
+export interface AnalysisContextSnapshot {
+  schemaVersion: '1';
+  snapshotHash: string;
+  createdAt: string;
+  analysisId: string | null;
+  repository: {
+    repoId: string;
+    owner: string;
+    repo: string;
+    pullNumber: number | null;
+    baseSha: string | null;
+    requestedSha: string | null;
+  };
+  graph: {
+    indexedSha: string | null;
+    stale: boolean;
+    indexerVersion: string;
+    graphSchemaVersion: string;
+    queryVersion: string;
+  };
+  input: {
+    diffHash: string;
+    diff: string;
+    changedFiles: Array<{
+      path: string;
+      diff: string;
+      fullContent: string;
+      relatedFiles: Array<{ path: string; content: string }>;
+    }>;
+    conventions: string;
+  };
+  selected: {
+    nodes: GraphSnapshotNode[];
+    changedSymbols: GraphSnapshotNode[];
+    callers: GraphSnapshotNode[];
+    callees: GraphSnapshotNode[];
+    tests: GraphSnapshotNode[];
+    deadCodeCandidates: GraphSnapshotNode[];
+    repoMap: string;
+  };
+  edges: GraphSnapshotEdge[];
+  budget: {
+    tokenBudget: number;
+    budgetUsed: number;
+    truncated: boolean;
+    omittedNodes: number;
+    omittedEdges: number;
+  };
+  rendered: {
+    graphContextBlock: string;
+    relatedContext: Record<string, unknown>;
+  };
 }
 
 export interface ReviewFinding {
