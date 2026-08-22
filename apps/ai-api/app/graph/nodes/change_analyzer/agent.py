@@ -39,28 +39,49 @@ def analyze_changes(changed_files: list[dict], diff: str = "") -> dict:
 async def node(state: GraphState) -> dict:
     analysis = analyze_changes(state["changed_files"], state.get("diff", ""))
     analysis["usage"] = skipped_step("change_analyzer")
-    analysis["relatedContext"] = await _related_context(state)
+    related, snapshot = await _graph_context(state)
+    analysis["relatedContext"] = related
+    analysis["graphSnapshot"] = snapshot
     return {"change_analysis": analysis}
 
 
-async def _related_context(state: GraphState) -> dict | None:
+async def _graph_context(state: GraphState) -> tuple[dict | None, dict | None]:
     """Never lets a graph/Neo4j/Redis problem take down the run (CGC-04/CGC-12
     spirit) — `change_analyzer` degrading to `relatedContext=None` is the same
     contract as "repo never indexed", not a special error path."""
+    frozen = state.get("frozen_context") or {}
+    frozen_snapshot = frozen.get("graphSnapshot")
+    if isinstance(frozen_snapshot, dict):
+        rendered = frozen_snapshot.get("rendered") or {}
+        return rendered.get("relatedContext"), frozen_snapshot
+
     repo_id = state.get("repo_id")
     sha = state.get("sha")
     if not repo_id or not sha:
-        return None
+        return None, None
 
     try:
         from app.code_graph.context import assemble_related_context
+        from app.code_graph.models import Graph
+        from app.code_graph.snapshot import build_context_snapshot
 
         driver, cache = _get_index_cache()
         changed_paths = [item["path"] for item in state["changed_files"] if item.get("path")]
         related = await assemble_related_context(cache, driver, repo_id, sha, changed_paths)
-        return related.model_dump()
+        graph = await cache.lookup(repo_id, sha) or Graph()
+        snapshot = build_context_snapshot(
+            analysis_id=state.get("run_id"),
+            repo_id=repo_id,
+            sha=sha,
+            graph=graph,
+            related=related,
+            diff=state.get("diff", ""),
+            changed_files=state["changed_files"],
+            conventions=state.get("conventions", ""),
+        )
+        return related.model_dump(), snapshot.model_dump()
     except Exception:
-        return None
+        return None, None
 
 def _classify(path: str) -> dict:
     normalized = path.replace("\\", "/")
