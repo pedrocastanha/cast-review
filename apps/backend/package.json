@@ -24,7 +24,8 @@
     "migration:generate": "npm run typeorm -- migration:generate src/shared/database/postgres/migrations/Migration -d src/shared/database/postgres/postgres.datasource.ts",
     "migration:create": "typeorm-ts-node-commonjs migration:create",
     "migration:run": "npm run typeorm -- migration:run -d src/shared/database/postgres/postgres.datasource.ts",
-    "migration:revert": "npm run typeorm -- migration:revert -d src/shared/database/postgres/postgres.datasource.ts"
+    "migration:revert": "npm run typeorm -- migration:revert -d src/shared/database/postgres/postgres.datasource.ts",
+    "benchmark:refresh-curated": "node scripts/generate-curated-benchmark-cases.mjs"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.5",

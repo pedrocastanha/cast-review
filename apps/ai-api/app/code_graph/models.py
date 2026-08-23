@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -118,3 +118,93 @@ class VizGraph(BaseModel):
     nodes: list[VizNode] = Field(default_factory=list)
     edges: list[VizEdge] = Field(default_factory=list)
     stats: IndexStats
+
+
+GraphRelation = Literal["changed", "caller", "callee", "test", "dead_code"]
+GraphConfidence = Literal["confirmed", "inferred", "unresolved", "stale"]
+
+
+class GraphSnapshotNode(BaseModel):
+    id: str
+    kind: str
+    path: str
+    name: str
+    signature: str
+    body: str | None = None
+    line: int
+    endLine: int
+    contentHash: str | None = None
+    relation: GraphRelation
+    distance: int | None = None
+    score: float | None = None
+    confidence: GraphConfidence
+    reason: str
+
+
+class GraphSnapshotEdge(BaseModel):
+    fromId: str
+    toId: str
+    kind: EdgeKind
+    weight: float = 1.0
+    confidence: Literal["confirmed", "inferred", "stale"] = "confirmed"
+
+
+class SnapshotRepository(BaseModel):
+    repoId: str
+    owner: str
+    repo: str
+    pullNumber: int | None = None
+    baseSha: str | None = None
+    requestedSha: str | None = None
+
+
+class SnapshotGraphMetadata(BaseModel):
+    indexedSha: str | None = None
+    stale: bool = False
+    indexerVersion: str = "code-graph-v1"
+    graphSchemaVersion: str = "1"
+    queryVersion: str = "related-context-v1"
+
+
+class SnapshotInput(BaseModel):
+    diffHash: str
+    diff: str
+    changedFiles: list[dict[str, Any]] = Field(default_factory=list)
+    conventions: str = ""
+
+
+class SnapshotSelection(BaseModel):
+    nodes: list[GraphSnapshotNode] = Field(default_factory=list)
+    changedSymbols: list[GraphSnapshotNode] = Field(default_factory=list)
+    callers: list[GraphSnapshotNode] = Field(default_factory=list)
+    callees: list[GraphSnapshotNode] = Field(default_factory=list)
+    tests: list[GraphSnapshotNode] = Field(default_factory=list)
+    deadCodeCandidates: list[GraphSnapshotNode] = Field(default_factory=list)
+    repoMap: str = ""
+
+
+class SnapshotBudget(BaseModel):
+    tokenBudget: int
+    budgetUsed: int
+    truncated: bool
+    omittedNodes: int
+    omittedEdges: int
+
+
+class SnapshotRendered(BaseModel):
+    graphContextBlock: str
+    relatedContext: dict[str, Any]
+
+
+class AnalysisContextSnapshot(BaseModel):
+    schemaVersion: Literal["1"] = "1"
+    snapshotHash: str
+    createdAt: str
+    analysisId: str | None = None
+    repository: SnapshotRepository
+    graph: SnapshotGraphMetadata
+    input: SnapshotInput
+    selected: SnapshotSelection
+    edges: list[GraphSnapshotEdge] = Field(default_factory=list)
+    budget: SnapshotBudget
+    rendered: SnapshotRendered

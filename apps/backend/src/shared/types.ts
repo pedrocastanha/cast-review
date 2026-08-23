@@ -58,6 +58,9 @@ export interface AgentRunRequest {
   policies?: Policies;
   repoId?: string;
   sha?: string;
+  frozenContext?: {
+    graphSnapshot: unknown;
+  };
 }
 
 export interface Annotation {

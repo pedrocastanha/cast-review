@@ -13,6 +13,7 @@ import type { AgentEvent, AgentResumeRequest } from 'src/shared/types';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { RepositoriesService } from '../repositories/repositories.service';
 import type {
+  AnalysisContextSnapshot,
   AnalysisRecord,
   AnalysisReview,
   GithubCommentsResult,
@@ -21,6 +22,7 @@ import type {
 } from './analyses.types';
 import { Analysis } from './analysis.entity';
 import { AnalysisRepository } from './analysis.repository';
+import { AnalysisContextSnapshotRepository } from './analysis-context-snapshot.repository';
 import type { ApproveAnalysisDto } from './dtos/approve-analysis.dto';
 import type { ResumeAnalysisDto } from './dtos/resume-analysis.dto';
 import {
@@ -58,6 +60,7 @@ export class AnalysesService extends BaseService {
     private readonly repositoriesService: RepositoriesService,
     private readonly aiApiClient: AiApiClient,
     private readonly analysisRepository: AnalysisRepository,
+    private readonly contextSnapshotRepository: AnalysisContextSnapshotRepository,
     logger: AppLogger,
   ) {
     super(logger);
@@ -166,9 +169,7 @@ export class AnalysesService extends BaseService {
     }
 
     if (analysis.status !== 'running' && analysis.status !== 'error') {
-      throw new ConflictException(
-        'Análise não pode ser retomada neste status',
-      );
+      throw new ConflictException('Análise não pode ser retomada neste status');
     }
 
     await this.analysisRepository.update(analysisId, {
@@ -331,7 +332,10 @@ export class AnalysesService extends BaseService {
         apiKeys: dto.apiKeys!,
         models: dto.models!,
         policies: analysis.publishPolicy
-          ? { prd: analysis.publishPolicy.prd, spec: analysis.publishPolicy.spec }
+          ? {
+              prd: analysis.publishPolicy.prd,
+              spec: analysis.publishPolicy.spec,
+            }
           : { prd: 'manual', spec: 'manual' },
         decision: {
           stage,
@@ -442,6 +446,9 @@ export class AnalysesService extends BaseService {
           writeEvent(event);
           return;
         } else {
+          if (event.type === 'change_analysis_done') {
+            await this.persistContextSnapshot(analysis.id, event.payload);
+          }
           review = applyReviewEvent(review, event.type, event.payload);
           if (event.type === 'report_ready') {
             if (analysis.publishPolicy?.publish === 'auto') {
@@ -571,6 +578,57 @@ export class AnalysesService extends BaseService {
     }
 
     return this.toRecord(row);
+  }
+
+  async getContextSnapshotForUser(
+    id: string,
+    currentUser: CurrentUserData,
+  ): Promise<AnalysisContextSnapshot> {
+    const analysis = await this.analysisRepository.findOne({
+      where: { id, requestedBy: currentUser.id },
+    });
+    if (!analysis) {
+      throw new NotFoundException('Análise não encontrada');
+    }
+
+    const row = await this.contextSnapshotRepository.findOne({
+      where: { analysisId: id },
+    });
+    if (!row) {
+      throw new NotFoundException('Contexto histórico indisponível');
+    }
+    return row.graphSnapshot;
+  }
+
+  private async persistContextSnapshot(
+    analysisId: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    const snapshot = payload.graphSnapshot;
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+      return;
+    }
+    const value = snapshot as Partial<AnalysisContextSnapshot>;
+    if (!value.snapshotHash || !value.schemaVersion) {
+      return;
+    }
+
+    try {
+      await this.contextSnapshotRepository.save(
+        this.contextSnapshotRepository.create({
+          id: randomUUID(),
+          analysisId,
+          schemaVersion: value.schemaVersion,
+          snapshotHash: value.snapshotHash,
+          graphSnapshot: snapshot as AnalysisContextSnapshot,
+        }),
+      );
+    } catch (err) {
+      this.logger.error('Falha ao persistir snapshot de contexto', {
+        exception: err,
+        analysisId,
+      });
+    }
   }
 
   private async publishGithubComments(input: {

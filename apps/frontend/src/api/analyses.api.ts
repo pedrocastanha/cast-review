@@ -1,4 +1,10 @@
-import type { AgentEvent, Annotation, AnalysisRecord, RunAnalysisPayload } from '../types';
+import type {
+  AgentEvent,
+  AnalysisContextSnapshot,
+  Annotation,
+  AnalysisRecord,
+  RunAnalysisPayload,
+} from '../types';
 import { authorizedFetch, request } from './http';
 
 function parseSseChunk(rawEvent: string): AgentEvent | null {
@@ -78,6 +84,11 @@ export const analysesApi = {
   },
 
   getById: (id: string) => request<AnalysisRecord>(`/analyses/${encodeURIComponent(id)}`),
+
+  getContextSnapshot: (id: string) =>
+    request<AnalysisContextSnapshot>(
+      `/analyses/${encodeURIComponent(id)}/context-snapshot`,
+    ),
 
   async *run(
     repo: string,

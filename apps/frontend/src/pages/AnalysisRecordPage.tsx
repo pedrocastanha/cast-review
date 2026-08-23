@@ -8,6 +8,8 @@ import { ReportView } from '../components/analysis/ReportView';
 import { ThoughtLog } from '../components/analysis/ThoughtLog';
 import { Spinner } from '../components/ui/Spinner';
 import { GithubCommentsStatus } from '../components/analysis/GithubCommentsStatus';
+import { GraphContextPanel } from '../components/analysis/GraphContextPanel';
+import { SaveBenchmarkButton } from '../components/analysis/SaveBenchmarkButton';
 import { formatUsageHeadline } from '../lib/format-usage';
 import type { AnalysisRecord } from '../types';
 
@@ -127,6 +129,8 @@ export function AnalysisRecordPage() {
             )}
           </dl>
 
+          <SaveBenchmarkButton analysisId={record.id} />
+
           {record.errorMessage && (
             <p className="rounded-sm border border-state-closed/40 bg-state-closed-dim px-4 py-3 text-sm">
               {record.errorMessage}
@@ -141,6 +145,8 @@ export function AnalysisRecordPage() {
               <ThoughtLog thoughts={thoughts} running={record.status === 'running'} />
             </section>
           )}
+
+          <GraphContextPanel analysisId={record.id} />
 
           {hasReviewContent(record.report) && record.report && (
             <ReportView report={record.report} />

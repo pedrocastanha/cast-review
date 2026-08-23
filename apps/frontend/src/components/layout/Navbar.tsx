@@ -28,7 +28,7 @@ export function Navbar() {
           Repositórios
         </NavLink>
         <NavLink
-          to="/settings"
+          to="/benchmarks"
           className={({ isActive }) =>
             `flex min-h-11 shrink-0 items-center gap-3 rounded-sm px-3 text-sm transition-colors ${
               isActive ? 'bg-surface-2 text-ink' : 'text-ink-faint hover:bg-surface-1 hover:text-ink'
@@ -36,6 +36,17 @@ export function Navbar() {
           }
         >
           <span aria-hidden="true" className="grid size-5 place-items-center rounded-sm border border-current font-mono text-[10px]">02</span>
+          Benchmark Lab
+        </NavLink>
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            `flex min-h-11 shrink-0 items-center gap-3 rounded-sm px-3 text-sm transition-colors ${
+              isActive ? 'bg-surface-2 text-ink' : 'text-ink-faint hover:bg-surface-1 hover:text-ink'
+            }`
+          }
+        >
+          <span aria-hidden="true" className="grid size-5 place-items-center rounded-sm border border-current font-mono text-[10px]">03</span>
           Configurações
         </NavLink>
       </nav>

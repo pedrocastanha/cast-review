@@ -68,6 +68,14 @@ export class AnalysesController {
     return this.analysesService.getByIdForUser(id, currentUser);
   }
 
+  @Get('analyses/:id/context-snapshot')
+  getContextSnapshot(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: CurrentUserData,
+  ) {
+    return this.analysesService.getContextSnapshotForUser(id, currentUser);
+  }
+
   @Post('analyses/:id/resume')
   resume(
     @Param('id') id: string,

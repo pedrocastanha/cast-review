@@ -194,6 +194,144 @@ export interface ChangeAnalysis {
   hasMigration: boolean;
 }
 
+export type GraphRelation = 'changed' | 'caller' | 'callee' | 'test' | 'dead_code';
+export type GraphConfidence = 'confirmed' | 'inferred' | 'unresolved' | 'stale';
+
+export interface GraphSnapshotNode {
+  id: string;
+  kind: string;
+  path: string;
+  name: string;
+  signature: string;
+  body: string | null;
+  line: number;
+  endLine: number;
+  contentHash: string | null;
+  relation: GraphRelation;
+  distance: number | null;
+  score: number | null;
+  confidence: GraphConfidence;
+  reason: string;
+}
+
+export interface GraphSnapshotEdge {
+  fromId: string;
+  toId: string;
+  kind: 'defines' | 'references' | 'imports' | 'tests';
+  weight: number;
+  confidence: 'confirmed' | 'inferred' | 'stale';
+}
+
+export interface AnalysisContextSnapshot {
+  schemaVersion: '1';
+  snapshotHash: string;
+  createdAt: string;
+  analysisId: string | null;
+  repository: {
+    repoId: string;
+    owner: string;
+    repo: string;
+    pullNumber: number | null;
+    baseSha: string | null;
+    requestedSha: string | null;
+  };
+  graph: {
+    indexedSha: string | null;
+    stale: boolean;
+    indexerVersion: string;
+    graphSchemaVersion: string;
+    queryVersion: string;
+  };
+  input: {
+    diffHash: string;
+    diff: string;
+    changedFiles: Array<Record<string, unknown>>;
+    conventions: string;
+  };
+  selected: {
+    nodes: GraphSnapshotNode[];
+    changedSymbols: GraphSnapshotNode[];
+    callers: GraphSnapshotNode[];
+    callees: GraphSnapshotNode[];
+    tests: GraphSnapshotNode[];
+    deadCodeCandidates: GraphSnapshotNode[];
+    repoMap: string;
+  };
+  edges: GraphSnapshotEdge[];
+  budget: {
+    tokenBudget: number;
+    budgetUsed: number;
+    truncated: boolean;
+    omittedNodes: number;
+    omittedEdges: number;
+  };
+  rendered: {
+    graphContextBlock: string;
+    relatedContext: Record<string, unknown>;
+  };
+}
+
+export interface BenchmarkCase {
+  id: string;
+  slug: string | null;
+  title: string;
+  kind: 'curated' | 'private';
+  evaluationMode: 'exploratory' | 'scored';
+  ownerId: string | null;
+  source: {
+    analysisId?: string;
+    provider?: 'github';
+    owner?: string;
+    repo?: string;
+    pullNumber?: number;
+    url?: string;
+    originalTitle?: string;
+    body?: string;
+    headSha?: string;
+    baseSha?: string;
+    mergedAt?: string;
+    category?: string;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    description?: string;
+    graphScope?: 'changed-files';
+    contentPolicy?: string;
+    license?: {
+      spdx: string;
+      name: string;
+      url: string;
+    };
+  };
+  inputSnapshot: AnalysisContextSnapshot['input'];
+  graphSnapshot: AnalysisContextSnapshot;
+  groundTruth: Record<string, unknown> | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BenchmarkModelResult {
+  model: string;
+  status: 'completed' | 'error';
+  durationMs: number;
+  report: ReportPayload | null;
+  errorMessage: string | null;
+}
+
+export interface BenchmarkRun {
+  id: string;
+  caseId: string;
+  requestedBy: string;
+  status: 'running' | 'completed' | 'error';
+  models: string[];
+  promptVersion: string;
+  graphSnapshotHash: string;
+  results: BenchmarkModelResult[] | null;
+  errorMessage: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PrdPayload {
   title: string;
   problem: string;
