@@ -197,6 +197,8 @@ Com ground truth anotado, calcula:
 - RF-B8: o usuário deve conseguir criar e editar anotações de ground truth em casos privados.
 - RF-B9: resultados de benchmark devem ser persistidos e consultáveis posteriormente.
 - RF-B10: dados de casos privados só podem ser acessados pelo dono ou por compartilhamento explícito futuro.
+- RF-B11: casos oficiais devem congelar o título e a descrição originais da PR, sem consultar o GitHub durante a navegação.
+- RF-B12: antes de executar modelos, o Lab deve mostrar a proposta da PR, os arquivos alterados e o diff congelado; snapshots antigos sem descrição devem continuar utilizáveis com fallback explícito.
 
 ## Critérios de sucesso
 
@@ -260,11 +262,17 @@ Implementado em 2026-08-22:
 - criação de caso privado como cópia materializada da análise;
 - execução síncrona de até quatro modelos contra o mesmo snapshot congelado;
 - comparação exploratória de findings compartilhados e exclusivos, custo e duração;
-- isolamento de casos e runs por usuário.
+- isolamento de casos e runs por usuário;
+- catálogo global v1 com oito PRs públicas e mergeadas, carregado por migration;
+- origem, licença, categoria, dificuldade, head SHA e escopo do grafo auditáveis no Lab.
+- título e descrição originais da PR, lista de arquivos e diff congelado visíveis antes da comparação.
 
 Permanece para as próximas etapas:
 
-- fixtures oficiais curadas e seu seed;
 - editor de ground truth e métricas scored;
 - fila assíncrona para matrizes maiores;
 - edição/remoção de casos pela interface.
+
+### Catálogo oficial v1
+
+O pacote inicial usa PRs de Axios, Express, Fastify, TypeORM e node-redis. Cada caso é exploratório, somente leitura e contém diff, conteúdo limitado dos arquivos, testes relacionados e snapshot com hash canônico. O catálogo é instalado pela migration `SeedCuratedBenchmarkCatalog1787503000000`; não consulta GitHub, Neo4j ou Redis durante o uso.

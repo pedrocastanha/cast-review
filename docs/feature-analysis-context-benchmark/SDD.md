@@ -386,6 +386,10 @@ benchmarks/cases/
 
 Cada fixture precisa conter licença/origem e versão. O seed transforma os fixtures em `benchmark_cases` com `kind=curated`.
 
+O campo JSONB `source` também congela `originalTitle` e `body`, ambos obtidos da PR no momento da geração. O frontend usa esses campos para apresentar a intenção declarada pelo autor antes da escolha dos modelos. Comentários HTML de templates são removidos apenas na renderização; o valor persistido permanece íntegro. Arquivos e diff vêm de `input_snapshot`, com o diff completo sob divulgação progressiva.
+
+A migration `AddCuratedBenchmarkPullBody1787586000000` atualiza instalações que já executaram o seed inicial. Novas instalações recebem o mesmo conteúdo diretamente do fixture importado pelo seed, sem chamadas externas durante a migration.
+
 Um caso oficial só entra no ranking se:
 
 - tiver input congelado;
@@ -470,6 +474,7 @@ O resultado deve separar:
 - benchmark privado é criado a partir de análise;
 - execução benchmark usa snapshot congelado mesmo sem Neo4j;
 - casos oficiais são carregados pelos fixtures;
+- casos oficiais preservam título e descrição originais da PR;
 - dois modelos recebem o mesmo hash de contexto.
 
 ### Aceitação
@@ -522,7 +527,7 @@ Análises antigas não terão snapshot. A UI deve mostrar “contexto histórico
 | BENCH-03 | `BenchmarkRun` com matriz de modelos |
 | BENCH-04 | `evaluationMode` + `GroundTruth` |
 | RF-S1 a RF-S7 | tabela `analysis_context_snapshots` |
-| RF-B1 a RF-B10 | tabelas `benchmark_cases` e `benchmark_runs` |
+| RF-B1 a RF-B12 | tabelas `benchmark_cases` e `benchmark_runs` + contexto da PR no Lab |
 
 ## 19. Notas da implementação
 
@@ -530,4 +535,7 @@ Análises antigas não terão snapshot. A UI deve mostrar “contexto histórico
 - `frozenContext.graphSnapshot` é propagado no estado do LangGraph. O `change_analyzer` usa o `rendered.relatedContext` congelado e não chama Neo4j.
 - O MVP normaliza a seleção também em `selected.nodes`, além das listas por relação, para simplificar filtros e renderização sem reconstruir o conjunto.
 - Runs são síncronos e sequenciais, limitados a quatro modelos. A chave OpenAI não é armazenada.
-- `curated` e `scored` existem no modelo de dados, mas fixtures oficiais, seed e ground truth editor continuam fora do MVP entregue.
+- O catálogo oficial v1 contém oito fixtures exploratórios de repositórios MIT. O gerador fixa o head SHA, materializa input/snapshot e valida hashes; a migration insere os casos de forma idempotente por ID/slug.
+- O snapshot oficial v1 declara `graphScope=changed-files`: representa arquivos alterados, testes relacionados e relações de co-change/import detectáveis, sem sugerir uma indexação integral do repositório.
+- O Lab apresenta o body original congelado, remove comentários invisíveis de template somente para leitura e mantém lista de arquivos/diff disponíveis mesmo quando um caso privado antigo não possui body.
+- `scored` e o ground truth editor continuam fora do MVP entregue.

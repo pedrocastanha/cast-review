@@ -64,12 +64,30 @@ T1 → T2 → T3
 - Verificação: build dos três apps e UAT com Playwright/Chrome.
 - Status: concluído.
 
+## T7 — Catálogo oficial versionado
+
+- Requisito: BENCH-01, RF-B1, RF-B5, RF-B7.
+- Depende de: T4, T5, T6.
+- Entrega: oito PRs públicas congeladas, gerador reproduzível, migration idempotente e metadados de auditoria na UI.
+- Testes: contrato de fixture, hash canônico, acesso global, somente leitura e banco real.
+- Verificação: Jest, builds, migration executada duas vezes e UAT no Chrome.
+- Status: concluído.
+
+## T8 — Contexto original da PR no Lab
+
+- Requisito: RF-B11, RF-B12.
+- Depende de: T7.
+- Entrega: body/título originais congelados, migration para instalações existentes e painel com descrição, arquivos e diff antes da comparação.
+- Testes: contrato das fixtures, normalização do conteúdo e UAT responsivo no Chrome.
+- Verificação: Jest focal, teste Node do frontend, builds e migration em banco real.
+- Status: concluído.
+
 ## Resultado de validação
 
 - ai-api: 192 testes passaram.
-- backend: 90 testes passaram; build passou; migrations aplicadas em banco local.
+- backend: 96 testes passaram; build passou; migration do catálogo aplicada e repetida sem duplicação.
 - frontend: typecheck/build e oxlint passaram.
-- Chrome: fluxo completo validado em 1440×1000 e 390×844, sem erros de console no uso normal.
+- Chrome: usuário sem análises visualizou 8 casos oficiais; fluxo validado em 1440×1000 e 390×844, sem overflow ou novos erros de console.
 
 ## Checagem de rastreabilidade
 
