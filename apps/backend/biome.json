@@ -6,7 +6,11 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!!**/dist"]
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!!src/modules/benchmarks/fixtures/curated-benchmark-cases.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
