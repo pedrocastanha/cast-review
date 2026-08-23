@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { BenchmarksService } from './benchmarks.service';
 
 function repository() {
@@ -61,6 +61,32 @@ const graphSnapshot = {
 };
 
 describe('BenchmarksService', () => {
+  it('lists curated cases together with only the current user private cases', async () => {
+    const { service, caseRepository } = buildService();
+    caseRepository.find.mockResolvedValue([]);
+
+    await service.listCases(user);
+
+    expect(caseRepository.find).toHaveBeenCalledWith({
+      where: [{ kind: 'curated' }, { ownerId: user.id }],
+      order: { createdAt: 'DESC' },
+    });
+  });
+
+  it('keeps curated cases read-only for every user', async () => {
+    const { service, caseRepository } = buildService();
+    caseRepository.findOne.mockResolvedValue({
+      id: 'official-case',
+      kind: 'curated',
+      ownerId: null,
+    });
+
+    await expect(
+      service.deleteCase('official-case', user),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(caseRepository.delete).not.toHaveBeenCalled();
+  });
+
   it('creates an independent private case from an owned analysis snapshot', async () => {
     const { service, analysisRepository, snapshotRepository, caseRepository } =
       buildService();
