@@ -280,9 +280,26 @@ export interface BenchmarkCase {
   ownerId: string | null;
   source: {
     analysisId?: string;
+    provider?: 'github';
     owner?: string;
     repo?: string;
     pullNumber?: number;
+    url?: string;
+    originalTitle?: string;
+    body?: string;
+    headSha?: string;
+    baseSha?: string;
+    mergedAt?: string;
+    category?: string;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    description?: string;
+    graphScope?: 'changed-files';
+    contentPolicy?: string;
+    license?: {
+      spdx: string;
+      name: string;
+      url: string;
+    };
   };
   inputSnapshot: AnalysisContextSnapshot['input'];
   graphSnapshot: AnalysisContextSnapshot;

@@ -3,7 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { benchmarksApi } from '../api/benchmarks.api';
 import { ApiError } from '../api/http';
 import { openaiKeyStore } from '../api/openai-key-store';
+import { ReportMarkdown } from '../components/analysis/ReportMarkdown';
 import { Spinner } from '../components/ui/Spinner';
+import {
+  cleanPullRequestBody,
+  normalizeBenchmarkChangedFiles,
+} from '../lib/benchmark-pr-context';
 import type {
   BenchmarkCase,
   BenchmarkModelResult,
@@ -27,6 +32,95 @@ function findingKey(finding: ReviewComment) {
 
 function usd(value: number | null | undefined) {
   return value === null || value === undefined ? '—' : `$${value.toFixed(4)}`;
+}
+
+function difficultyLabel(value: BenchmarkCase['source']['difficulty']) {
+  if (value === 'easy') return 'entrada';
+  if (value === 'medium') return 'intermediário';
+  if (value === 'hard') return 'avançado';
+  return null;
+}
+
+function PullRequestContext({ benchmarkCase }: { benchmarkCase: BenchmarkCase }) {
+  const source = benchmarkCase.source;
+  const body = cleanPullRequestBody(source.body);
+  const changedFiles = normalizeBenchmarkChangedFiles(
+    benchmarkCase.inputSnapshot.changedFiles,
+  );
+  const diff = changedFiles
+    .map((file) => file.diff)
+    .filter(Boolean)
+    .join('\n\n');
+
+  return (
+    <section className="border-b border-border bg-surface-1/45 px-4 py-6 sm:px-6" aria-labelledby="benchmark-pr-context-title">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-mono text-[10px] tracking-[0.14em] text-accent uppercase">Antes de comparar</p>
+          <h2 id="benchmark-pr-context-title" className="mt-2 font-display text-lg font-semibold text-ink">
+            O que esta PR propõe
+          </h2>
+        </div>
+        <p className="max-w-sm text-xs leading-5 text-ink-faint">
+          Conteúdo congelado com o caso. A leitura não depende do estado atual da PR no GitHub.
+        </p>
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">Título original</p>
+          <h3 className="mt-2 max-w-3xl text-base font-semibold leading-6 text-ink">
+            {source.originalTitle ?? benchmarkCase.title}
+          </h3>
+
+          {body ? (
+            <details open className="group mt-5 border-y border-border py-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium text-ink transition-colors hover:text-accent">
+                Descrição original da PR
+                <span className="font-mono text-[10px] text-ink-faint group-open:hidden">abrir ↓</span>
+                <span className="hidden font-mono text-[10px] text-ink-faint group-open:inline">recolher ↑</span>
+              </summary>
+              <div className="mt-4 max-h-96 overflow-y-auto pr-3 [scrollbar-color:var(--color-border-strong)_transparent]">
+                <ReportMarkdown markdown={body} />
+              </div>
+            </details>
+          ) : (
+            <div className="mt-5 border-y border-border py-4">
+              <p className="text-sm leading-6 text-ink-dim">
+                {source.description ?? 'A descrição original não fazia parte deste snapshot. O diff congelado abaixo continua disponível.'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <aside className="min-w-0 border-t border-border pt-5 xl:border-t-0 xl:pt-0" aria-label="Arquivos alterados na PR">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">Arquivos alterados</p>
+            <span className="font-mono text-xs text-ink">{changedFiles.length}</span>
+          </div>
+          <ol className="mt-3 flex max-h-64 flex-col gap-2 overflow-y-auto pr-2">
+            {changedFiles.map((file, index) => (
+              <li key={`${file.path}-${index}`} className="break-all font-mono text-[11px] leading-5 text-ink-dim">
+                <span className="mr-2 text-ink-faint">{String(index + 1).padStart(2, '0')}</span>
+                {file.path}
+              </li>
+            ))}
+          </ol>
+        </aside>
+      </div>
+
+      <details className="group mt-5">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 border border-border px-3 font-mono text-xs text-ink-dim transition-colors hover:border-border-strong hover:text-ink">
+          <span>Ver diff congelado</span>
+          <span className="text-[10px] text-ink-faint group-open:hidden">{changedFiles.length} arquivos ↓</span>
+          <span className="hidden text-[10px] text-ink-faint group-open:inline">recolher ↑</span>
+        </summary>
+        <pre className="max-h-[32rem] overflow-auto border-x border-b border-border bg-surface p-4 font-mono text-[11px] leading-5 text-ink-dim">
+          {diff || 'Diff indisponível neste snapshot.'}
+        </pre>
+      </details>
+    </section>
+  );
 }
 
 function Comparison({ run }: { run: BenchmarkRun }) {
@@ -140,6 +234,8 @@ function CaseWorkspace({ benchmarkCase }: { benchmarkCase: BenchmarkCase }) {
   const sourceLabel = benchmarkCase.source.owner && benchmarkCase.source.repo
     ? `${benchmarkCase.source.owner}/${benchmarkCase.source.repo} #${benchmarkCase.source.pullNumber ?? ''}`
     : 'Caso oficial Cast Review';
+  const difficulty = difficultyLabel(benchmarkCase.source.difficulty);
+  const source = benchmarkCase.source;
 
   return (
     <div className="min-w-0">
@@ -149,10 +245,58 @@ function CaseWorkspace({ benchmarkCase }: { benchmarkCase: BenchmarkCase }) {
             {benchmarkCase.kind === 'curated' ? 'oficial' : 'privado'}
           </span>
           <span className="text-ink-faint">v{benchmarkCase.version} · {benchmarkCase.evaluationMode}</span>
+          {source.category && <span className="text-ink-dim">· {source.category}</span>}
+          {difficulty && <span className="text-ink-dim">· {difficulty}</span>}
         </div>
         <h1 className="mt-3 font-display text-xl font-semibold text-ink sm:text-2xl">{benchmarkCase.title}</h1>
-        <p className="mt-2 font-mono text-xs text-ink-faint">{sourceLabel}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-ink-faint">
+          <span>{sourceLabel}</span>
+          {source.url && (
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent transition-colors hover:text-accent-hover"
+            >
+              abrir PR ↗
+            </a>
+          )}
+        </div>
+        {source.description && (
+          <p className="mt-4 max-w-3xl text-sm leading-6 text-ink-dim">{source.description}</p>
+        )}
       </header>
+
+      {benchmarkCase.kind === 'curated' && (
+        <dl className="grid gap-px border-b border-border bg-border sm:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-surface px-4 py-3">
+            <dt className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">Commit congelado</dt>
+            <dd className="mt-1 truncate font-mono text-xs text-ink">{source.headSha?.slice(0, 12) ?? '—'}</dd>
+          </div>
+          <div className="bg-surface px-4 py-3">
+            <dt className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">Licença</dt>
+            <dd className="mt-1 font-mono text-xs text-ink">
+              {source.license ? (
+                <a href={source.license.url} target="_blank" rel="noreferrer" className="hover:text-accent">
+                  {source.license.spdx} ↗
+                </a>
+              ) : '—'}
+            </dd>
+          </div>
+          <div className="bg-surface px-4 py-3">
+            <dt className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">Escopo do grafo</dt>
+            <dd className="mt-1 font-mono text-xs text-ink">mudanças + testes</dd>
+          </div>
+          <div className="bg-surface px-4 py-3">
+            <dt className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">Merge</dt>
+            <dd className="mt-1 font-mono text-xs text-ink">
+              {source.mergedAt ? new Date(source.mergedAt).toLocaleDateString('pt-BR') : '—'}
+            </dd>
+          </div>
+        </dl>
+      )}
+
+      <PullRequestContext benchmarkCase={benchmarkCase} />
 
       <section className="grid gap-7 py-7 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div>
@@ -226,6 +370,8 @@ export function BenchmarksPage() {
     () => cases.find((item) => item.id === requestedId) ?? cases[0] ?? null,
     [cases, requestedId],
   );
+  const officialCases = useMemo(() => cases.filter((item) => item.kind === 'curated'), [cases]);
+  const privateCases = useMemo(() => cases.filter((item) => item.kind === 'private'), [cases]);
 
   useEffect(() => {
     benchmarksApi.listCases()
@@ -239,8 +385,17 @@ export function BenchmarksPage() {
   return (
     <div>
       <header className="mb-8 border-b border-border pb-6">
-        <p className="mb-2 font-mono text-xs tracking-[0.14em] text-accent uppercase">Laboratório · 03</p>
-        <h1 className="font-display text-xl font-semibold text-ink sm:text-2xl">Benchmark Lab</h1>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="mb-2 font-mono text-xs tracking-[0.14em] text-accent uppercase">Laboratório · 03</p>
+            <h1 className="font-display text-xl font-semibold text-ink sm:text-2xl">Benchmark Lab</h1>
+          </div>
+          {!loading && (
+            <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
+              {officialCases.length} PRs oficiais · {privateCases.length} privadas
+            </p>
+          )}
+        </div>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-faint">Compare modelos contra exatamente a mesma PR e a mesma visão estrutural. Sem mover o alvo entre uma execução e outra.</p>
       </header>
 
@@ -254,22 +409,31 @@ export function BenchmarksPage() {
       )}
 
       {selected && (
-        <div className="grid gap-8 xl:grid-cols-[15rem_minmax(0,1fr)]">
-          <aside>
-            <p className="mb-3 font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">Casos</p>
-            <nav className="flex gap-2 overflow-x-auto xl:flex-col" aria-label="Casos de benchmark">
-              {cases.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSearchParams({ case: item.id })}
-                  className={`min-w-56 rounded-sm border p-3 text-left transition-colors xl:min-w-0 ${item.id === selected.id ? 'border-accent bg-accent-quiet/30' : 'border-border bg-surface-1/40 hover:border-border-strong'}`}
-                >
-                  <p className="truncate text-sm font-medium text-ink">{item.title}</p>
-                  <p className="mt-1 font-mono text-[10px] text-ink-faint">{item.kind === 'curated' ? 'oficial' : 'privado'} · v{item.version}</p>
-                </button>
-              ))}
-            </nav>
+        <div className="grid min-w-0 gap-8 xl:grid-cols-[15rem_minmax(0,1fr)]">
+          <aside className="min-w-0 max-w-full overflow-hidden">
+            {[
+              { label: 'Oficiais', items: officialCases },
+              { label: 'Suas PRs', items: privateCases },
+            ].map((group) => group.items.length > 0 && (
+              <section key={group.label} className="mb-6 min-w-0 max-w-full last:mb-0">
+                <p className="mb-3 font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">{group.label}</p>
+                <nav className="flex max-w-full gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible" aria-label={`Casos ${group.label.toLowerCase()}`}>
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSearchParams({ case: item.id })}
+                      className={`min-w-56 rounded-sm border p-3 text-left transition-colors xl:min-w-0 ${item.id === selected.id ? 'border-accent bg-accent-quiet/30' : 'border-border bg-surface-1/40 hover:border-border-strong'}`}
+                    >
+                      <p className="line-clamp-2 text-sm font-medium leading-5 text-ink">{item.title}</p>
+                      <p className="mt-1 font-mono text-[10px] text-ink-faint">
+                        {item.source.category ?? (item.kind === 'curated' ? 'oficial' : 'privado')} · v{item.version}
+                      </p>
+                    </button>
+                  ))}
+                </nav>
+              </section>
+            ))}
           </aside>
           <CaseWorkspace key={selected.id} benchmarkCase={selected} />
         </div>
