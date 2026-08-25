@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { AppLogger } from 'src/shared/logger/logger.service';
 import { CreateUserDto } from '../users/dtos/create-user.dto';
 import { User } from '../users/user.entity';
 import { UserService } from '../users/user.service';
@@ -12,6 +13,7 @@ export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
+    private readonly logger: AppLogger,
   ) {}
 
   async validateUserByEmail(email: string): Promise<User | null> {
@@ -19,7 +21,9 @@ export class AuthService {
   }
 
   async register(dto: CreateUserDto) {
-    return this.userService.createUser(dto);
+    const user = await this.userService.createUser(dto);
+    this.logger.log('Usuário registrado', { userId: user.id });
+    return user;
   }
 
   async login({ email, username, password }: LoginDto) {
@@ -27,11 +31,15 @@ export class AuthService {
       throw new UnauthorizedException('E-mail ou senha inválidos');
     }
 
+    const identifier = email ?? username;
     const user = email
       ? await this.validateUserByEmail(email)
       : await this.userService.getByUsername(username ?? '');
 
-    if (!user) throw new UnauthorizedException('E-mail ou senha inválidos');
+    if (!user) {
+      this.logger.warn('Login falhou: usuário não encontrado', { identifier });
+      throw new UnauthorizedException('E-mail ou senha inválidos');
+    }
 
     if (!user.password) {
       throw new UnauthorizedException(
@@ -41,15 +49,21 @@ export class AuthService {
 
     const isPasswordValid = await this.comparePassword(password, user.password);
     if (!isPasswordValid) {
+      this.logger.warn('Login falhou: senha inválida', { userId: user.id });
       throw new UnauthorizedException('E-mail ou senha inválidos');
     }
 
-    if (!user.active) throw new UnauthorizedException('Usuário inativo');
+    if (!user.active) {
+      this.logger.warn('Login falhou: usuário inativo', { userId: user.id });
+      throw new UnauthorizedException('Usuário inativo');
+    }
 
     const accessToken = await this.generateAccessToken(user);
     const refreshToken = await this.generateRefreshToken(user);
 
     await this.setCurrentRefreshToken(refreshToken, user.id);
+
+    this.logger.log('Login bem-sucedido', { userId: user.id });
 
     return {
       accessToken,
@@ -66,6 +80,8 @@ export class AuthService {
     const refreshToken = await this.generateRefreshToken(user);
 
     await this.setCurrentRefreshToken(refreshToken, user.id);
+
+    this.logger.log('Tokens renovados', { userId: user.id });
 
     return {
       accessToken,
