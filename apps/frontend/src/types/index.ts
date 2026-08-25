@@ -83,6 +83,91 @@ export interface Repository {
   defaultBranch: string;
 }
 
+export interface ProjectRepositoryMember {
+  id: string;
+  projectId: string;
+  githubId: string;
+  name: string;
+  fullName: string;
+  owner: string;
+  private: boolean;
+  description: string | null;
+  htmlUrl: string;
+  defaultBranch: string;
+}
+
+export interface Project {
+  id: string;
+  ownerId: string;
+  name: string;
+  description: string | null;
+  repositories: ProjectRepositoryMember[];
+}
+
+export interface ProjectPayload {
+  name: string;
+  description?: string;
+  repositories: string[];
+}
+
+export interface ProjectRepositoryIndexStatus extends Omit<RepositoryIndexStatus, 'status'> {
+  repository: string;
+  status: RepositoryIndexStatusValue | 'error';
+  errorMessage?: string;
+}
+
+export interface ProjectIndexStatus {
+  projectId: string;
+  repositories: ProjectRepositoryIndexStatus[];
+}
+
+export interface ProjectGraphEvidence {
+  repoId: string;
+  path: string;
+  line: number;
+  sha: string;
+  symbolId: string | null;
+  symbolName: string | null;
+  framework: string;
+}
+
+export interface ProjectGraphMatch {
+  method: string;
+  route: string;
+  confidence: 'confirmed';
+  evidenceType: 'method_route';
+  consumer: ProjectGraphEvidence;
+  provider: ProjectGraphEvidence;
+}
+
+export interface ProjectGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  kind: 'consumes';
+  count: number;
+  confidence: 'confirmed';
+  matches: ProjectGraphMatch[];
+}
+
+export interface ProjectGraph {
+  nodes: Array<{
+    id: string;
+    repoId: string;
+    label: string;
+    kind: 'repository';
+    indexed: boolean;
+    sha: string | null;
+  }>;
+  edges: ProjectGraphEdge[];
+  stats: {
+    repositories: number;
+    indexedRepositories: number;
+    links: number;
+    endpoints: number;
+  };
+}
+
 export interface PullRequest {
   id: number;
   number: number;
