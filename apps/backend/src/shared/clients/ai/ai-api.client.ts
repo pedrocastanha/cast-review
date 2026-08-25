@@ -7,6 +7,8 @@ import type {
   IndexBuildRequest,
   IndexBuildResult,
   IndexStatusResult,
+  ProjectGraphRequest,
+  ProjectGraphResult,
   VizGraph,
 } from 'src/shared/types';
 
@@ -164,6 +166,26 @@ export class AiApiClient {
     }
 
     return (await response.json()) as VizGraph;
+  }
+
+  async getProjectGraph(
+    payload: ProjectGraphRequest,
+  ): Promise<ProjectGraphResult> {
+    const response = await fetch(`${resolveAiApiUrl()}/index/project/graph`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      this.logger.error('ai-api respondeu com falha ao buscar grafo do projeto', {
+        status: response.status,
+        projectId: payload.projectId,
+      });
+      throw new Error(`ai-api indisponível (status ${response.status})`);
+    }
+
+    return (await response.json()) as ProjectGraphResult;
   }
 
   private parseEvent(rawEvent: string): AgentEvent | null {

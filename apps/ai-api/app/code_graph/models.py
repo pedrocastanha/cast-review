@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 SymbolKind = Literal["file", "function", "class", "method"]
 EdgeKind = Literal["defines", "references", "imports", "tests"]
+HttpEndpointRole = Literal["provider", "consumer"]
 
 
 class Symbol(BaseModel):
@@ -30,6 +31,21 @@ class Edge(BaseModel):
 class Graph(BaseModel):
     nodes: dict[str, Symbol] = Field(default_factory=dict)
     edges: list[Edge] = Field(default_factory=list)
+    endpoints: list["HttpEndpoint"] = Field(default_factory=list)
+
+
+class HttpEndpoint(BaseModel):
+    id: str
+    role: HttpEndpointRole
+    method: str
+    route: str
+    normalized_route: str
+    path: str
+    line: int
+    framework: str
+    evidence_type: str = "method_route"
+    symbol_id: str | None = None
+    symbol_name: str | None = None
 
 
 class RawCall(BaseModel):
@@ -118,6 +134,62 @@ class VizGraph(BaseModel):
     nodes: list[VizNode] = Field(default_factory=list)
     edges: list[VizEdge] = Field(default_factory=list)
     stats: IndexStats
+
+
+class ProjectRepositoryRef(BaseModel):
+    repoId: str
+    sha: str | None = None
+
+
+class ProjectGraphNode(BaseModel):
+    id: str
+    repoId: str
+    label: str
+    kind: Literal["repository"] = "repository"
+    indexed: bool
+    sha: str | None = None
+
+
+class ProjectEndpointEvidence(BaseModel):
+    repoId: str
+    path: str
+    line: int
+    sha: str
+    symbolId: str | None = None
+    symbolName: str | None = None
+    framework: str
+
+
+class ProjectEndpointMatch(BaseModel):
+    method: str
+    route: str
+    confidence: Literal["confirmed"] = "confirmed"
+    evidenceType: Literal["method_route"] = "method_route"
+    consumer: ProjectEndpointEvidence
+    provider: ProjectEndpointEvidence
+
+
+class ProjectGraphEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    kind: Literal["consumes"] = "consumes"
+    count: int
+    confidence: Literal["confirmed"] = "confirmed"
+    matches: list[ProjectEndpointMatch] = Field(default_factory=list)
+
+
+class ProjectGraphStats(BaseModel):
+    repositories: int
+    indexedRepositories: int
+    links: int
+    endpoints: int
+
+
+class ProjectGraph(BaseModel):
+    nodes: list[ProjectGraphNode] = Field(default_factory=list)
+    edges: list[ProjectGraphEdge] = Field(default_factory=list)
+    stats: ProjectGraphStats
 
 
 GraphRelation = Literal["changed", "caller", "callee", "test", "dead_code"]

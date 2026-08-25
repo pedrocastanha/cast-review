@@ -34,6 +34,7 @@ export function Button({
     <button
       className={`${base} ${variants[variant]} ${className}`}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...rest}
     >
       {loading && (

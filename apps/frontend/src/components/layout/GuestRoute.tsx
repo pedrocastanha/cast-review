@@ -6,7 +6,7 @@ export function GuestRoute({ children }: { children: ReactNode }) {
   const { status } = useAuth();
 
   if (status === 'authenticated') {
-    return <Navigate to="/repos" replace />;
+    return <Navigate to="/projects" replace />;
   }
 
   return <>{children}</>;

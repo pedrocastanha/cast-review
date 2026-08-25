@@ -4,6 +4,8 @@ import { Analysis } from 'src/modules/analyses/analysis.entity';
 import { AnalysisContextSnapshotEntity } from 'src/modules/analyses/analysis-context-snapshot.entity';
 import { BenchmarkCase } from 'src/modules/benchmarks/benchmark-case.entity';
 import { BenchmarkRun } from 'src/modules/benchmarks/benchmark-run.entity';
+import { Project } from 'src/modules/projects/project.entity';
+import { ProjectRepositoryMember } from 'src/modules/projects/project-repository-member.entity';
 import { User } from 'src/modules/users/user.entity';
 import { DataSource } from 'typeorm';
 
@@ -20,6 +22,8 @@ export default new DataSource({
     AnalysisContextSnapshotEntity,
     BenchmarkCase,
     BenchmarkRun,
+    Project,
+    ProjectRepositoryMember,
   ],
   synchronize: false,
   migrations: [`${__dirname}/migrations/**/*{.ts,.js}`],

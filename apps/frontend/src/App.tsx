@@ -13,13 +13,16 @@ import { RepoGraphPage } from './pages/RepoGraphPage';
 import { ReposPage } from './pages/ReposPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { BenchmarksPage } from './pages/BenchmarksPage';
+import { ProjectFormPage } from './pages/ProjectFormPage';
+import { ProjectGraphPage } from './pages/ProjectGraphPage';
+import { ProjectsPage } from './pages/ProjectsPage';
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/" element={<Navigate to="/repos" replace />} />
+          <Route path="/" element={<Navigate to="/projects" replace />} />
 
           <Route
             path="/login"
@@ -38,6 +41,22 @@ function App() {
             }
           />
 
+          <Route
+            path="/projects"
+            element={<ProtectedRoute><Layout><ProjectsPage /></Layout></ProtectedRoute>}
+          />
+          <Route
+            path="/projects/new"
+            element={<ProtectedRoute><Layout><ProjectFormPage /></Layout></ProtectedRoute>}
+          />
+          <Route
+            path="/projects/:id/edit"
+            element={<ProtectedRoute><Layout><ProjectFormPage /></Layout></ProtectedRoute>}
+          />
+          <Route
+            path="/projects/:id"
+            element={<ProtectedRoute><Layout><ProjectGraphPage /></Layout></ProtectedRoute>}
+          />
           <Route
             path="/repos"
             element={
@@ -119,7 +138,7 @@ function App() {
             }
           />
 
-          <Route path="*" element={<Navigate to="/repos" replace />} />
+          <Route path="*" element={<Navigate to="/projects" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
