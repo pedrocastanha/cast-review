@@ -95,6 +95,7 @@ function buildService() {
   };
   const repositoriesService = {};
   const aiApiClient = { resumeAgent: jest.fn() };
+  const logger = { error: jest.fn(), log: jest.fn(), warn: jest.fn() };
   const contextSnapshotRepository = {
     create: jest.fn((value) => value),
     save: jest.fn().mockResolvedValue(undefined),

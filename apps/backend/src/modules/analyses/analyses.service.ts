@@ -104,6 +104,12 @@ export class AnalysesService extends BaseService {
       }),
     );
 
+    this.logger.log('Análise iniciada', {
+      analysisId: analysis.id,
+      repo,
+      pullNumber,
+    });
+
     const abortController = new AbortController();
     req.on('close', () => abortController.abort());
 
@@ -499,6 +505,10 @@ export class AnalysesService extends BaseService {
       }
 
       await persistThoughts(true);
+      this.logger.log('Stream de análise finalizado', {
+        analysisId: analysis.id,
+        verdict: review.verdict ?? 'unknown',
+      });
     } catch (err) {
       await this.analysisRepository.update(analysis.id, {
         status: 'error',
@@ -703,6 +713,12 @@ export class AnalysesService extends BaseService {
         input.currentUser,
         input.owner,
       );
+
+      this.logger.log('Comentários publicados na PR', {
+        analysisId: input.analysisId,
+        posted: comments.length,
+        skipped,
+      });
 
       return {
         status: 'posted',

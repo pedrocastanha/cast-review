@@ -437,6 +437,8 @@ export class RepositoriesService extends BaseService {
         { jobId, removeOnComplete: true, removeOnFail: true },
       );
 
+      this.logger.log('Indexação enfileirada', { owner, repo, sha, jobId });
+
       return { jobId, status: 'queued' };
     } catch (err) {
       this.handleGithubError(err);

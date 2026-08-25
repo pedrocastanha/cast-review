@@ -1,6 +1,6 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -12,6 +12,7 @@ import { RepositoriesModule } from './modules/repositories/repositories.module';
 import { UsersModule } from './modules/users/user.module';
 import { PostgresModule } from './shared/database/postgres/postgres.module';
 import { LoggerModule } from './shared/logger/logger.module';
+import { LoggingInterceptor } from './shared/logger/logging.interceptor';
 import { resolveRedisConnection } from './shared/queue/redis-connection';
 
 @Module({
@@ -37,6 +38,10 @@ import { resolveRedisConnection } from './shared/queue/redis-connection';
     {
       provide: APP_GUARD,
       useClass: JwtAccessGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
     },
   ],
 })
