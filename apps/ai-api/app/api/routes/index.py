@@ -6,8 +6,16 @@ from pydantic import BaseModel
 from app.code_graph.budget import DEFAULT_TOKEN_BUDGET
 from app.code_graph.cache import IndexCache
 from app.code_graph.context import assemble_related_context
+from app.code_graph.http_endpoints import extract_http_endpoints
 from app.code_graph.incremental import build_incremental
-from app.code_graph.models import IndexResult, IndexStats, RelatedContext, VizGraph
+from app.code_graph.models import (
+    IndexResult,
+    IndexStats,
+    ProjectGraph,
+    ProjectRepositoryRef,
+    RelatedContext,
+    VizGraph,
+)
 from app.code_graph.viz import DEFAULT_MAX_NODES, expand_neighborhood, serialize_overview
 
 router = APIRouter()
@@ -36,6 +44,11 @@ class IndexContextRequest(BaseModel):
     tokenBudget: int = DEFAULT_TOKEN_BUDGET
 
 
+class ProjectGraphRequest(BaseModel):
+    projectId: str
+    repositories: list[ProjectRepositoryRef]
+
+
 def _get_cache(request: Request) -> IndexCache:
     return IndexCache(request.app.state.neo4j_driver, request.app.state.index_redis)
 
@@ -53,6 +66,7 @@ async def build_index(body: IndexBuildRequest, request: Request) -> IndexResult:
         files = [{"path": f.path, "content": f.content} for f in body.files]
 
         result = await build_incremental(cache, body.repoId, files)
+        result.graph.endpoints = extract_http_endpoints(files, result.graph)
         await cache.build_and_store(body.repoId, body.sha, result.graph)
 
         return IndexResult(
@@ -106,3 +120,9 @@ async def index_graph(
     if focus:
         return expand_neighborhood(graph, focus, depth)
     return serialize_overview(graph, DEFAULT_MAX_NODES)
+
+
+@router.post("/index/project/graph", response_model=ProjectGraph)
+async def project_graph(body: ProjectGraphRequest, request: Request) -> ProjectGraph:
+    cache = _get_cache(request)
+    return await cache.materialize_project_graph(body.projectId, body.repositories)
