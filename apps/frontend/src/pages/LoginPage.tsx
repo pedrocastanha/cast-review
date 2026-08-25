@@ -26,7 +26,7 @@ export function LoginPage() {
         : { username: identifier, password };
 
       await login(payload);
-      navigate('/repos', { replace: true });
+      navigate('/projects', { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Não foi possível entrar.');
     } finally {
