@@ -23,31 +23,53 @@ export class IndexProcessor extends WorkerHost {
 
   async process(job: Job<IndexJobData>): Promise<IndexJobResult> {
     const { owner, repo, sha, userId } = job.data;
+    const start = Date.now();
 
-    await job.updateProgress(PROGRESS_STARTED);
+    this.logger.log('Indexação de repositório iniciada', { owner, repo, sha });
 
-    const { token } = await this.userService.getGithubCredentials(userId);
-    const octokit = new Octokit({ auth: token });
+    try {
+      await job.updateProgress(PROGRESS_STARTED);
 
-    const { files, truncated } = await fetchRepoTree(octokit, owner, repo, sha);
-    if (truncated) {
-      this.logger.warn('Árvore do repositório truncada pela API do Github', {
+      const { token } = await this.userService.getGithubCredentials(userId);
+      const octokit = new Octokit({ auth: token });
+
+      const { files, truncated } = await fetchRepoTree(octokit, owner, repo, sha);
+      if (truncated) {
+        this.logger.warn('Árvore do repositório truncada pela API do Github', {
+          owner,
+          repo,
+          sha,
+        });
+      }
+
+      await job.updateProgress(PROGRESS_TREE_FETCHED);
+
+      const result = await this.aiApiClient.buildIndex({
+        repoId: `${owner}/${repo}`,
+        sha,
+        files,
+      });
+
+      await job.updateProgress(PROGRESS_DONE);
+
+      this.logger.log('Indexação de repositório concluída', {
         owner,
         repo,
         sha,
+        fileCount: files.length,
+        durationMs: Date.now() - start,
       });
+
+      return result;
+    } catch (err) {
+      this.logger.error('Indexação de repositório falhou', {
+        exception: err,
+        owner,
+        repo,
+        sha,
+        durationMs: Date.now() - start,
+      });
+      throw err;
     }
-
-    await job.updateProgress(PROGRESS_TREE_FETCHED);
-
-    const result = await this.aiApiClient.buildIndex({
-      repoId: `${owner}/${repo}`,
-      sha,
-      files,
-    });
-
-    await job.updateProgress(PROGRESS_DONE);
-
-    return result;
   }
 }
