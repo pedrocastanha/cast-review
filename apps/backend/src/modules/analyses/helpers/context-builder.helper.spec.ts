@@ -5,7 +5,12 @@ import { buildAgentRunRequest } from './context-builder.helper';
 
 function fakeRepositoriesService(): RepositoriesService {
   return {
-    getPullByNumber: jest.fn().mockResolvedValue({ headRef: 'main', headSha: 'sha-abc123' }),
+    getPullByNumber: jest.fn().mockResolvedValue({
+      headRef: 'feature',
+      headSha: 'sha-abc123',
+      baseRef: 'main',
+      baseSha: 'sha-base123',
+    }),
     getPullDiff: jest.fn().mockResolvedValue('diff --git a/a b/a'),
     listPullFiles: jest.fn().mockResolvedValue([]),
     getConventions: jest.fn().mockResolvedValue('conventions'),
@@ -123,5 +128,57 @@ describe('buildAgentRunRequest', () => {
 
     expect(repositoriesService.loginFor).not.toHaveBeenCalled();
     expect(payload.repoId).toBe('some-org/my-repo');
+  });
+
+  it('includes base content and the frozen impact scope in the AI payload', async () => {
+    const repositoriesService = fakeRepositoriesService();
+    (repositoriesService.listPullFiles as jest.Mock).mockResolvedValue([
+      {
+        filename: 'src/controller.ts',
+        status: 'modified',
+        patch: '@@ route @@',
+      },
+    ]);
+    (repositoriesService.getFileContent as jest.Mock)
+      .mockResolvedValueOnce('head content')
+      .mockResolvedValueOnce('base content');
+    const impactScope = {
+      requestedMode: 'project' as const,
+      effectiveMode: 'project' as const,
+      status: 'exact' as const,
+      projectId: 'project-1',
+      projectName: 'Cast',
+      fallbackReason: null,
+      repositories: [
+        {
+          repoId: 'cast/frontend',
+          indexedSha: 'front-sha',
+          indexStatus: 'indexed',
+          included: true,
+          omissionReason: null,
+        },
+      ],
+    };
+
+    const payload = await buildAgentRunRequest(
+      repositoriesService,
+      'my-repo',
+      42,
+      currentUser,
+      baseDto(),
+      'analysis-123',
+      undefined,
+      impactScope,
+    );
+
+    expect(payload.baseSha).toBe('sha-base123');
+    expect(payload.changedFiles[0]).toEqual(
+      expect.objectContaining({
+        path: 'src/controller.ts',
+        fullContent: 'head content',
+        baseContent: 'base content',
+      }),
+    );
+    expect(payload.impactScope).toEqual(impactScope);
   });
 });

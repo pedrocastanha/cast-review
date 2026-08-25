@@ -1,6 +1,7 @@
 import { DefaultEntity } from 'src/shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
 import type {
+  AnalysisImpactScopeSummary,
   AnalysisReview,
   AnalysisStatus,
   Iteration,
@@ -37,6 +38,9 @@ export class Analysis extends DefaultEntity<Analysis> {
 
   @Column({ type: 'jsonb', nullable: true })
   models: { testReviewer: string; architectureReviewer: string } | null;
+
+  @Column({ name: 'impact_scope', type: 'jsonb', nullable: true })
+  impactScope: AnalysisImpactScopeSummary | null;
 
   @Column({ name: 'finished_at', type: 'timestamptz', nullable: true })
   finishedAt: Date | null;

@@ -1,12 +1,16 @@
 import type {
   AgentRunRequest,
   ChangedFileContext,
+  FrozenImpactScope,
   RelatedFile,
 } from 'src/shared/types';
 import type { CurrentUserData } from '../../auth/utils/current-user-decorator';
 import type { RepositoriesService } from '../../repositories/repositories.service';
 import type { RunAnalysisDto } from '../dtos/run-analysis.dto';
-import { candidatePathsFor, extractRelativeImportPaths } from './import-resolver.helper';
+import {
+  candidatePathsFor,
+  extractRelativeImportPaths,
+} from './import-resolver.helper';
 
 const MAX_RELATED_FILES_PER_CHANGE = 3;
 const MAX_RELATED_FILE_CHARS = 4000;
@@ -19,8 +23,14 @@ export async function buildAgentRunRequest(
   dto: RunAnalysisDto,
   analysisId: string,
   owner?: string,
+  impactScope?: FrozenImpactScope,
 ): Promise<AgentRunRequest> {
-  const pull = await repositoriesService.getPullByNumber(repo, pullNumber, currentUser, owner);
+  const pull = await repositoriesService.getPullByNumber(
+    repo,
+    pullNumber,
+    currentUser,
+    owner,
+  );
 
   const [diff, files, conventions, resolvedOwner] = await Promise.all([
     repositoriesService.getPullDiff(repo, pullNumber, currentUser, owner),
@@ -31,7 +41,15 @@ export async function buildAgentRunRequest(
 
   const changedFiles = await Promise.all(
     files.map((file) =>
-      buildChangedFile(repositoriesService, repo, file, pull.headRef, currentUser, owner),
+      buildChangedFile(
+        repositoriesService,
+        repo,
+        file,
+        pull.headRef,
+        pull.baseRef,
+        currentUser,
+        owner,
+      ),
     ),
   );
 
@@ -48,6 +66,9 @@ export async function buildAgentRunRequest(
     },
     repoId: `${resolvedOwner}/${repo}`,
     sha: pull.headSha,
+    baseSha: pull.baseSha,
+    pullNumber,
+    ...(impactScope ? { impactScope } : {}),
   };
 }
 
@@ -55,19 +76,34 @@ async function buildChangedFile(
   repositoriesService: RepositoriesService,
   repo: string,
   file: { filename: string; patch?: string },
-  ref: string,
+  headRef: string,
+  baseRef: string,
   currentUser: CurrentUserData,
   owner?: string,
 ): Promise<ChangedFileContext> {
-  const fullContent =
-    (await repositoriesService.getFileContent(repo, file.filename, ref, currentUser, owner)) ?? '';
+  const [fullContent, baseContent] = await Promise.all([
+    repositoriesService.getFileContent(
+      repo,
+      file.filename,
+      headRef,
+      currentUser,
+      owner,
+    ),
+    repositoriesService.getFileContent(
+      repo,
+      file.filename,
+      baseRef,
+      currentUser,
+      owner,
+    ),
+  ]);
 
   const relatedFiles = await resolveRelatedFiles(
     repositoriesService,
     repo,
     file.filename,
-    fullContent,
-    ref,
+    fullContent ?? '',
+    headRef,
     currentUser,
     owner,
   );
@@ -75,7 +111,8 @@ async function buildChangedFile(
   return {
     path: file.filename,
     diff: file.patch ?? '',
-    fullContent,
+    fullContent: fullContent ?? '',
+    baseContent: baseContent ?? '',
     relatedFiles,
   };
 }
@@ -89,14 +126,21 @@ async function resolveRelatedFiles(
   currentUser: CurrentUserData,
   owner?: string,
 ): Promise<RelatedFile[]> {
-  const candidatePaths = extractRelativeImportPaths(changedFilePath, content).slice(
-    0,
-    MAX_RELATED_FILES_PER_CHANGE,
-  );
+  const candidatePaths = extractRelativeImportPaths(
+    changedFilePath,
+    content,
+  ).slice(0, MAX_RELATED_FILES_PER_CHANGE);
 
   const resolved = await Promise.all(
     candidatePaths.map((path) =>
-      fetchWithExtensionFallback(repositoriesService, repo, path, ref, currentUser, owner),
+      fetchWithExtensionFallback(
+        repositoriesService,
+        repo,
+        path,
+        ref,
+        currentUser,
+        owner,
+      ),
     ),
   );
 
@@ -112,10 +156,19 @@ async function fetchWithExtensionFallback(
   owner?: string,
 ): Promise<RelatedFile | null> {
   for (const candidate of candidatePathsFor(path)) {
-    const content = await repositoriesService.getFileContent(repo, candidate, ref, currentUser, owner);
+    const content = await repositoriesService.getFileContent(
+      repo,
+      candidate,
+      ref,
+      currentUser,
+      owner,
+    );
 
     if (content) {
-      return { path: candidate, content: content.slice(0, MAX_RELATED_FILE_CHARS) };
+      return {
+        path: candidate,
+        content: content.slice(0, MAX_RELATED_FILE_CHARS),
+      };
     }
   }
 

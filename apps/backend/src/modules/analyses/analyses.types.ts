@@ -6,6 +6,15 @@ export type AnalysisStatus =
 
 export type FindingStatus = 'fail' | 'warning' | 'pass';
 
+export interface AnalysisImpactScopeSummary {
+  requestedMode: 'repository' | 'project';
+  effectiveMode: 'repository' | 'project';
+  status: 'exact' | 'degraded' | 'fallback';
+  projectId: string | null;
+  projectName: string | null;
+  fallbackReason: string | null;
+}
+
 export interface ChangeAnalysisFile {
   path: string;
   kind: string;
@@ -52,7 +61,7 @@ export interface GraphSnapshotEdge {
 }
 
 export interface AnalysisContextSnapshot {
-  schemaVersion: '1';
+  schemaVersion: '1' | '2';
   snapshotHash: string;
   createdAt: string;
   analysisId: string | null;
@@ -78,6 +87,7 @@ export interface AnalysisContextSnapshot {
       path: string;
       diff: string;
       fullContent: string;
+      baseContent?: string;
       relatedFiles: Array<{ path: string; content: string }>;
     }>;
     conventions: string;
@@ -103,6 +113,24 @@ export interface AnalysisContextSnapshot {
     graphContextBlock: string;
     relatedContext: Record<string, unknown>;
   };
+  scope?: AnalysisImpactScopeSummary;
+  source?: {
+    repoId: string;
+    pullNumber: number | null;
+    baseSha: string | null;
+    headSha: string | null;
+  };
+  repositories?: Array<{
+    repoId: string;
+    indexedSha: string | null;
+    indexStatus: string;
+    included: boolean;
+    omissionReason: string | null;
+  }>;
+  contractChanges?: Array<Record<string, unknown>>;
+  impacts?: Array<Record<string, unknown>>;
+  evidence?: Array<Record<string, unknown>>;
+  versions?: Record<string, string>;
 }
 
 export interface ReviewFinding {
@@ -114,6 +142,7 @@ export interface ReviewFinding {
   path?: string;
   line?: number;
   endLine?: number;
+  evidenceId?: string;
 }
 
 export interface ReviewResult {
@@ -219,6 +248,7 @@ export interface AnalysisRecord {
   thoughts: Record<string, string> | null;
   errorMessage: string | null;
   models: { testReviewer: string; architectureReviewer: string } | null;
+  impactScope: AnalysisImpactScopeSummary | null;
   createdAt: string;
   finishedAt: string | null;
   approvalStage: 'prd' | 'spec' | 'publish' | null;

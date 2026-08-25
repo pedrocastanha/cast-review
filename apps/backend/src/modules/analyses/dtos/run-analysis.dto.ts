@@ -1,5 +1,23 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
+
+export type ImpactScopeDto =
+  | { mode: 'repository' }
+  | { mode: 'project'; projectId: string };
+
+export class ProjectImpactScopeDto {
+  @IsIn(['project'])
+  mode!: 'project';
+
+  @IsUUID()
+  projectId!: string;
+}
 
 export class ReviewModelsDto {
   @IsString()
@@ -41,4 +59,6 @@ export class RunAnalysisDto {
   @ValidateNested()
   @Type(() => PoliciesDto)
   policies?: PoliciesDto;
+
+  impactScope!: ImpactScopeDto;
 }

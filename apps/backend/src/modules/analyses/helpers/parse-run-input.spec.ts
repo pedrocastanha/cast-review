@@ -24,6 +24,39 @@ describe('parseRunAnalysisBody', () => {
     expect(dto.policies).toBeUndefined();
   });
 
+  it('defaults impact scope to repository mode', () => {
+    const dto = parseRunAnalysisBody(baseBody());
+
+    expect(dto.impactScope).toEqual({ mode: 'repository' });
+  });
+
+  it('accepts a project impact scope with a valid UUID', () => {
+    const dto = parseRunAnalysisBody(
+      baseBody({
+        impactScope: {
+          mode: 'project',
+          projectId: '2d597fd5-0dfd-448d-85c4-4ee143c4832c',
+        },
+      }),
+    );
+
+    expect(dto.impactScope).toEqual({
+      mode: 'project',
+      projectId: '2d597fd5-0dfd-448d-85c4-4ee143c4832c',
+    });
+  });
+
+  it.each([
+    { mode: 'repository', projectId: '2d597fd5-0dfd-448d-85c4-4ee143c4832c' },
+    { mode: 'project' },
+    { mode: 'project', projectId: 'not-a-uuid' },
+    { mode: 'everything' },
+  ])('rejects invalid impact scope %#', (impactScope) => {
+    expect(() => parseRunAnalysisBody(baseBody({ impactScope }))).toThrow(
+      BadRequestException,
+    );
+  });
+
   it('rejects an invalid policy value', () => {
     expect(() =>
       parseRunAnalysisBody(baseBody({ policies: { prd: 'sometimes' } })),

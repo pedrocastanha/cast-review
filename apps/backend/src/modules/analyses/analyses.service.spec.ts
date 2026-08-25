@@ -64,6 +64,7 @@ function fakeAnalysis(overrides: Partial<Analysis> = {}): Analysis {
     thoughts: {},
     errorMessage: null,
     models: { testReviewer: 'gpt-4', architectureReviewer: 'gpt-4' },
+    impactScope: null,
     finishedAt: null,
     approvalStage: null,
     publishPolicy: null,
@@ -101,13 +102,14 @@ function buildService() {
     save: jest.fn().mockResolvedValue(undefined),
     findOne: jest.fn(),
   };
-  const logger = { error: jest.fn() };
+  const projectsService = { resolveAnalysisScope: jest.fn() };
 
   const service = new AnalysesService(
     repositoriesService as any,
     aiApiClient as any,
     analysisRepository as any,
     contextSnapshotRepository as any,
+    projectsService as any,
     logger as any,
   );
 
@@ -655,7 +657,7 @@ describe('AnalysesService#approve', () => {
       expect(analysisRepository.update).toHaveBeenCalledWith(analysis.id, {
         prdIterations: [
           expect.objectContaining({
-            content: analysis.report!.prd,
+            content: analysis.report?.prd,
             annotations,
             createdAt: expect.any(String),
           }),
@@ -747,7 +749,7 @@ describe('AnalysesService#approve', () => {
       expect(analysisRepository.update).toHaveBeenCalledWith(analysis.id, {
         specIterations: [
           expect.objectContaining({
-            content: analysis.report!.spec,
+            content: analysis.report?.spec,
             annotations,
           }),
         ],
