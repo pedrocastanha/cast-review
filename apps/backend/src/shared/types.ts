@@ -117,6 +117,60 @@ export interface VizGraph {
   stats: { indexed: boolean; truncated?: boolean };
 }
 
+export interface ProjectGraphRequest {
+  projectId: string;
+  repositories: Array<{ repoId: string; sha: string | null }>;
+}
+
+export interface ProjectGraphNode {
+  id: string;
+  repoId: string;
+  label: string;
+  kind: 'repository';
+  indexed: boolean;
+  sha: string | null;
+}
+
+export interface ProjectEndpointEvidence {
+  repoId: string;
+  path: string;
+  line: number;
+  sha: string;
+  symbolId: string | null;
+  symbolName: string | null;
+  framework: string;
+}
+
+export interface ProjectEndpointMatch {
+  method: string;
+  route: string;
+  confidence: 'confirmed';
+  evidenceType: 'method_route';
+  consumer: ProjectEndpointEvidence;
+  provider: ProjectEndpointEvidence;
+}
+
+export interface ProjectGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  kind: 'consumes';
+  count: number;
+  confidence: 'confirmed';
+  matches: ProjectEndpointMatch[];
+}
+
+export interface ProjectGraphResult {
+  nodes: ProjectGraphNode[];
+  edges: ProjectGraphEdge[];
+  stats: {
+    repositories: number;
+    indexedRepositories: number;
+    links: number;
+    endpoints: number;
+  };
+}
+
 export interface AgentResumeRequest {
   analysisId: string;
   models: {
