@@ -61,6 +61,14 @@ function notOkResponse(status: number): Response {
   } as unknown as Response;
 }
 
+function jsonResponse(body: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => body,
+  } as unknown as Response;
+}
+
 describe('AiApiClient', () => {
   const originalUrl = process.env.AI_API_URL;
   const fetchMock = jest.fn();
@@ -163,5 +171,36 @@ describe('AiApiClient.resumeAgent', () => {
     await expect(
       client.resumeAgent(resumePayload, new AbortController().signal).next(),
     ).rejects.toThrow('ai-api indisponível (status 500)');
+  });
+});
+
+describe('AiApiClient.getProjectGraph', () => {
+  const fetchMock = jest.fn();
+  const logger = { error: jest.fn() } as unknown as AppLogger;
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  it('posts only the authorized project id and repository sha references', async () => {
+    const responseBody = { nodes: [], edges: [], stats: { repositories: 2 } };
+    fetchMock.mockResolvedValue(jsonResponse(responseBody));
+    const client = new AiApiClient(logger);
+    const requestBody = {
+      projectId: 'project-1',
+      repositories: [
+        { repoId: 'cast/frontend', sha: 'front-sha' },
+        { repoId: 'cast/backend', sha: null },
+      ],
+    };
+
+    const result = await client.getProjectGraph(requestBody);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8000/index/project/graph',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(requestBody) }),
+    );
+    expect(result).toEqual(responseBody);
   });
 });
