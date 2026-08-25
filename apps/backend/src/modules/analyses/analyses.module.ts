@@ -4,10 +4,17 @@ import { RepositoriesModule } from '../repositories/repositories.module';
 import { AnalysesController } from './analyses.controller';
 import { AnalysesService } from './analyses.service';
 import { AnalysisRepository } from './analysis.repository';
+import { AnalysisContextSnapshotRepository } from './analysis-context-snapshot.repository';
 
 @Module({
   imports: [RepositoriesModule],
   controllers: [AnalysesController],
-  providers: [AnalysesService, AiApiClient, AnalysisRepository],
+  providers: [
+    AnalysesService,
+    AiApiClient,
+    AnalysisRepository,
+    AnalysisContextSnapshotRepository,
+  ],
+  exports: [AnalysisRepository, AnalysisContextSnapshotRepository],
 })
 export class AnalysesModule {}

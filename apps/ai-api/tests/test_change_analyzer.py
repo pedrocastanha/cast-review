@@ -64,3 +64,40 @@ async def test_node_related_context_degrades_to_none_on_exception(monkeypatch):
     }
     result = await node(state)
     assert result["change_analysis"]["relatedContext"] is None
+
+
+@pytest.mark.asyncio
+async def test_node_uses_frozen_context_without_querying_graph(monkeypatch):
+    def must_not_query():
+        raise AssertionError("frozen context must not query the live graph")
+
+    monkeypatch.setattr(
+        "app.graph.nodes.change_analyzer.agent._get_index_cache", must_not_query
+    )
+    frozen = {
+        "schemaVersion": "1",
+        "snapshotHash": "hash-1",
+        "rendered": {
+            "relatedContext": {
+                "callers": [{"path": "src/caller.ts", "name": "caller", "signature": "caller()"}],
+                "callees": [],
+                "tests": [],
+                "deadCodeCandidates": [],
+                "repoMap": "",
+                "stats": {"indexed": True},
+            },
+            "graphContextBlock": "## Callers",
+        },
+    }
+    state = {
+        "changed_files": [{"path": "src/a.ts"}],
+        "diff": "",
+        "repo_id": "owner/repo",
+        "sha": "sha1",
+        "frozen_context": {"graphSnapshot": frozen},
+    }
+
+    result = await node(state)
+
+    assert result["change_analysis"]["graphSnapshot"] == frozen
+    assert result["change_analysis"]["relatedContext"] == frozen["rendered"]["relatedContext"]

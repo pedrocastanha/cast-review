@@ -51,6 +51,7 @@ class AgentRunRequest(BaseModel):
     policies: Policies = Field(default_factory=Policies)
     repoId: str | None = None
     sha: str | None = None
+    frozenContext: dict[str, Any] | None = None
 
 
 class Annotation(BaseModel):

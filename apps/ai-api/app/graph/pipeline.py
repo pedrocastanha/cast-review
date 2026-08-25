@@ -138,6 +138,7 @@ async def run_pipeline(graph, request: AgentRunRequest) -> AsyncIterator[AgentEv
         "conventions": request.conventions,
         "repo_id": request.repoId,
         "sha": request.sha,
+        "frozen_context": request.frozenContext,
         "models": request.models.model_dump(),
     }
     config = _build_config(request.analysisId, request.apiKeys, request.policies)

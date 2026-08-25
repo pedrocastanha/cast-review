@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { AnalysesModule } from './modules/analyses/analyses.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAccessGuard } from './modules/auth/guards/jwt-access.guard';
+import { BenchmarksModule } from './modules/benchmarks/benchmarks.module';
 import { RepositoriesModule } from './modules/repositories/repositories.module';
 import { UsersModule } from './modules/users/user.module';
 import { PostgresModule } from './shared/database/postgres/postgres.module';
@@ -29,6 +30,7 @@ import { resolveRedisConnection } from './shared/queue/redis-connection';
     UsersModule,
     RepositoriesModule,
     AnalysesModule,
+    BenchmarksModule,
   ],
   controllers: [AppController],
   providers: [

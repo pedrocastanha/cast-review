@@ -96,15 +96,28 @@ function buildService() {
   const repositoriesService = {};
   const aiApiClient = { resumeAgent: jest.fn() };
   const logger = { error: jest.fn(), log: jest.fn(), warn: jest.fn() };
+  const contextSnapshotRepository = {
+    create: jest.fn((value) => value),
+    save: jest.fn().mockResolvedValue(undefined),
+    findOne: jest.fn(),
+  };
+  const logger = { error: jest.fn() };
 
   const service = new AnalysesService(
     repositoriesService as any,
     aiApiClient as any,
     analysisRepository as any,
+    contextSnapshotRepository as any,
     logger as any,
   );
 
-  return { service, analysisRepository, aiApiClient, logger };
+  return {
+    service,
+    analysisRepository,
+    aiApiClient,
+    contextSnapshotRepository,
+    logger,
+  };
 }
 
 function publishPolicy(publish: PublishPolicy['publish']): PublishPolicy {
@@ -112,6 +125,70 @@ function publishPolicy(publish: PublishPolicy['publish']): PublishPolicy {
 }
 
 describe('AnalysesService#streamLeg', () => {
+  it('persists the immutable graph snapshot emitted by change_analysis_done', async () => {
+    const { service, contextSnapshotRepository } = buildService();
+    const analysis = fakeAnalysis();
+    const { res } = fakeResponse();
+    const graphSnapshot = {
+      schemaVersion: '1',
+      snapshotHash: 'sha256-context',
+      selected: { nodes: [] },
+    };
+
+    await (service as any).streamLeg(
+      analysis,
+      scripted([
+        {
+          type: 'change_analysis_done',
+          payload: {
+            files: [],
+            hasTests: false,
+            hasMigration: false,
+            graphSnapshot,
+          },
+        },
+      ]),
+      res,
+    );
+
+    expect(contextSnapshotRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisId: analysis.id,
+        schemaVersion: '1',
+        snapshotHash: 'sha256-context',
+        graphSnapshot,
+      }),
+    );
+  });
+
+  it('keeps the review running when snapshot persistence fails', async () => {
+    const { service, contextSnapshotRepository, analysisRepository, logger } =
+      buildService();
+    const analysis = fakeAnalysis();
+    const { res, writes } = fakeResponse();
+    contextSnapshotRepository.save.mockRejectedValue(new Error('disk full'));
+
+    await (service as any).streamLeg(
+      analysis,
+      scripted([
+        {
+          type: 'change_analysis_done',
+          payload: {
+            files: [],
+            graphSnapshot: { schemaVersion: '1', snapshotHash: 'hash' },
+          },
+        },
+      ]),
+      res,
+    );
+
+    expect(analysisRepository.update).toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      'Falha ao persistir snapshot de contexto',
+      expect.objectContaining({ analysisId: analysis.id }),
+    );
+    expect(eventsOf(writes)[0].type).toBe('change_analysis_done');
+  });
   it('prd awaiting_approval persists status/stage and stops the leg without processing further events', async () => {
     const { service, analysisRepository } = buildService();
     const analysis = fakeAnalysis();
@@ -305,7 +382,11 @@ describe('AnalysesService#streamLeg', () => {
 });
 
 describe('AnalysesService#resume', () => {
-  const currentUser = { id: 'user-1', username: null, email: 'user@example.com' };
+  const currentUser = {
+    id: 'user-1',
+    username: null,
+    email: 'user@example.com',
+  };
   const dto = {
     models: { testReviewer: 'gpt-4', architectureReviewer: 'gpt-4' },
     apiKeys: { openai: 'sk-test' },
@@ -385,7 +466,11 @@ describe('AnalysesService#resume', () => {
 });
 
 describe('AnalysesService#approve', () => {
-  const currentUser = { id: 'user-1', username: null, email: 'user@example.com' };
+  const currentUser = {
+    id: 'user-1',
+    username: null,
+    email: 'user@example.com',
+  };
   const stageDto = {
     apiKeys: { openai: 'sk-test' },
     models: { testReviewer: 'gpt-4', architectureReviewer: 'gpt-4' },
