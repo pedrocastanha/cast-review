@@ -55,6 +55,60 @@ async def _graph_context(state: GraphState) -> tuple[dict | None, dict | None]:
         rendered = frozen_snapshot.get("rendered") or {}
         return rendered.get("relatedContext"), frozen_snapshot
 
+    impact_scope = state.get("impact_scope") or {"requestedMode": "repository"}
+    related, local_snapshot = await _local_graph_context(state)
+    if impact_scope.get("requestedMode") != "project":
+        return related, local_snapshot
+
+    from app.code_graph.cross_repo_impact import (
+        extract_contract_changes,
+        resolve_cross_repo_impacts,
+    )
+    from app.code_graph.snapshot import build_cross_repo_snapshot
+
+    effective_scope = dict(impact_scope)
+    resolution = {
+        "contractChanges": extract_contract_changes(state.get("changed_files") or []),
+        "impacts": [],
+        "evidence": [],
+        "budget": None,
+    }
+    try:
+        if effective_scope.get("effectiveMode") == "project":
+            _driver, cache = _get_index_cache()
+            resolution = await resolve_cross_repo_impacts(
+                cache=cache,
+                source_repo_id=state.get("repo_id") or "unknown/unknown",
+                source_sha=state.get("sha") or "unknown",
+                source_base_sha=state.get("base_sha"),
+                changed_files=state.get("changed_files") or [],
+                impact_scope=effective_scope,
+            )
+    except Exception:
+        effective_scope.update(
+            {
+                "effectiveMode": "repository",
+                "status": "fallback",
+                "fallbackReason": "O Project Graph ficou indisponível; a análise local continuou.",
+            }
+        )
+
+    snapshot = build_cross_repo_snapshot(
+        local_snapshot=local_snapshot,
+        analysis_id=state.get("run_id"),
+        source_repo_id=state.get("repo_id") or "unknown/unknown",
+        pull_number=state.get("pull_number"),
+        base_sha=state.get("base_sha"),
+        head_sha=state.get("sha"),
+        impact_scope=effective_scope,
+        resolution=resolution,
+    )
+    return snapshot["rendered"]["relatedContext"], snapshot
+
+
+async def _local_graph_context(state: GraphState) -> tuple[dict | None, dict | None]:
+    """Build local context independently so optional cross-repo failures are fail-open."""
+
     repo_id = state.get("repo_id")
     sha = state.get("sha")
     if not repo_id or not sha:

@@ -1,5 +1,6 @@
 import hashlib
 import json
+from copy import deepcopy
 from collections import deque
 from datetime import UTC, datetime
 
@@ -92,6 +93,14 @@ def _canonical_hash(payload: dict) -> str:
         key: value
         for key, value in payload.items()
         if key not in {"snapshotHash", "createdAt", "analysisId"}
+    }
+    canonical = json.dumps(stable, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _canonical_hash_v2(payload: dict) -> str:
+    stable = {
+        key: value for key, value in payload.items() if key not in {"snapshotHash", "createdAt"}
     }
     canonical = json.dumps(stable, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -211,3 +220,138 @@ def build_context_snapshot(
     )
     snapshot.snapshotHash = _canonical_hash(snapshot.model_dump())
     return snapshot
+
+
+def build_cross_repo_snapshot(
+    *,
+    local_snapshot: dict | None,
+    analysis_id: str | None,
+    source_repo_id: str,
+    pull_number: int | None,
+    base_sha: str | None,
+    head_sha: str | None,
+    impact_scope: dict,
+    resolution: dict,
+) -> dict:
+    """Create the immutable v2 envelope while retaining all v1 local graph fields."""
+    owner, separator, repo = source_repo_id.partition("/")
+    snapshot = deepcopy(local_snapshot) if local_snapshot else {
+        "repository": {
+            "repoId": source_repo_id,
+            "owner": owner,
+            "repo": repo if separator else source_repo_id,
+            "pullNumber": pull_number,
+            "baseSha": base_sha,
+            "requestedSha": head_sha,
+        },
+        "graph": {
+            "indexedSha": None,
+            "stale": False,
+            "indexerVersion": "code-graph-v1",
+            "graphSchemaVersion": "1",
+            "queryVersion": "related-context-v1",
+        },
+        "input": {"diffHash": "", "diff": "", "changedFiles": [], "conventions": ""},
+        "selected": {
+            "nodes": [],
+            "changedSymbols": [],
+            "callers": [],
+            "callees": [],
+            "tests": [],
+            "deadCodeCandidates": [],
+            "repoMap": "",
+        },
+        "edges": [],
+        "rendered": {"graphContextBlock": "", "relatedContext": {}},
+    }
+    scope = {
+        key: impact_scope.get(key)
+        for key in (
+            "requestedMode",
+            "effectiveMode",
+            "status",
+            "projectId",
+            "projectName",
+            "fallbackReason",
+        )
+    }
+    local_rendered = snapshot.get("rendered") or {}
+    related = deepcopy(local_rendered.get("relatedContext") or {})
+    related.update(
+        {
+            "projectScope": scope,
+            "contractChanges": resolution.get("contractChanges") or [],
+            "crossRepoImpacts": resolution.get("impacts") or [],
+            "crossRepoEvidence": resolution.get("evidence") or [],
+        }
+    )
+    cross_block = _cross_repo_context_block(scope, resolution)
+    local_block = str(local_rendered.get("graphContextBlock") or "").strip()
+    graph_context_block = "\n\n".join(part for part in (local_block, cross_block) if part)
+
+    snapshot.update(
+        {
+            "schemaVersion": "2",
+            "snapshotHash": "",
+            "createdAt": datetime.now(UTC).isoformat(),
+            "analysisId": analysis_id,
+            "scope": scope,
+            "source": {
+                "repoId": source_repo_id,
+                "pullNumber": pull_number,
+                "baseSha": base_sha,
+                "headSha": head_sha,
+            },
+            "repositories": impact_scope.get("repositories") or [],
+            "contractChanges": resolution.get("contractChanges") or [],
+            "impacts": resolution.get("impacts") or [],
+            "evidence": resolution.get("evidence") or [],
+            "budget": resolution.get("budget")
+            or {
+                "tokenBudget": 0,
+                "budgetUsed": 0,
+                "truncated": False,
+                "omittedImpacts": 0,
+                "omittedEvidence": 0,
+            },
+            "versions": {
+                "indexerVersion": "code-graph-v1",
+                "graphSchemaVersion": "1",
+                "queryVersion": "cross-repo-impact-v1",
+                "contractExtractorVersion": "http-contract-v1",
+            },
+            "rendered": {
+                "graphContextBlock": graph_context_block,
+                "relatedContext": related,
+            },
+        }
+    )
+    snapshot["snapshotHash"] = _canonical_hash_v2(snapshot)
+    return snapshot
+
+
+def _cross_repo_context_block(scope: dict, resolution: dict) -> str:
+    lines = [
+        "## Impacto entre repositórios (evidência determinística)",
+        f"Projeto: {scope.get('projectName') or 'indisponível'}",
+        f"Cobertura: {scope.get('status') or 'fallback'}",
+    ]
+    fallback_reason = scope.get("fallbackReason")
+    if fallback_reason:
+        lines.append(f"Limitação: {fallback_reason}")
+    impacts = resolution.get("impacts") or []
+    if not impacts:
+        lines.append("Nenhum impacto cross-repo confirmado no orçamento atual.")
+    for impact in impacts:
+        lines.append(
+            "- "
+            f"[{impact.get('evidenceId', 'sem-evidência')}] "
+            f"{impact.get('risk', 'informational')}: "
+            f"{impact.get('direction', 'indisponível')} · "
+            f"{impact.get('method', '?')} {impact.get('route', '?')} "
+            f"({impact.get('confidence', 'unresolved')})"
+        )
+    lines.append(
+        "Use apenas evidenceIds listados acima para sustentar afirmações sobre outros repositórios."
+    )
+    return "\n".join(lines)

@@ -101,3 +101,70 @@ async def test_node_uses_frozen_context_without_querying_graph(monkeypatch):
 
     assert result["change_analysis"]["graphSnapshot"] == frozen
     assert result["change_analysis"]["relatedContext"] == frozen["rendered"]["relatedContext"]
+
+
+@pytest.mark.asyncio
+async def test_project_mode_falls_back_to_local_snapshot_when_project_graph_fails(monkeypatch):
+    local_snapshot = {
+        "schemaVersion": "1",
+        "snapshotHash": "local-hash",
+        "repository": {"repoId": "cast/backend"},
+        "graph": {},
+        "input": {"diffHash": "", "diff": "", "changedFiles": [], "conventions": ""},
+        "selected": {
+            "nodes": [],
+            "changedSymbols": [],
+            "callers": [],
+            "callees": [],
+            "tests": [],
+            "deadCodeCandidates": [],
+            "repoMap": "",
+        },
+        "edges": [],
+        "budget": {},
+        "rendered": {"relatedContext": {"callers": []}, "graphContextBlock": ""},
+    }
+
+    async def local(_state):
+        return {"callers": []}, local_snapshot
+
+    def graph_down():
+        raise RuntimeError("neo4j unavailable")
+
+    monkeypatch.setattr("app.graph.nodes.change_analyzer.agent._local_graph_context", local)
+    monkeypatch.setattr("app.graph.nodes.change_analyzer.agent._get_index_cache", graph_down)
+    state = {
+        "run_id": "analysis-1",
+        "changed_files": [],
+        "diff": "",
+        "repo_id": "cast/backend",
+        "sha": "head-sha",
+        "base_sha": "base-sha",
+        "impact_scope": {
+            "requestedMode": "project",
+            "effectiveMode": "project",
+            "status": "exact",
+            "projectId": "project-1",
+            "projectName": "Cast",
+            "fallbackReason": None,
+            "repositories": [
+                {
+                    "repoId": "cast/frontend",
+                    "indexedSha": "front-sha",
+                    "indexStatus": "indexed",
+                    "included": True,
+                    "omissionReason": None,
+                }
+            ],
+        },
+    }
+
+    result = await node(state)
+    snapshot = result["change_analysis"]["graphSnapshot"]
+
+    assert snapshot["schemaVersion"] == "2"
+    assert snapshot["scope"]["requestedMode"] == "project"
+    assert snapshot["scope"]["effectiveMode"] == "repository"
+    assert snapshot["scope"]["status"] == "fallback"
+    assert "análise local continuou" in snapshot["scope"]["fallbackReason"]
+    assert result["change_analysis"]["relatedContext"]["callers"] == []

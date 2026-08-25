@@ -70,8 +70,9 @@ def build_report(
             continue
         for finding in ordered:
             ref = f" (`{finding['conventionRef']}`)" if finding.get("conventionRef") else ""
+            evidence = f" [{finding['evidenceId']}]" if finding.get("evidenceId") else ""
             lines.append(
-                f"- **{finding['status']}** {finding['title']}: {finding['detail']}{ref}"
+                f"- **{finding['status']}** {finding['title']}{evidence}: {finding['detail']}{ref}"
             )
         lines.append("")
 
@@ -90,6 +91,54 @@ def build_report(
     if usage:
         report["usage"] = usage
     return report
+
+
+def build_impact_result(related_context: dict | None) -> dict | None:
+    if not related_context:
+        return None
+    evidence_by_id = {
+        item.get("id"): item
+        for item in related_context.get("crossRepoEvidence") or []
+        if isinstance(item, dict) and item.get("id")
+    }
+    findings = []
+    for impact in related_context.get("crossRepoImpacts") or []:
+        if not isinstance(impact, dict):
+            continue
+        evidence_id = impact.get("evidenceId")
+        evidence = evidence_by_id.get(evidence_id)
+        if not evidence:
+            continue
+        risk = impact.get("risk")
+        status = "fail" if risk == "breaking_candidate" else "warning"
+        target = evidence.get("consumer") or evidence.get("provider") or {}
+        findings.append(
+            {
+                "status": status,
+                "title": _impact_title(risk),
+                "detail": (
+                    f"Candidato de impacto {impact.get('direction', '')}: "
+                    f"{impact.get('method', '?')} {impact.get('route', '?')}. "
+                    "Valide a evidência antes de tratar o efeito como quebra comprovada."
+                ),
+                "path": target.get("path"),
+                "line": target.get("line"),
+                "evidenceId": evidence_id,
+            }
+        )
+    if not findings:
+        return None
+    penalty = sum(25 if finding["status"] == "fail" else 10 for finding in findings)
+    return {"name": "impact_reviewer", "score": max(0, 100 - penalty), "findings": findings}
+
+
+def _impact_title(risk: str | None) -> str:
+    return {
+        "breaking_candidate": "Contrato pode afetar consumidor externo",
+        "behavioral_candidate": "Mudança interna alcança consumidor externo",
+        "integration_gap": "Consumidor sem provedor conhecido no projeto",
+        "informational": "Integração cross-repo relacionada",
+    }.get(risk or "", "Impacto cross-repo")
 
 
 def _cost_lines(usage: dict | None) -> list[str]:
@@ -111,6 +160,11 @@ async def node(state: GraphState) -> dict:
         {"name": "test_reviewer", **state["test_review"]},
         {"name": "architecture_reviewer", **state["architecture_review"]},
     ]
+    impact_result = build_impact_result(
+        (state.get("change_analysis") or {}).get("relatedContext")
+    )
+    if impact_result:
+        results.append(impact_result)
     _text, source = resolve_conventions(state.get("conventions") or "")
     usage = aggregate_usage(collect_steps_from_state(state))
     return {

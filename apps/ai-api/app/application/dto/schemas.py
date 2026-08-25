@@ -24,6 +24,7 @@ class ChangedFileContext(BaseModel):
     path: str
     diff: str = ""
     fullContent: str = ""
+    baseContent: str = ""
     relatedFiles: list[RelatedFile] = Field(default_factory=list)
 
 
@@ -41,6 +42,24 @@ class Policies(BaseModel):
     spec: Literal["manual", "auto"] = "manual"
 
 
+class FrozenImpactRepository(BaseModel):
+    repoId: str
+    indexedSha: str | None = None
+    indexStatus: str
+    included: bool
+    omissionReason: str | None = None
+
+
+class FrozenImpactScope(BaseModel):
+    requestedMode: Literal["repository", "project"]
+    effectiveMode: Literal["repository", "project"]
+    status: Literal["exact", "degraded", "fallback"]
+    projectId: str | None = None
+    projectName: str | None = None
+    fallbackReason: str | None = None
+    repositories: list[FrozenImpactRepository] = Field(default_factory=list)
+
+
 class AgentRunRequest(BaseModel):
     analysisId: str
     diff: str
@@ -51,6 +70,9 @@ class AgentRunRequest(BaseModel):
     policies: Policies = Field(default_factory=Policies)
     repoId: str | None = None
     sha: str | None = None
+    baseSha: str | None = None
+    pullNumber: int | None = None
+    impactScope: FrozenImpactScope | None = None
     frozenContext: dict[str, Any] | None = None
 
 
