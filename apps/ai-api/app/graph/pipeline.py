@@ -1,4 +1,5 @@
 import asyncio
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -14,6 +15,9 @@ from app.application.dto.schemas import (
 )
 from app.graph.thoughts import end_run, start_run
 from app.infrastructure.llm.client import LlmError
+from app.infrastructure.logging.setup import get_logger
+
+log = get_logger(__name__)
 
 EVENT_BY_NODE = {
     "change_analyzer": ("change_analysis_done", "change_analysis"),
@@ -69,6 +73,9 @@ async def _stream_leg(
     observed — yields a single `awaiting_approval` event and ends the leg (stops
     iterating; the checkpoint already has everything the next leg needs)."""
     queue: asyncio.Queue[AgentEvent | object] = asyncio.Queue()
+    bound = log.bind(run_id=run_id)
+    bound.info("pipeline.leg.start")
+    leg_start = time.monotonic()
 
     async def emit_thought(step: str, text: str) -> None:
         await queue.put(AgentEvent(type="thought", payload={"step": step, "delta": text}))
@@ -80,6 +87,7 @@ async def _stream_leg(
             async for update in graph.astream(state_input, config, stream_mode="updates"):
                 interrupt_event = _interrupt_event(update)
                 if interrupt_event is not None:
+                    bound.info("pipeline.leg.interrupted", stage=interrupt_event.payload.get("stage"))
                     await queue.put(interrupt_event)
                     return
                 for node_name, delta in update.items():
@@ -89,10 +97,12 @@ async def _stream_leg(
                     event_type, payload_key = mapping
                     await queue.put(AgentEvent(type=event_type, payload=delta[payload_key]))
         except LlmError as exc:
+            bound.error("pipeline.leg.error", step="llm", error=exc.message)
             await queue.put(
                 AgentEvent(type="error", payload={"step": "llm", "message": exc.message})
             )
         except Exception as exc:
+            bound.error("pipeline.leg.error", step="pipeline", error=str(exc))
             await queue.put(
                 AgentEvent(type="error", payload={"step": "pipeline", "message": str(exc)})
             )
@@ -109,9 +119,18 @@ async def _stream_leg(
     finally:
         end_run(run_id)
         await task
+        bound.info(
+            "pipeline.leg.end", duration_ms=round((time.monotonic() - leg_start) * 1000, 1)
+        )
 
 
 async def run_pipeline(graph, request: AgentRunRequest) -> AsyncIterator[AgentEvent]:
+    log.info(
+        "pipeline.run.start",
+        run_id=request.analysisId,
+        repo_id=request.repoId,
+        sha=request.sha,
+    )
     initial = {
         "run_id": request.analysisId,
         "diff": request.diff,
@@ -135,6 +154,7 @@ async def resume_pipeline(
     decision: ApprovalDecision | None,
 ) -> AsyncIterator[AgentEvent]:
     del models
+    log.info("pipeline.resume.start", run_id=analysis_id, stage=decision.stage if decision else None)
     resume_input = Command(resume=decision.model_dump()) if decision is not None else None
     config = _build_config(analysis_id, api_keys, policies)
     async for event in _stream_leg(graph, analysis_id, resume_input, config):
