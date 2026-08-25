@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import httpx
 
 from app.config.settings import LLM_MAX_TOKENS, LLM_TIMEOUT_SECONDS, OPENAI_URL
+from app.infrastructure.llm.pricing import estimate_cost_usd
 from app.infrastructure.llm.tokens import TokenUsage, parse_openai_usage
+from app.infrastructure.logging.setup import get_logger
+
+log = get_logger(__name__)
 
 OnDelta = Callable[[str], Awaitable[None]]
 
@@ -45,6 +50,10 @@ async def complete_json(
         **_token_limit_field(model),
     }
 
+    bound = log.bind(model=model)
+    bound.info("llm.request.start")
+    start = time.monotonic()
+
     try:
         async with httpx.AsyncClient(timeout=LLM_TIMEOUT_SECONDS) as client:
             async with client.stream(
@@ -73,16 +82,47 @@ async def complete_json(
                         await on_delta(delta)
 
                 text = "".join(pieces)
-    except LlmError:
+    except LlmError as exc:
+        bound.error(
+            "llm.request.error",
+            duration_ms=round((time.monotonic() - start) * 1000, 1),
+            error=exc.message,
+        )
         raise
     except httpx.TimeoutException as exc:
+        bound.error(
+            "llm.request.error",
+            duration_ms=round((time.monotonic() - start) * 1000, 1),
+            error="timeout",
+        )
         raise LlmError("timeout ao chamar o LLM") from exc
     except httpx.HTTPError as exc:
+        bound.error(
+            "llm.request.error",
+            duration_ms=round((time.monotonic() - start) * 1000, 1),
+            error="network",
+        )
         raise LlmError("falha de rede ao chamar o LLM") from exc
 
     if not text.strip():
+        bound.error(
+            "llm.request.error",
+            duration_ms=round((time.monotonic() - start) * 1000, 1),
+            error="empty_response",
+        )
         raise LlmError("LLM devolveu resposta vazia")
-    return LlmResult(data=parse_json_object(text), usage=parse_openai_usage(last_usage))
+
+    usage = parse_openai_usage(last_usage)
+    cost_usd = estimate_cost_usd(model, usage.prompt_tokens, usage.completion_tokens, usage.cached_tokens)
+    bound.info(
+        "llm.request.end",
+        duration_ms=round((time.monotonic() - start) * 1000, 1),
+        prompt_tokens=usage.prompt_tokens,
+        completion_tokens=usage.completion_tokens,
+        cached_tokens=usage.cached_tokens,
+        cost_usd=cost_usd,
+    )
+    return LlmResult(data=parse_json_object(text), usage=usage)
 
 
 def sanitize_openai_error(status: int, body: bytes) -> str:
