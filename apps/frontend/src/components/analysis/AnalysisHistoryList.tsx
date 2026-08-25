@@ -79,6 +79,23 @@ export function AnalysisHistoryList({
               <div className="flex flex-wrap items-center gap-3">
                 <span className="font-mono text-xs text-ink-faint">#{analysis.pullNumber}</span>
                 <AnalysisStatusBadge status={analysis.status} />
+                {analysis.impactScope && (
+                  <span
+                    className={`rounded-sm border px-2 py-0.5 font-mono text-[10px] tracking-wide uppercase ${
+                      analysis.impactScope.requestedMode === 'repository'
+                        ? 'border-border text-ink-faint'
+                        : analysis.impactScope.status === 'exact'
+                          ? 'border-state-open/50 text-state-open'
+                          : 'border-accent/50 text-accent'
+                    }`}
+                  >
+                    {analysis.impactScope.requestedMode === 'repository'
+                      ? 'esta PR'
+                      : analysis.impactScope.status === 'fallback'
+                        ? 'fallback local'
+                        : `${analysis.impactScope.projectName ?? 'projeto'} · ${analysis.impactScope.status}`}
+                  </span>
+                )}
                 {scores && (
                   <span className="font-mono text-xs tabular-nums text-ink">{scores}</span>
                 )}
