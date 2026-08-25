@@ -95,7 +95,7 @@ function buildService() {
   };
   const repositoriesService = {};
   const aiApiClient = { resumeAgent: jest.fn() };
-  const logger = { error: jest.fn() };
+  const logger = { error: jest.fn(), log: jest.fn(), warn: jest.fn() };
 
   const service = new AnalysesService(
     repositoriesService as any,
