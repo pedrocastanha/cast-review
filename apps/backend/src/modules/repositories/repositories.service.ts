@@ -39,7 +39,7 @@ type GithubPull = {
   html_url: string;
   draft?: boolean;
   head: { ref: string; sha: string };
-  base: { ref: string };
+  base: { ref: string; sha: string };
 };
 
 type GithubSession = {
@@ -59,7 +59,8 @@ const REPO_AFFILIATION = 'owner,collaborator,organization_member';
 export class RepositoriesService extends BaseService {
   constructor(
     private readonly userService: UserService,
-    @InjectQueue(CODE_INDEX_QUEUE) private readonly indexQueue: Queue<IndexJobData>,
+    @InjectQueue(CODE_INDEX_QUEUE)
+    private readonly indexQueue: Queue<IndexJobData>,
     private readonly aiApiClient: AiApiClient,
     logger: AppLogger,
   ) {
@@ -300,6 +301,7 @@ export class RepositoriesService extends BaseService {
       headRef: pull.head.ref,
       headSha: pull.head.sha,
       baseRef: pull.base.ref,
+      baseSha: pull.base.sha,
     };
   }
 
@@ -428,7 +430,11 @@ export class RepositoriesService extends BaseService {
     const owner = ownerOverride?.trim() || session.owner;
 
     try {
-      const sha = await this.resolveDefaultBranchSha(session.octokit, owner, repo);
+      const sha = await this.resolveDefaultBranchSha(
+        session.octokit,
+        owner,
+        repo,
+      );
       const jobId = buildIndexJobId(owner, repo, sha);
       await this.indexQueue.add(
         'build',
@@ -496,7 +502,8 @@ export class RepositoriesService extends BaseService {
     const owner = ownerOverride?.trim() || (await this.loginFor(currentUser));
     const repoId = `${owner}/${repo}`;
 
-    const resolvedSha = sha ?? (await this.aiApiClient.getIndexStatus(repoId)).sha;
+    const resolvedSha =
+      sha ?? (await this.aiApiClient.getIndexStatus(repoId)).sha;
     if (!resolvedSha) {
       return { nodes: [], edges: [], stats: { indexed: false } };
     }

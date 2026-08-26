@@ -234,6 +234,7 @@ function normalizeFinding(value: unknown): ReviewFinding | null {
     path: optionalString(value.path),
     line: asCount(value.line) || undefined,
     endLine: asCount(value.endLine ?? value.end_line) || undefined,
+    evidenceId: optionalString(value.evidenceId ?? value.evidence_id),
   };
 }
 

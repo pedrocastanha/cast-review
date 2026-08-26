@@ -9,8 +9,13 @@ import type { Request, Response } from 'express';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import { BaseService } from 'src/shared/services/base.service';
-import type { AgentEvent, AgentResumeRequest } from 'src/shared/types';
+import type {
+  AgentEvent,
+  AgentResumeRequest,
+  FrozenImpactScope,
+} from 'src/shared/types';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
+import { ProjectsService } from '../projects/projects.service';
 import { RepositoriesService } from '../repositories/repositories.service';
 import type {
   AnalysisContextSnapshot,
@@ -61,6 +66,7 @@ export class AnalysesService extends BaseService {
     private readonly aiApiClient: AiApiClient,
     private readonly analysisRepository: AnalysisRepository,
     private readonly contextSnapshotRepository: AnalysisContextSnapshotRepository,
+    private readonly projectsService: ProjectsService,
     logger: AppLogger,
   ) {
     super(logger);
@@ -81,6 +87,29 @@ export class AnalysesService extends BaseService {
 
     const pullNumber = parsePullNumber(pullNumberRaw);
     const dto = parseRunAnalysisBody(body);
+    const requestedOwner = owner?.trim() || '';
+    const sourceOwner =
+      dto.impactScope.mode === 'project'
+        ? requestedOwner ||
+          (await this.repositoriesService.loginFor(currentUser))
+        : requestedOwner;
+    const sourceRepoId = sourceOwner ? `${sourceOwner}/${repo}` : '';
+    const impactScope: FrozenImpactScope =
+      dto.impactScope.mode === 'project'
+        ? await this.projectsService.resolveAnalysisScope(
+            dto.impactScope.projectId,
+            sourceRepoId,
+            currentUser,
+          )
+        : {
+            requestedMode: 'repository',
+            effectiveMode: 'repository',
+            status: 'exact',
+            projectId: null,
+            projectName: null,
+            fallbackReason: null,
+            repositories: [],
+          };
     const publishPolicy: PublishPolicy = {
       prd: dto.policies?.prd ?? 'manual',
       spec: dto.policies?.spec ?? 'manual',
@@ -99,6 +128,14 @@ export class AnalysesService extends BaseService {
         thoughts: {},
         errorMessage: null,
         models: dto.models,
+        impactScope: {
+          requestedMode: impactScope.requestedMode,
+          effectiveMode: impactScope.effectiveMode,
+          status: impactScope.status,
+          projectId: impactScope.projectId,
+          projectName: impactScope.projectName,
+          fallbackReason: impactScope.fallbackReason,
+        },
         finishedAt: null,
         publishPolicy,
       }),
@@ -130,7 +167,8 @@ export class AnalysesService extends BaseService {
         currentUser,
         dto,
         analysis.id,
-        owner,
+        sourceOwner || undefined,
+        impactScope,
       );
 
       await this.streamLeg(
@@ -633,6 +671,37 @@ export class AnalysesService extends BaseService {
           graphSnapshot: snapshot as AnalysisContextSnapshot,
         }),
       );
+      const scope = (snapshot as { scope?: unknown }).scope;
+      if (scope && typeof scope === 'object' && !Array.isArray(scope)) {
+        const value = scope as Record<string, unknown>;
+        if (
+          (value.requestedMode === 'repository' ||
+            value.requestedMode === 'project') &&
+          (value.effectiveMode === 'repository' ||
+            value.effectiveMode === 'project') &&
+          (value.status === 'exact' ||
+            value.status === 'degraded' ||
+            value.status === 'fallback')
+        ) {
+          await this.analysisRepository.update(analysisId, {
+            impactScope: {
+              requestedMode: value.requestedMode,
+              effectiveMode: value.effectiveMode,
+              status: value.status,
+              projectId:
+                typeof value.projectId === 'string' ? value.projectId : null,
+              projectName:
+                typeof value.projectName === 'string'
+                  ? value.projectName
+                  : null,
+              fallbackReason:
+                typeof value.fallbackReason === 'string'
+                  ? value.fallbackReason
+                  : null,
+            },
+          });
+        }
+      }
     } catch (err) {
       this.logger.error('Falha ao persistir snapshot de contexto', {
         exception: err,
@@ -757,6 +826,7 @@ export class AnalysesService extends BaseService {
       thoughts: row.thoughts,
       errorMessage: row.errorMessage,
       models: row.models,
+      impactScope: row.impactScope,
       createdAt: row.createdAt.toISOString(),
       finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
       approvalStage: row.approvalStage,

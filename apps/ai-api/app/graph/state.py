@@ -7,6 +7,9 @@ class GraphState(TypedDict, total=False):
     conventions: str
     repo_id: str | None
     sha: str | None
+    base_sha: str | None
+    pull_number: int | None
+    impact_scope: dict[str, Any] | None
     frozen_context: dict[str, Any] | None
     models: dict[str, str]
     change_analysis: dict[str, Any]

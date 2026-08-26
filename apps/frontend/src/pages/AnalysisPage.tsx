@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import type { ApproveStagePayload, ApprovePublishPayload } from '../api/analyses.api';
 import { openaiKeyStore } from '../api/openai-key-store';
 import { repositoriesApi } from '../api/repositories.api';
+import { projectsApi } from '../api/projects.api';
 import { AgentStepper } from '../components/analysis/AgentStepper';
 import { AnalysisHistoryList } from '../components/analysis/AnalysisHistoryList';
 import { AnalysisStatusBadge } from '../components/analysis/AnalysisStatusBadge';
@@ -18,7 +19,7 @@ import { Spinner } from '../components/ui/Spinner';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
 import { useRepoAnalyses } from '../hooks/useRepoAnalyses';
 import { hasReviewContent } from '../lib/assemble-report';
-import type { PullRequest, SpecPayload } from '../types';
+import type { EligibleProject, PullRequest, SpecPayload } from '../types';
 
 const DEFAULT_MODEL = 'gpt-4o';
 
@@ -78,6 +79,11 @@ export function AnalysisPage() {
   const [prdPolicy, setPrdPolicy] = useState<'manual' | 'auto'>('manual');
   const [specPolicy, setSpecPolicy] = useState<'manual' | 'auto'>('manual');
   const [publishPolicy, setPublishPolicy] = useState<'manual' | 'auto_safe' | 'auto'>('manual');
+  const [eligibleProjects, setEligibleProjects] = useState<EligibleProject[]>([]);
+  const [eligibilityLoading, setEligibilityLoading] = useState(true);
+  const [eligibilityError, setEligibilityError] = useState(false);
+  const [projectImpactEnabled, setProjectImpactEnabled] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
 
   useEffect(() => {
     if (!repo || !owner || !Number.isFinite(number)) return;
@@ -95,7 +101,31 @@ export function AnalysisPage() {
     };
   }, [owner, repo, number]);
 
-  const canStart = openaiKey.trim().length > 0 && phase !== 'running';
+  useEffect(() => {
+    if (!owner || !repo) return;
+    let cancelled = false;
+    setEligibilityLoading(true);
+    setEligibilityError(false);
+    projectsApi
+      .eligible(`${owner}/${repo}`)
+      .then((projects) => {
+        if (!cancelled) setEligibleProjects(projects);
+      })
+      .catch(() => {
+        if (!cancelled) setEligibilityError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setEligibilityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [owner, repo]);
+
+  const canStart =
+    openaiKey.trim().length > 0 &&
+    phase !== 'running' &&
+    (!projectImpactEnabled || Boolean(selectedProjectId));
   const pullsPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`;
   const saved = analyses?.find((item) => hasReviewContent(item.report));
   const visibleReport =
@@ -120,7 +150,24 @@ export function AnalysisPage() {
       models: { testReviewer: testModel, architectureReviewer: archModel },
       apiKeys: { openai: openaiKey.trim() },
       policies: { prd: prdPolicy, spec: specPolicy, publish: publishPolicy },
+      impactScope: projectImpactEnabled
+        ? { mode: 'project', projectId: selectedProjectId }
+        : { mode: 'repository' },
     });
+  };
+
+  const toggleProjectImpact = () => {
+    const next = !projectImpactEnabled;
+    setProjectImpactEnabled(next);
+    if (next && eligibleProjects.length === 1) {
+      setSelectedProjectId(eligibleProjects[0].id);
+    }
+  };
+
+  const newExecution = () => {
+    setProjectImpactEnabled(false);
+    setSelectedProjectId('');
+    reset();
   };
 
   const onResume = (analysisId: string) => {
@@ -229,12 +276,127 @@ export function AnalysisPage() {
             </select>
           </div>
         </div>
+        <section className="rounded-md border border-border bg-surface-1/55 p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl">
+              <p className="font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">
+                Escopo da análise
+              </p>
+              <h2 className="mt-1 font-display text-base font-semibold text-ink">
+                {projectImpactEnabled ? 'Projeto conectado' : 'Apenas esta PR'}
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-ink-faint">
+                {projectImpactEnabled
+                  ? 'Compara contratos e procura consumidores ou provedores nos índices congelados do projeto.'
+                  : 'Fluxo local, sem consultar o Project Graph e sem adicionar contexto cross-repo.'}
+              </p>
+            </div>
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-sm border border-border px-3 py-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={projectImpactEnabled}
+                onChange={toggleProjectImpact}
+                disabled={eligibilityLoading || eligibleProjects.length === 0}
+                className="size-4 accent-[var(--color-accent)]"
+              />
+              Verificar outros repositórios
+            </label>
+          </div>
+
+          {eligibilityLoading && (
+            <p className="mt-4 font-mono text-xs text-ink-faint">Verificando projetos elegíveis…</p>
+          )}
+          {!eligibilityLoading && eligibilityError && (
+            <p className="mt-4 text-xs text-state-closed">
+              Não foi possível verificar os projetos. A análise local continua disponível.
+            </p>
+          )}
+          {!eligibilityLoading && !eligibilityError && eligibleProjects.length === 0 && (
+            <p className="mt-4 text-xs text-ink-faint">
+              Este repositório ainda não pertence a um projeto com pelo menos dois membros.{' '}
+              <Link to="/projects" className="text-accent hover:underline">
+                Configurar projeto
+              </Link>
+            </p>
+          )}
+
+          {projectImpactEnabled && eligibleProjects.length > 0 && (
+            <div className="mt-4 border-t border-border pt-4">
+              {eligibleProjects.length > 1 && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="impact-project" className={POLICY_LABEL_CLASS}>
+                    Projeto
+                  </label>
+                  <select
+                    id="impact-project"
+                    className={POLICY_SELECT_CLASS}
+                    value={selectedProjectId}
+                    onChange={(event) => setSelectedProjectId(event.target.value)}
+                  >
+                    <option value="">Selecione um projeto</option>
+                    {eligibleProjects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {eligibleProjects
+                .filter((project) => project.id === selectedProjectId)
+                .map((project) => (
+                  <div key={project.id} className="mt-3">
+                    <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                      <span className="text-ink">{project.name}</span>
+                      <span className="text-ink-faint">·</span>
+                      <span className="text-ink-faint">
+                        {project.readyCount}/{project.memberCount} índices prontos
+                      </span>
+                      {project.staleCount > 0 && (
+                        <span className="rounded-sm border border-accent/40 px-2 py-0.5 text-accent">
+                          {project.staleCount} stale
+                        </span>
+                      )}
+                    </div>
+                    <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {project.repositories.map((repository) => (
+                        <li
+                          key={repository.repository}
+                          className="flex items-center justify-between gap-3 rounded-sm border border-border px-3 py-2 font-mono text-[10px]"
+                        >
+                          <span className="truncate text-ink-dim">{repository.repository}</span>
+                          <span
+                            className={
+                              repository.status === 'indexed' && !repository.stale
+                                ? 'text-state-open'
+                                : 'text-accent'
+                            }
+                          >
+                            {repository.stale ? 'stale' : repository.status}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    {project.readyCount < project.memberCount && (
+                      <p className="mt-3 text-xs text-ink-faint">
+                        A cobertura será parcial. O Cast não indexa automaticamente ao iniciar.{' '}
+                        <Link to={`/projects/${project.id}`} className="text-accent hover:underline">
+                          Preparar índices
+                        </Link>
+                      </p>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
+        </section>
         <div className="flex gap-3">
           <Button type="submit" loading={phase === 'running'} disabled={!canStart}>
             {phase === 'running' ? 'Rodando' : 'Rodar análise'}
           </Button>
           {phase !== 'idle' && phase !== 'running' && (
-            <Button type="button" variant="secondary" onClick={reset}>
+            <Button type="button" variant="secondary" onClick={newExecution}>
               Nova execução
             </Button>
           )}

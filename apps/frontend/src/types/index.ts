@@ -121,6 +121,15 @@ export interface ProjectIndexStatus {
   repositories: ProjectRepositoryIndexStatus[];
 }
 
+export interface EligibleProject {
+  id: string;
+  name: string;
+  memberCount: number;
+  readyCount: number;
+  staleCount: number;
+  repositories: ProjectRepositoryIndexStatus[];
+}
+
 export interface ProjectGraphEvidence {
   repoId: string;
   path: string;
@@ -244,6 +253,9 @@ export interface RunAnalysisPayload {
     openai: string;
   };
   policies: Policies;
+  impactScope?:
+    | { mode: 'repository' }
+    | { mode: 'project'; projectId: string };
 }
 
 export interface Finding {
@@ -255,6 +267,7 @@ export interface Finding {
   path?: string;
   line?: number;
   endLine?: number;
+  evidenceId?: string;
 }
 
 export interface ReviewResult {
@@ -307,8 +320,49 @@ export interface GraphSnapshotEdge {
   confidence: 'confirmed' | 'inferred' | 'stale';
 }
 
+export interface CrossRepoEvidenceEndpoint {
+  repoId: string;
+  sha: string;
+  path: string;
+  line: number;
+  symbolId?: string | null;
+  symbolName?: string | null;
+  framework: string;
+}
+
+export interface CrossRepoEvidence {
+  id: string;
+  contractChangeId: string;
+  method: string;
+  route: string;
+  confidence: GraphConfidence;
+  evidenceType: string;
+  consumer: CrossRepoEvidenceEndpoint;
+  provider: CrossRepoEvidenceEndpoint | null;
+}
+
+export interface CrossRepoImpact {
+  id: string;
+  evidenceId: string;
+  contractChangeId: string;
+  risk: 'breaking_candidate' | 'behavioral_candidate' | 'integration_gap' | 'informational';
+  confidence: GraphConfidence;
+  direction: string;
+  method: string;
+  route: string;
+}
+
+export interface AnalysisImpactScopeSummary {
+  requestedMode: 'repository' | 'project';
+  effectiveMode: 'repository' | 'project';
+  status: 'exact' | 'degraded' | 'fallback';
+  projectId: string | null;
+  projectName: string | null;
+  fallbackReason: string | null;
+}
+
 export interface AnalysisContextSnapshot {
-  schemaVersion: '1';
+  schemaVersion: '1' | '2';
   snapshotHash: string;
   createdAt: string;
   analysisId: string | null;
@@ -349,11 +403,31 @@ export interface AnalysisContextSnapshot {
     truncated: boolean;
     omittedNodes: number;
     omittedEdges: number;
+    omittedImpacts?: number;
+    omittedEvidence?: number;
   };
   rendered: {
     graphContextBlock: string;
     relatedContext: Record<string, unknown>;
   };
+  scope?: AnalysisImpactScopeSummary;
+  source?: {
+    repoId: string;
+    pullNumber: number | null;
+    baseSha: string | null;
+    headSha: string | null;
+  };
+  repositories?: Array<{
+    repoId: string;
+    indexedSha: string | null;
+    indexStatus: string;
+    included: boolean;
+    omissionReason: string | null;
+  }>;
+  contractChanges?: Array<Record<string, unknown>>;
+  impacts?: CrossRepoImpact[];
+  evidence?: CrossRepoEvidence[];
+  versions?: Record<string, string>;
 }
 
 export interface BenchmarkCase {
@@ -512,6 +586,7 @@ export interface AnalysisRecord {
   thoughts: Record<string, string> | null;
   errorMessage: string | null;
   models: { testReviewer: string; architectureReviewer: string } | null;
+  impactScope: AnalysisImpactScopeSummary | null;
   createdAt: string;
   finishedAt: string | null;
   approvalStage: 'prd' | 'spec' | 'publish' | null;

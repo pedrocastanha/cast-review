@@ -18,7 +18,28 @@ export interface ChangedFileContext {
   path: string;
   diff: string;
   fullContent: string;
+  baseContent?: string;
   relatedFiles: RelatedFile[];
+}
+
+export type ImpactScopeStatus = 'exact' | 'degraded' | 'fallback';
+
+export interface FrozenImpactRepository {
+  repoId: string;
+  indexedSha: string | null;
+  indexStatus: string;
+  included: boolean;
+  omissionReason: string | null;
+}
+
+export interface FrozenImpactScope {
+  requestedMode: 'repository' | 'project';
+  effectiveMode: 'repository' | 'project';
+  status: ImpactScopeStatus;
+  projectId: string | null;
+  projectName: string | null;
+  fallbackReason: string | null;
+  repositories: FrozenImpactRepository[];
 }
 
 export type AgentEventType =
@@ -58,6 +79,9 @@ export interface AgentRunRequest {
   policies?: Policies;
   repoId?: string;
   sha?: string;
+  baseSha?: string;
+  pullNumber?: number;
+  impactScope?: FrozenImpactScope;
   frozenContext?: {
     graphSnapshot: unknown;
   };

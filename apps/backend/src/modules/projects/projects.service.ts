@@ -1,15 +1,34 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import type {
+  FrozenImpactRepository,
+  FrozenImpactScope,
+} from 'src/shared/types';
 import { DataSource } from 'typeorm';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import type { RepositoriesService } from '../repositories/repositories.service';
 import type { CreateProjectDto } from './dtos/create-project.dto';
 import type { UpdateProjectDto } from './dtos/update-project.dto';
-import { ProjectRepositoryMemberRepository } from './project-repository-member.repository';
 import { ProjectRepository } from './project.repository';
+import { ProjectRepositoryMemberRepository } from './project-repository-member.repository';
 
-type AuthorizedRepository = Awaited<ReturnType<RepositoriesService['listRepos']>>[number];
+type AuthorizedRepository = Awaited<
+  ReturnType<RepositoriesService['listRepos']>
+>[number];
+type MemberIndexStatus = {
+  repository: string;
+  status: string;
+  sha: string | null;
+  stale: boolean;
+  progress?: number;
+  errorMessage?: string;
+};
 
 @Injectable()
 export class ProjectsService {
@@ -28,11 +47,126 @@ export class ProjectsService {
       where: { ownerId: currentUser.id, active: true },
       order: { updatedAt: 'DESC' },
     });
-    return Promise.all(projects.map((project) => this.withRepositories(project)));
+    return Promise.all(
+      projects.map((project) => this.withRepositories(project)),
+    );
+  }
+
+  async listEligible(repository: string, currentUser: CurrentUserData) {
+    const sourceRepoId = repository?.trim().toLowerCase();
+    if (!sourceRepoId?.includes('/')) {
+      throw new BadRequestException(
+        'repository deve usar o formato owner/repo',
+      );
+    }
+
+    const projects = await this.projectRepository.find({
+      where: { ownerId: currentUser.id, active: true },
+      order: { updatedAt: 'DESC' },
+    });
+    const eligible: Array<{
+      id: string;
+      name: string;
+      memberCount: number;
+      readyCount: number;
+      staleCount: number;
+      repositories: MemberIndexStatus[];
+    }> = [];
+
+    for (const project of projects) {
+      const members = await this.members(project.id);
+      if (
+        members.length < 2 ||
+        !members.some(
+          (member) => member.fullName.toLowerCase() === sourceRepoId,
+        )
+      ) {
+        continue;
+      }
+
+      const statuses = await Promise.all(
+        members.map((member) => this.memberStatus(member, currentUser)),
+      );
+      eligible.push({
+        id: project.id,
+        name: project.name,
+        memberCount: members.length,
+        readyCount: statuses.filter(
+          (status) => status.status === 'indexed' && Boolean(status.sha),
+        ).length,
+        staleCount: statuses.filter((status) => status.stale).length,
+        repositories: statuses,
+      });
+    }
+
+    return eligible;
+  }
+
+  async resolveAnalysisScope(
+    projectId: string,
+    sourceRepoId: string,
+    currentUser: CurrentUserData,
+  ): Promise<FrozenImpactScope> {
+    const project = await this.getById(projectId, currentUser);
+    const members = await this.members(project.id);
+    const normalizedSource = sourceRepoId.toLowerCase();
+    if (
+      members.length < 2 ||
+      !members.some(
+        (member) => member.fullName.toLowerCase() === normalizedSource,
+      )
+    ) {
+      throw new NotFoundException('Projeto não encontrado.');
+    }
+
+    const statuses = await Promise.all(
+      members.map((member) => this.memberStatus(member, currentUser)),
+    );
+    const repositories: FrozenImpactRepository[] = statuses.map((status) => {
+      const isSource = status.repository.toLowerCase() === normalizedSource;
+      const usable = status.status === 'indexed' && Boolean(status.sha);
+      return {
+        repoId: status.repository,
+        indexedSha: status.sha,
+        indexStatus: status.stale ? 'stale' : status.status,
+        included: isSource || usable,
+        omissionReason: isSource || usable ? null : status.status,
+      };
+    });
+    const secondary = repositories.filter(
+      (repository) => repository.repoId.toLowerCase() !== normalizedSource,
+    );
+    const usableSecondary = secondary.filter(
+      (repository) => repository.included,
+    );
+    const hasIncompleteCoverage = repositories.some(
+      (repository) =>
+        !repository.included || repository.indexStatus === 'stale',
+    );
+    const fallback = usableSecondary.length === 0;
+
+    return {
+      requestedMode: 'project',
+      effectiveMode: fallback ? 'repository' : 'project',
+      status: fallback
+        ? 'fallback'
+        : hasIncompleteCoverage
+          ? 'degraded'
+          : 'exact',
+      projectId: project.id,
+      projectName: project.name,
+      fallbackReason: fallback
+        ? 'Nenhum índice secundário utilizável no projeto selecionado.'
+        : null,
+      repositories,
+    };
   }
 
   async create(input: CreateProjectDto, currentUser: CurrentUserData) {
-    const repositories = await this.authorizeRepositories(input.repositories, currentUser);
+    const repositories = await this.authorizeRepositories(
+      input.repositories,
+      currentUser,
+    );
 
     const project = await this.dataSource.transaction(async (manager) => {
       const entity = this.projectRepository.create({
@@ -40,7 +174,11 @@ export class ProjectsService {
         name: input.name.trim(),
         description: input.description?.trim() || null,
       });
-      const saved = await this.projectRepository.save(entity, undefined, manager);
+      const saved = await this.projectRepository.save(
+        entity,
+        undefined,
+        manager,
+      );
       await this.memberRepository.replaceForProject(
         saved.id,
         repositories.map((repository) => this.toMember(saved.id, repository)),
@@ -64,7 +202,11 @@ export class ProjectsService {
     return this.withRepositories(await this.getById(id, currentUser));
   }
 
-  async update(id: string, input: UpdateProjectDto, currentUser: CurrentUserData) {
+  async update(
+    id: string,
+    input: UpdateProjectDto,
+    currentUser: CurrentUserData,
+  ) {
     const project = await this.getById(id, currentUser);
     const repositories = input.repositories
       ? await this.authorizeRepositories(input.repositories, currentUser)
@@ -84,7 +226,9 @@ export class ProjectsService {
       if (repositories) {
         await this.memberRepository.replaceForProject(
           project.id,
-          repositories.map((repository) => this.toMember(project.id, repository)),
+          repositories.map((repository) =>
+            this.toMember(project.id, repository),
+          ),
           manager,
         );
       }
@@ -161,9 +305,38 @@ export class ProjectsService {
     });
   }
 
-  private async authorizeRepositories(names: string[], currentUser: CurrentUserData) {
+  private async memberStatus(
+    member: { owner: string; name: string; fullName: string },
+    currentUser: CurrentUserData,
+  ): Promise<MemberIndexStatus> {
+    try {
+      return {
+        repository: member.fullName,
+        ...(await this.repositoriesService.getRepositoryIndexStatus(
+          member.name,
+          currentUser,
+          member.owner,
+        )),
+      };
+    } catch {
+      return {
+        repository: member.fullName,
+        status: 'error' as const,
+        sha: null,
+        stale: false,
+        errorMessage: 'Não foi possível consultar este repositório.',
+      };
+    }
+  }
+
+  private async authorizeRepositories(
+    names: string[],
+    currentUser: CurrentUserData,
+  ) {
     const available = await this.repositoriesService.listRepos(currentUser);
-    const byName = new Map(available.map((repository) => [repository.fullName, repository]));
+    const byName = new Map(
+      available.map((repository) => [repository.fullName, repository]),
+    );
     const selected = names.map((name) => byName.get(name));
     if (selected.some((repository) => !repository)) {
       throw new BadRequestException(

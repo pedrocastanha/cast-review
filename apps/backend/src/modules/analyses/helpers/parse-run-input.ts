@@ -45,12 +45,40 @@ export function parseRunAnalysisBody(body: unknown): RunAnalysisDto {
     },
     apiKeys: { openai: apiKeys.openai },
     policies: parsePolicies(body.policies),
+    impactScope: parseImpactScope(body.impactScope),
   } as RunAnalysisDto;
 }
 
-function parsePolicies(
-  raw: unknown,
-): RunAnalysisDto['policies'] | undefined {
+function parseImpactScope(raw: unknown): RunAnalysisDto['impactScope'] {
+  if (raw === undefined) return { mode: 'repository' };
+  if (!isRecord(raw)) {
+    throw new BadRequestException('impactScope deve ser um objeto');
+  }
+
+  if (raw.mode === 'repository') {
+    if (raw.projectId !== undefined) {
+      throw new BadRequestException(
+        'impactScope.projectId não é permitido no modo repository',
+      );
+    }
+    return { mode: 'repository' };
+  }
+
+  if (raw.mode === 'project') {
+    if (!isNonEmptyString(raw.projectId) || !isUuid(raw.projectId)) {
+      throw new BadRequestException(
+        'impactScope.projectId deve ser um UUID válido no modo project',
+      );
+    }
+    return { mode: 'project', projectId: raw.projectId };
+  }
+
+  throw new BadRequestException(
+    'impactScope.mode deve ser "repository" ou "project"',
+  );
+}
+
+function parsePolicies(raw: unknown): RunAnalysisDto['policies'] | undefined {
   if (raw === undefined) return undefined;
   if (!isRecord(raw)) {
     throw new BadRequestException('policies deve ser um objeto');
@@ -63,9 +91,7 @@ function parsePolicies(
     throw new BadRequestException('policies.prd deve ser "manual" ou "auto"');
   }
   if (spec !== undefined && spec !== 'manual' && spec !== 'auto') {
-    throw new BadRequestException(
-      'policies.spec deve ser "manual" ou "auto"',
-    );
+    throw new BadRequestException('policies.spec deve ser "manual" ou "auto"');
   }
   if (
     publish !== undefined &&
@@ -91,4 +117,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }

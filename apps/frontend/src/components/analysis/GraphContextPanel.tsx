@@ -139,6 +139,165 @@ function SnapshotGraph({ snapshot, filter }: { snapshot: AnalysisContextSnapshot
   );
 }
 
+const IMPACT_LABEL = {
+  breaking_candidate: 'possível quebra',
+  behavioral_candidate: 'risco comportamental',
+  integration_gap: 'integração sem provedor',
+  informational: 'informativo',
+} as const;
+
+function CrossRepoSnapshot({ snapshot }: { snapshot: AnalysisContextSnapshot }) {
+  if (snapshot.schemaVersion !== '2' || !snapshot.scope) return null;
+  const evidenceById = new Map((snapshot.evidence ?? []).map((item) => [item.id, item]));
+  const warning = snapshot.scope.status !== 'exact';
+
+  return (
+    <div className="flex flex-col gap-4 rounded-md border border-border bg-surface-1/55 p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-mono text-[10px] tracking-[0.14em] text-accent uppercase">
+            Impacto entre repositórios
+          </p>
+          <h3 className="mt-1 font-display text-base font-semibold text-ink">
+            {snapshot.scope.projectName ?? 'Projeto indisponível'}
+          </h3>
+        </div>
+        <span
+          className={`rounded-sm border px-2 py-1 font-mono text-[10px] tracking-wide uppercase ${
+            warning
+              ? 'border-accent/50 bg-accent/10 text-accent'
+              : 'border-state-open/50 bg-state-open/10 text-state-open'
+          }`}
+        >
+          {snapshot.scope.status === 'exact'
+            ? 'cobertura exata'
+            : snapshot.scope.status === 'degraded'
+              ? 'cobertura parcial'
+              : 'fallback local'}
+        </span>
+      </div>
+
+      {snapshot.scope.fallbackReason && (
+        <p className="rounded-sm border border-accent/40 bg-accent/10 px-3 py-2 text-xs text-ink">
+          {snapshot.scope.fallbackReason}
+        </p>
+      )}
+
+      {snapshot.source && (
+        <dl className="grid gap-3 font-mono text-xs sm:grid-cols-3">
+          <div>
+            <dt className="text-ink-faint">Origem</dt>
+            <dd className="mt-1 text-ink">{snapshot.source.repoId}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-faint">Base SHA</dt>
+            <dd className="mt-1 text-ink">{snapshot.source.baseSha?.slice(0, 12) ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-faint">Head SHA</dt>
+            <dd className="mt-1 text-ink">{snapshot.source.headSha?.slice(0, 12) ?? '—'}</dd>
+          </div>
+        </dl>
+      )}
+
+      {(snapshot.repositories?.length ?? 0) > 0 && (
+        <div>
+          <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
+            Versões congeladas
+          </p>
+          <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+            {snapshot.repositories?.map((repository) => (
+              <li
+                key={repository.repoId}
+                className="rounded-sm border border-border px-3 py-2 font-mono text-[10px]"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-ink">{repository.repoId}</span>
+                  <span className={repository.included ? 'text-state-open' : 'text-accent'}>
+                    {repository.included ? repository.indexStatus : 'omitido'}
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-ink-faint">
+                  {repository.indexedSha?.slice(0, 12) ?? repository.omissionReason ?? 'sem SHA'}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(snapshot.impacts?.length ?? 0) > 0 ? (
+        <div>
+          <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
+            Evidências selecionadas
+          </p>
+          <ul className="mt-2 flex flex-col gap-2">
+            {snapshot.impacts?.map((impact) => {
+              const evidence = evidenceById.get(impact.evidenceId);
+              return (
+                <li key={impact.id} className="rounded-sm border border-border p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`font-mono text-[10px] tracking-wide uppercase ${
+                        impact.risk === 'breaking_candidate' ? 'text-state-closed' : 'text-accent'
+                      }`}
+                    >
+                      {IMPACT_LABEL[impact.risk]}
+                    </span>
+                    <span className="font-mono text-xs text-ink">
+                      {impact.method} {impact.route}
+                    </span>
+                    <span className="font-mono text-[10px] text-ink-faint">
+                      {impact.confidence}
+                    </span>
+                  </div>
+                  <p className="mt-2 font-mono text-xs text-ink-dim">{impact.direction}</p>
+                  {evidence && (
+                    <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+                      <div className="rounded-sm bg-surface-2 px-3 py-2">
+                        <p className="font-mono text-[9px] tracking-wide text-ink-faint uppercase">
+                          consumidor
+                        </p>
+                        <p className="mt-1 truncate font-mono text-ink">
+                          {evidence.consumer.repoId}/{evidence.consumer.path}:{evidence.consumer.line}
+                        </p>
+                      </div>
+                      <div className="rounded-sm bg-surface-2 px-3 py-2">
+                        <p className="font-mono text-[9px] tracking-wide text-ink-faint uppercase">
+                          provedor
+                        </p>
+                        <p className="mt-1 truncate font-mono text-ink">
+                          {evidence.provider
+                            ? `${evidence.provider.repoId}/${evidence.provider.path}:${evidence.provider.line}`
+                            : 'não encontrado no escopo congelado'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <p className="mt-2 truncate font-mono text-[9px] text-ink-faint">
+                    {impact.evidenceId}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : (
+        <p className="rounded-sm border border-border px-3 py-4 text-sm text-ink-faint">
+          Nenhum impacto cross-repo confirmado no contexto selecionado.
+        </p>
+      )}
+
+      {snapshot.budget.truncated && (
+        <p className="font-mono text-xs text-ink-faint">
+          Contexto truncado: {snapshot.budget.omittedImpacts ?? 0} impactos e{' '}
+          {snapshot.budget.omittedEvidence ?? 0} evidências omitidos.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function GraphContextPanel({ analysisId }: { analysisId: string }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -192,6 +351,8 @@ export function GraphContextPanel({ analysisId }: { analysisId: string }) {
           {error && <p className="rounded-sm border border-border bg-surface-1 px-4 py-3 text-sm text-ink-dim">{error}</p>}
           {snapshot && (
             <>
+              <CrossRepoSnapshot snapshot={snapshot} />
+
               {snapshot.graph.stale && (
                 <p className="rounded-sm border border-state-closed/50 bg-state-closed-dim px-4 py-3 text-sm text-ink">
                   Contexto stale — o índice disponível é de outro SHA. Relações são evidência auxiliar, não certeza.
@@ -230,9 +391,9 @@ export function GraphContextPanel({ analysisId }: { analysisId: string }) {
                 </p>
               )}
 
-              {(snapshot.budget.truncated || snapshot.budget.omittedNodes > 0) && (
+              {(snapshot.budget.truncated || (snapshot.budget.omittedNodes ?? 0) > 0) && (
                 <p className="font-mono text-xs text-ink-faint">
-                  {snapshot.budget.omittedNodes} nós e {snapshot.budget.omittedEdges} arestas ficaram fora do snapshot
+                  {snapshot.budget.omittedNodes ?? 0} nós e {snapshot.budget.omittedEdges ?? 0} arestas ficaram fora do snapshot
                   {snapshot.budget.truncated ? ' por limite de contexto.' : '.'}
                 </p>
               )}

@@ -110,6 +110,22 @@ export function AnalysisRecordPage() {
                 </dd>
               </div>
             )}
+            {record.impactScope && (
+              <div className="col-span-2">
+                <dt className="text-ink-faint">Escopo</dt>
+                <dd className="mt-0.5 text-ink">
+                  {record.impactScope.requestedMode === 'repository'
+                    ? 'Apenas esta PR'
+                    : `${record.impactScope.projectName ?? 'Projeto'} · ${
+                        record.impactScope.status === 'exact'
+                          ? 'cobertura exata'
+                          : record.impactScope.status === 'degraded'
+                            ? 'cobertura parcial'
+                            : 'fallback local'
+                      }`}
+                </dd>
+              </div>
+            )}
             {record.report?.usage && (
               <div className="col-span-2">
                 <dt className="text-ink-faint">Custo</dt>

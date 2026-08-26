@@ -1,5 +1,5 @@
 from app.code_graph.models import Edge, Graph, IndexStats, RelatedContext, Symbol, SymbolRef
-from app.code_graph.snapshot import build_context_snapshot
+from app.code_graph.snapshot import build_context_snapshot, build_cross_repo_snapshot
 
 
 def _symbol(symbol_id: str, path: str, name: str, body: str) -> Symbol:
@@ -99,3 +99,97 @@ def test_snapshot_contains_only_explicit_input_and_never_api_keys():
     assert "sk-secret" not in serialized
     assert snapshot.graph.indexedSha is None
     assert snapshot.selected.nodes == []
+
+
+def test_cross_repo_snapshot_v2_hashes_frozen_evidence_and_preserves_local_graph():
+    local = build_context_snapshot(
+        analysis_id="analysis-a",
+        repo_id="cast/backend",
+        sha="head-sha",
+        graph=Graph(),
+        related=RelatedContext(stats=IndexStats(indexed=False)),
+        diff="safe diff",
+        changed_files=[],
+        conventions="safe conventions",
+    ).model_dump()
+    scope = {
+        "requestedMode": "project",
+        "effectiveMode": "project",
+        "status": "exact",
+        "projectId": "project-1",
+        "projectName": "Cast",
+        "fallbackReason": None,
+        "repositories": [
+            {
+                "repoId": "cast/frontend",
+                "indexedSha": "front-sha",
+                "indexStatus": "indexed",
+                "included": True,
+                "omissionReason": None,
+            }
+        ],
+    }
+    resolution = {
+        "contractChanges": [],
+        "impacts": [{"id": "impact-1", "evidenceId": "evidence-1"}],
+        "evidence": [{"id": "evidence-1", "method": "GET", "route": "/health"}],
+        "budget": {
+            "tokenBudget": 9000,
+            "budgetUsed": 20,
+            "truncated": False,
+            "omittedImpacts": 0,
+            "omittedEvidence": 0,
+        },
+    }
+
+    first = build_cross_repo_snapshot(
+        local_snapshot=local,
+        analysis_id="analysis-a",
+        source_repo_id="cast/backend",
+        pull_number=7,
+        base_sha="base-sha",
+        head_sha="head-sha",
+        impact_scope=scope,
+        resolution=resolution,
+    )
+    second = build_cross_repo_snapshot(
+        local_snapshot=local,
+        analysis_id="analysis-a",
+        source_repo_id="cast/backend",
+        pull_number=7,
+        base_sha="base-sha",
+        head_sha="head-sha",
+        impact_scope=scope,
+        resolution=resolution,
+    )
+
+    assert first["schemaVersion"] == "2"
+    assert first["snapshotHash"] == second["snapshotHash"]
+    assert first["repository"] == local["repository"]
+    assert first["source"]["baseSha"] == "base-sha"
+    assert first["rendered"]["relatedContext"]["crossRepoImpacts"][0]["id"] == "impact-1"
+
+
+def test_cross_repo_snapshot_can_record_repository_fallback_without_local_index():
+    snapshot = build_cross_repo_snapshot(
+        local_snapshot=None,
+        analysis_id="analysis-a",
+        source_repo_id="cast/backend",
+        pull_number=None,
+        base_sha="base-sha",
+        head_sha="head-sha",
+        impact_scope={
+            "requestedMode": "project",
+            "effectiveMode": "repository",
+            "status": "fallback",
+            "projectId": "project-1",
+            "projectName": "Cast",
+            "fallbackReason": "Neo4j indisponível.",
+            "repositories": [],
+        },
+        resolution={"contractChanges": [], "impacts": [], "evidence": [], "budget": None},
+    )
+
+    assert snapshot["scope"]["status"] == "fallback"
+    assert snapshot["selected"]["nodes"] == []
+    assert snapshot["snapshotHash"]

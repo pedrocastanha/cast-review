@@ -1,7 +1,7 @@
 import pytest
 
 from app.graph.agents.architecture_reviewer import run_architecture_reviewer
-from app.graph.nodes.report_builder import build_report
+from app.graph.nodes.report_builder import build_impact_result, build_report
 from app.graph.agents.test_reviewer import run_test_reviewer
 from tests.llm_fakes import llm
 
@@ -185,3 +185,47 @@ def test_report_contains_scores_spec_and_verdict():
     assert report["conventionsSource"] == "default"
     assert "score 85" in report["markdown"]
     assert "Comentar" in report["markdown"]
+
+
+def test_impact_result_only_emits_findings_bound_to_existing_evidence():
+    related = {
+        "crossRepoImpacts": [
+            {
+                "id": "impact-1",
+                "evidenceId": "evidence-1",
+                "risk": "breaking_candidate",
+                "confidence": "confirmed",
+                "direction": "cast/frontend -> cast/backend",
+                "method": "DELETE",
+                "route": "/projects/{param}",
+            },
+            {
+                "id": "impact-invalid",
+                "evidenceId": "missing",
+                "risk": "breaking_candidate",
+                "confidence": "confirmed",
+                "direction": "x -> y",
+                "method": "GET",
+                "route": "/made-up",
+            },
+        ],
+        "crossRepoEvidence": [
+            {
+                "id": "evidence-1",
+                "consumer": {"repoId": "cast/frontend", "path": "src/api.ts", "line": 18},
+                "provider": {
+                    "repoId": "cast/backend",
+                    "path": "src/projects.controller.ts",
+                    "line": 7,
+                },
+            }
+        ],
+    }
+
+    result = build_impact_result(related)
+
+    assert result["name"] == "impact_reviewer"
+    assert len(result["findings"]) == 1
+    assert result["findings"][0]["evidenceId"] == "evidence-1"
+    assert result["findings"][0]["path"] == "src/api.ts"
+    assert result["findings"][0]["line"] == 18

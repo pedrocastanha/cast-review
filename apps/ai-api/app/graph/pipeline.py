@@ -138,6 +138,9 @@ async def run_pipeline(graph, request: AgentRunRequest) -> AsyncIterator[AgentEv
         "conventions": request.conventions,
         "repo_id": request.repoId,
         "sha": request.sha,
+        "base_sha": request.baseSha,
+        "pull_number": request.pullNumber,
+        "impact_scope": request.impactScope.model_dump() if request.impactScope else None,
         "frozen_context": request.frozenContext,
         "models": request.models.model_dump(),
     }

@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { CurrentUser } from '../auth/utils/current-user-decorator';
 import { CreateProjectDto } from './dtos/create-project.dto';
@@ -14,8 +23,19 @@ export class ProjectsController {
     return this.projectsService.list(currentUser);
   }
 
+  @Get('eligible')
+  eligible(
+    @Query('repository') repository: string,
+    @CurrentUser() currentUser: CurrentUserData,
+  ) {
+    return this.projectsService.listEligible(repository, currentUser);
+  }
+
   @Post()
-  create(@Body() input: CreateProjectDto, @CurrentUser() currentUser: CurrentUserData) {
+  create(
+    @Body() input: CreateProjectDto,
+    @CurrentUser() currentUser: CurrentUserData,
+  ) {
     return this.projectsService.create(input, currentUser);
   }
 

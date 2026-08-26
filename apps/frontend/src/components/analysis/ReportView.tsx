@@ -46,6 +46,11 @@ function CommentRow({ comment }: { comment: ReviewComment | (Finding & { reviewe
           {comment.line ? `:${comment.line}` : ''}
         </p>
       )}
+      {comment.evidenceId && (
+        <p className="mt-1 font-mono text-[10px] tracking-wide text-accent uppercase">
+          evidência {comment.evidenceId}
+        </p>
+      )}
     </li>
   );
 }
