@@ -27,6 +27,72 @@ const POLICY_LABEL_CLASS = 'text-xs font-semibold tracking-wide text-ink-faint u
 const POLICY_SELECT_CLASS =
   'min-h-11 rounded-sm border border-border bg-surface-1 px-3 py-2.5 text-base text-ink transition-colors hover:border-border-strong focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25';
 
+function ProjectImpactReadiness({
+  project,
+  sourceRepository,
+}: {
+  project: EligibleProject;
+  sourceRepository: string;
+}) {
+  const normalizedSource = sourceRepository.toLowerCase();
+  const externalRepositories = project.repositories.filter(
+    (repository) => repository.repository.toLowerCase() !== normalizedSource,
+  );
+  const readyExternalRepositories = externalRepositories.filter(
+    (repository) => repository.status === 'indexed' && !repository.stale,
+  ).length;
+  const staleExternalRepositories = externalRepositories.filter(
+    (repository) => repository.stale,
+  ).length;
+
+  return (
+    <div className="mt-3">
+      <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+        <span className="text-ink">{project.name}</span>
+        <span className="text-ink-faint">·</span>
+        <span className="text-ink-faint">
+          {readyExternalRepositories}/{externalRepositories.length} repositórios externos prontos
+        </span>
+        {staleExternalRepositories > 0 && (
+          <span className="rounded-sm border border-accent/40 px-2 py-0.5 text-accent">
+            {staleExternalRepositories} stale
+          </span>
+        )}
+      </div>
+      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+        {project.repositories.map((repository) => {
+          const isSource = repository.repository.toLowerCase() === normalizedSource;
+          return (
+            <li
+              key={repository.repository}
+              className="flex items-center justify-between gap-3 rounded-sm border border-border px-3 py-2 font-mono text-[10px]"
+            >
+              <span className="truncate text-ink-dim">{repository.repository}</span>
+              <span
+                className={
+                  isSource || (repository.status === 'indexed' && !repository.stale)
+                    ? 'text-state-open'
+                    : 'text-accent'
+                }
+              >
+                {isSource ? 'fonte da PR' : repository.stale ? 'stale' : repository.status}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {readyExternalRepositories < externalRepositories.length && (
+        <p className="mt-3 text-xs text-ink-faint">
+          A cobertura será parcial. O Cast não indexa automaticamente ao iniciar.{' '}
+          <Link to={`/projects/${project.id}`} className="text-accent hover:underline">
+            Preparar índices
+          </Link>
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** SPEC não tem markdown pronto (só campos estruturados) — monta um texto legível para o ApprovalGate/ExcerptCommentEditor. */
 function formatSpecMarkdown(spec: SpecPayload | null | undefined): string {
   if (!spec) return '';
@@ -346,47 +412,11 @@ export function AnalysisPage() {
               {eligibleProjects
                 .filter((project) => project.id === selectedProjectId)
                 .map((project) => (
-                  <div key={project.id} className="mt-3">
-                    <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                      <span className="text-ink">{project.name}</span>
-                      <span className="text-ink-faint">·</span>
-                      <span className="text-ink-faint">
-                        {project.readyCount}/{project.memberCount} índices prontos
-                      </span>
-                      {project.staleCount > 0 && (
-                        <span className="rounded-sm border border-accent/40 px-2 py-0.5 text-accent">
-                          {project.staleCount} stale
-                        </span>
-                      )}
-                    </div>
-                    <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {project.repositories.map((repository) => (
-                        <li
-                          key={repository.repository}
-                          className="flex items-center justify-between gap-3 rounded-sm border border-border px-3 py-2 font-mono text-[10px]"
-                        >
-                          <span className="truncate text-ink-dim">{repository.repository}</span>
-                          <span
-                            className={
-                              repository.status === 'indexed' && !repository.stale
-                                ? 'text-state-open'
-                                : 'text-accent'
-                            }
-                          >
-                            {repository.stale ? 'stale' : repository.status}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    {project.readyCount < project.memberCount && (
-                      <p className="mt-3 text-xs text-ink-faint">
-                        A cobertura será parcial. O Cast não indexa automaticamente ao iniciar.{' '}
-                        <Link to={`/projects/${project.id}`} className="text-accent hover:underline">
-                          Preparar índices
-                        </Link>
-                      </p>
-                    )}
-                  </div>
+                  <ProjectImpactReadiness
+                    key={project.id}
+                    project={project}
+                    sourceRepository={`${owner}/${repo}`}
+                  />
                 ))}
             </div>
           )}
