@@ -72,7 +72,7 @@ export function GithubTokenModal({ onClose }: GithubTokenModalProps) {
         />
 
         {error && (
-          <p className="rounded-sm border border-state-closed/40 bg-state-closed-dim px-3 py-2 text-sm text-ink">
+          <p className="rounded-sm border border-fail/40 bg-fail-soft px-3 py-2 text-sm text-fail">
             {error}
           </p>
         )}
