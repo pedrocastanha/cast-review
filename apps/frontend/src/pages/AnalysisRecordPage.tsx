@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { analysesApi } from '../api/analyses.api';
 import { ApiError } from '../api/http';
 import { hasReviewContent } from '../lib/assemble-report';
 import { AnalysisStatusBadge } from '../components/analysis/AnalysisStatusBadge';
 import { ReportView } from '../components/analysis/ReportView';
 import { ThoughtLog } from '../components/analysis/ThoughtLog';
+import { Breadcrumb } from '../components/ui/Breadcrumb';
+import { PageHead } from '../components/ui/Card';
 import { Spinner } from '../components/ui/Spinner';
 import { GithubCommentsStatus } from '../components/analysis/GithubCommentsStatus';
 import { GraphContextPanel } from '../components/analysis/GraphContextPanel';
@@ -58,20 +60,19 @@ export function AnalysisRecordPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <Link to={pullsPath} className="text-sm text-ink-faint hover:text-ink">
-          ← Pull requests
-        </Link>
-        <p className="mt-3 mb-1 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
-          Análise salva
-        </p>
-        <h1 className="font-display text-xl font-semibold text-ink">
-          {record ? `PR #${record.pullNumber}` : 'Análise'}
-        </h1>
-        <p className="mt-1 font-mono text-xs text-ink-faint">
-          {owner}/{repo}
-        </p>
-      </div>
+      <Breadcrumb
+        items={[
+          { label: 'Repositórios', to: '/repos' },
+          { label: `${owner}/${repo}`, to: pullsPath },
+          { label: record ? `#${record.pullNumber}` : 'Análise' },
+        ]}
+      />
+
+      <PageHead
+        eyebrow="Análise salva"
+        title={record ? `PR #${record.pullNumber}` : 'Análise'}
+        description={`${owner}/${repo}`}
+      />
 
       {loading && (
         <div className="flex justify-center py-16">
@@ -80,7 +81,7 @@ export function AnalysisRecordPage() {
       )}
 
       {!loading && error && (
-        <p className="rounded-sm border border-state-closed/40 bg-state-closed-dim px-4 py-3 text-sm">
+        <p className="rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">
           {error}
         </p>
       )}
@@ -148,7 +149,7 @@ export function AnalysisRecordPage() {
           <SaveBenchmarkButton analysisId={record.id} />
 
           {record.errorMessage && (
-            <p className="rounded-sm border border-state-closed/40 bg-state-closed-dim px-4 py-3 text-sm">
+            <p className="rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">
               {record.errorMessage}
             </p>
           )}

@@ -1,10 +1,10 @@
 import type { AgentEvent, AgentEventType } from '../../types';
 import { formatStepUsage, stepUsageFromEvents } from '../../lib/format-usage';
 
-const STEPS: { type: AgentEventType; label: string }[] = [
+const STEPS: { type: AgentEventType; label: string; gate?: boolean }[] = [
   { type: 'change_analysis_done', label: 'Change Analyzer' },
-  { type: 'prd_generated', label: 'PRD' },
-  { type: 'spec_generated', label: 'Implementation Spec' },
+  { type: 'prd_generated', label: 'PRD', gate: true },
+  { type: 'spec_generated', label: 'Especificação', gate: true },
   { type: 'test_reviewer_done', label: 'Test Reviewer' },
   { type: 'architecture_reviewer_done', label: 'Architecture' },
   { type: 'report_ready', label: 'Relatório' },
@@ -39,12 +39,20 @@ function stepState(
   return 'pending';
 }
 
-const tones: Record<StepState, string> = {
-  pending: 'border-border text-ink-faint',
-  current: 'border-accent text-accent',
-  done: 'border-state-open text-state-open',
-  error: 'border-state-closed text-state-closed',
-  awaiting: 'border-state-draft text-state-draft',
+const nodeTones: Record<StepState, string> = {
+  pending: 'border-machine-line',
+  current: 'border-machine-accent',
+  done: 'border-[#D3DBE5] bg-[#D3DBE5]',
+  error: 'border-fail',
+  awaiting: 'border-[#E3B25C]',
+};
+
+const dotTones: Record<StepState, string> = {
+  pending: 'bg-transparent',
+  current: 'bg-machine-accent animate-node-pulse',
+  done: 'bg-machine',
+  error: 'bg-fail',
+  awaiting: 'bg-[#E3B25C] animate-node-pulse',
 };
 
 interface AgentStepperProps {
@@ -55,42 +63,62 @@ interface AgentStepperProps {
   awaitingApproval?: boolean;
 }
 
-export function AgentStepper({
-  events,
-  running,
-  failed,
-  awaitingApproval = false,
-}: AgentStepperProps) {
+export function AgentStepper({ events, running, failed, awaitingApproval = false }: AgentStepperProps) {
   const done = new Set(
-    events
-      .filter((event) => event.type !== 'error' && event.type !== 'thought')
-      .map((event) => event.type),
+    events.filter((event) => event.type !== 'error' && event.type !== 'thought').map((event) => event.type),
   );
+  const progress = (done.size / STEPS.length) * 100;
 
   return (
-    <ol className="grid gap-2 sm:grid-cols-2">
-      {STEPS.map((step, index) => {
-        const state = stepState(step.type, done, failed, running, awaitingApproval);
-        const usage = stepUsageFromEvents(events, step.type);
-        return (
-          <li
-            key={step.type}
-            title={usage?.model ?? undefined}
-            className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 ${tones[state]}`}
-          >
-            <span className="font-mono text-xs tabular-nums">
-              {String(index + 1).padStart(2, '0')}
-            </span>
-            <span className="text-sm">{step.label}</span>
-            <span className="ml-auto font-mono text-[10px] tracking-wider uppercase tabular-nums">
-              {state === 'done' && (usage ? formatStepUsage(usage) : 'ok')}
-              {state === 'current' && '…'}
-              {state === 'awaiting' && 'aguardando'}
-              {state === 'error' && 'erro'}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="relative mt-6">
+      <div className="absolute top-2.5 right-[6%] left-[6%] hidden h-0.5 rounded-sm bg-machine-line sm:block">
+        <div
+          className="h-full rounded-sm bg-[#D3DBE5] transition-[width] duration-500 ease-precise"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      <ol className="relative grid grid-cols-3 gap-y-6 sm:grid-cols-6">
+        {STEPS.map((step, index) => {
+          const state = stepState(step.type, done, failed, running, awaitingApproval);
+          const usage = stepUsageFromEvents(events, step.type);
+          return (
+            <li key={step.type} className="flex flex-col items-center gap-2.5 px-1 text-center">
+              <span
+                className={`relative grid size-5.5 place-items-center border-2 bg-machine transition-all duration-200 ${
+                  step.gate ? 'rotate-45 rounded-sm' : 'rounded-full'
+                } ${nodeTones[state]}`}
+              >
+                <i className={`block size-2 rounded-full ${step.gate ? '-rotate-45 rounded-[1px]' : ''} ${dotTones[state]}`} />
+                {state === 'current' && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -inset-[7px] animate-node-halo rounded-[inherit] border border-machine-accent/40"
+                  />
+                )}
+              </span>
+              <span>
+                <span className="block font-mono text-[10px] tracking-[0.1em] text-machine-fg-3">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <span
+                  className={`block text-[12.5px] leading-tight font-semibold ${
+                    state === 'pending' ? 'text-machine-fg-2' : 'text-machine-fg'
+                  }`}
+                >
+                  {step.label}
+                </span>
+                <span className="block font-mono text-[10.5px] text-machine-fg-3">
+                  {state === 'done' && (usage ? formatStepUsage(usage) : 'sem LLM')}
+                  {state === 'current' && 'rodando'}
+                  {state === 'awaiting' && 'aguardando'}
+                  {state === 'error' && 'erro'}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }

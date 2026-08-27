@@ -1,64 +1,110 @@
 @import 'tailwindcss';
 
-/* ==========================================================================
-   Cast Review — design tokens (Tailwind v4 theme)
-   Instrumento de precisão: neutros frios quase-pretos + um único acento
-   quente (magenta/vermelhão) raro e funcional. Display mecânico (Neue
-   Machina) + corpo grotesco denso (Hanken Grotesk) + mono só pra dado
-   técnico real (JetBrains Mono).
-   ========================================================================== */
-
 @theme {
-  /* ---- superfícies (elevação = mais claro, sem sombra) ---- */
-  --color-surface: oklch(13% 0.007 350);
-  --color-surface-1: oklch(16% 0.008 350);
-  --color-surface-2: oklch(19.5% 0.009 350);
-  --color-surface-3: oklch(23% 0.010 350);
-  --color-border: oklch(28% 0.011 350);
-  --color-border-strong: oklch(36% 0.013 350);
+  --color-machine: oklch(19% 0.010 350);
+  --color-machine-2: oklch(23% 0.011 350);
+  --color-machine-3: oklch(27% 0.012 350);
+  --color-machine-line: oklch(33% 0.013 350);
+  --color-machine-fg: oklch(92% 0.006 350);
+  --color-machine-fg-2: oklch(68% 0.012 350);
+  --color-machine-fg-3: oklch(50% 0.014 350);
+  --color-machine-accent: oklch(72% 0.19 350);
 
-  /* ---- texto ---- */
-  --color-ink: oklch(94% 0.005 350);
-  --color-ink-dim: oklch(72% 0.010 350);
-  --color-ink-faint: oklch(58% 0.013 350);
+  --color-surface: #e6e8ec;
+  --color-surface-1: #ffffff;
+  --color-surface-2: #f4f5f8;
+  --color-surface-3: #edeef2;
+  --color-border: #d8dce2;
+  --color-border-strong: #c2c8d1;
 
-  /* ---- acento (magenta-vermelhão — instrumento de precisão, não "IA") ---- */
-  --color-accent-quiet: oklch(38% 0.10 350);
-  --color-accent-soft: oklch(50% 0.17 350);
+  --color-ink: #12161c;
+  --color-ink-dim: #576070;
+  --color-ink-faint: #868e9b;
+
   --color-accent: oklch(62% 0.21 350);
-  --color-accent-hover: oklch(70% 0.19 350);
-  --color-accent-ink: oklch(17% 0.03 350);
+  --color-accent-hover: #b01750;
+  --color-accent-soft: #fbe6ee;
+  --color-accent-ink: #ffffff;
 
-  /* ---- estado de PR (reservado — nunca reaproveitado como cor de marca) ---- */
-  --color-state-open: oklch(70% 0.16 148);
-  --color-state-open-dim: oklch(28% 0.05 148);
-  --color-state-closed: oklch(63% 0.19 25);
-  --color-state-closed-dim: oklch(28% 0.06 25);
-  --color-state-draft: oklch(58% 0.013 350);
-  --color-state-draft-dim: oklch(23% 0.010 350);
+  --color-pass: #0f6b55;
+  --color-pass-soft: #ddede8;
+  --color-warn: #8a5a0b;
+  --color-warn-soft: #f7ebd6;
+  --color-fail: #b3261e;
+  --color-fail-soft: #fadfdc;
 
-  /* ---- tipografia ---- */
-  --font-display: 'Neue Machina', 'Hanken Grotesk', system-ui, sans-serif;
-  --font-body: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+  --color-state-open: #0f6b55;
+  --color-state-open-dim: #ddede8;
+  --color-state-closed: #b3261e;
+  --color-state-closed-dim: #fadfdc;
+  --color-state-draft: #868e9b;
+  --color-state-draft-dim: #f4f5f8;
+
+  --font-display: 'Bricolage Grotesque', Georgia, serif;
+  --font-body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
   --text-base: 0.9375rem;
   --text-lg: 1.25rem;
-  --text-xl: 1.75rem;
-  --text-2xl: 2.75rem;
+  --text-xl: 1.625rem;
+  --text-2xl: 2.125rem;
+  --text-3xl: 2.375rem;
 
-  /* ---- forma ---- */
-  --radius-sm: 3px;
-  --radius-md: 5px;
-  --radius-lg: 8px;
+  --radius-sm: 5px;
+  --radius-md: 9px;
+  --radius-lg: 14px;
 
   --ease-precise: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --shadow-card: 0 1px 2px rgba(16, 20, 25, 0.05), 0 8px 24px -14px rgba(16, 20, 25, 0.22);
 
   --animate-spin-precise: spin 700ms linear infinite;
   --animate-overlay-in: overlay-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
   --animate-modal-in: modal-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-fade-up: fade-up 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-node-pulse: node-pulse 1.1s ease-in-out infinite;
+  --animate-node-halo: node-halo 1.6s ease-out infinite;
+  --animate-caret: caret 1s steps(2) infinite;
+}
+
+:root[data-theme='dark'] {
+  --color-surface: oklch(13% 0.007 350);
+  --color-surface-1: oklch(16% 0.008 350);
+  --color-surface-2: oklch(19.5% 0.009 350);
+  --color-surface-3: oklch(23% 0.01 350);
+  --color-border: oklch(28% 0.011 350);
+  --color-border-strong: oklch(36% 0.013 350);
+
+  --color-ink: oklch(94% 0.005 350);
+  --color-ink-dim: oklch(72% 0.01 350);
+  --color-ink-faint: oklch(58% 0.013 350);
+
+  --color-accent-hover: oklch(70% 0.19 350);
+  --color-accent-soft: oklch(38% 0.1 350);
+
+  --color-pass: oklch(70% 0.16 148);
+  --color-pass-soft: oklch(28% 0.05 148);
+  --color-warn: oklch(74% 0.14 80);
+  --color-warn-soft: oklch(28% 0.05 80);
+  --color-fail: oklch(63% 0.19 25);
+  --color-fail-soft: oklch(28% 0.06 25);
+
+  --color-state-open: oklch(70% 0.16 148);
+  --color-state-open-dim: oklch(28% 0.05 148);
+  --color-state-closed: oklch(63% 0.19 25);
+  --color-state-closed-dim: oklch(28% 0.06 25);
+  --color-state-draft: oklch(58% 0.013 350);
+  --color-state-draft-dim: oklch(23% 0.01 350);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
+
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
 }
 
 @keyframes overlay-in {
@@ -74,30 +120,58 @@
   }
 }
 
-/* ==========================================================================
-   Base
-   ========================================================================== */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
 
-html {
-  color-scheme: dark;
+@keyframes node-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes node-halo {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
 }
 
 body {
   background-color: var(--color-surface);
-  background-image:
-    linear-gradient(color-mix(in oklch, var(--color-ink) 2.5%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in oklch, var(--color-ink) 2.5%, transparent) 1px, transparent 1px),
-    radial-gradient(circle at 12% -8%, color-mix(in oklch, var(--color-accent) 8%, transparent), transparent 42%);
-  background-size: 32px 32px, 32px 32px, auto;
-  background-attachment: fixed;
   color: var(--color-ink);
   font-family: var(--font-body);
-  font-weight: 350;
+  font-size: var(--text-base);
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
 #root {
   min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -112,7 +186,7 @@ body {
 }
 
 ::selection {
-  background: var(--color-accent-quiet);
+  background: var(--color-accent-soft);
   color: var(--color-ink);
 }
 

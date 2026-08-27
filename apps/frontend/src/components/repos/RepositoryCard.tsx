@@ -1,30 +1,33 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useRepositoryIndexStatus } from '../../hooks/useRepositoryIndexStatus';
 import type { Repository } from '../../types';
-import { Button } from '../ui/Button';
+import { RowMain, RowMeta, StatusDot } from '../ui/List';
+import { RowMenu } from '../ui/RowMenu';
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' });
 
-function IndexBadge({
-  status,
-}: {
-  status: ReturnType<typeof useRepositoryIndexStatus>['status'];
-}) {
-  if (!status) return null;
+type IndexStatus = ReturnType<typeof useRepositoryIndexStatus>['status'];
 
-  if (status.status === 'indexed') {
+function IndexChip({ status, busy }: { status: IndexStatus; busy: boolean }) {
+  const base =
+    'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10.5px] font-semibold tracking-[0.08em] uppercase';
+
+  if (busy || status?.status === 'queued' || status?.status === 'indexing') {
+    const label =
+      status?.status === 'indexing' && status.progress ? `indexando ${status.progress}%` : 'indexando';
     return (
-      <span className="shrink-0 rounded-sm border border-border-strong px-1.5 py-0.5 text-[0.65rem] tracking-wide text-ink-faint uppercase">
-        {status.stale ? 'Índice desatualizado' : 'Indexado'}
+      <span className={`${base} bg-accent-soft text-accent`}>
+        <span aria-hidden="true" className="size-1.5 animate-node-pulse rounded-full bg-current" />
+        {label}
       </span>
     );
   }
 
-  if (status.status === 'queued' || status.status === 'indexing') {
-    return (
-      <span className="shrink-0 rounded-sm border border-accent/40 px-1.5 py-0.5 text-[0.65rem] tracking-wide text-accent uppercase">
-        {status.status === 'queued' ? 'Na fila' : `Indexando${status.progress ? ` ${status.progress}%` : ''}`}
-      </span>
+  if (status?.status === 'indexed') {
+    return status.stale ? (
+      <span className={`${base} bg-warn-soft text-warn`}>desatualizado</span>
+    ) : (
+      <span className={`${base} bg-pass-soft text-pass`}>indexado</span>
     );
   }
 
@@ -33,73 +36,57 @@ function IndexBadge({
 
 export function RepositoryCard({ repo }: { repo: Repository }) {
   const navigate = useNavigate();
-  const { status, error, triggering, trigger } = useRepositoryIndexStatus(
-    repo.name,
-    repo.owner,
-  );
+  const { status, error, triggering, trigger } = useRepositoryIndexStatus(repo.name, repo.owner);
 
   const busy = triggering || status?.status === 'queued' || status?.status === 'indexing';
-  const buttonLabel =
-    status?.status === 'indexed' && !status.stale
-      ? 'Atualizar'
-      : 'Indexar';
+  const indexed = status?.status === 'indexed';
+  const graphPath = `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/graph`;
 
   return (
     <Link
       to={`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/pulls`}
-      className="group flex items-center justify-between gap-4 rounded-md border border-border bg-surface-1/55 px-4 py-4 transition-[background-color,border-color,transform] duration-200 hover:border-border-strong hover:bg-surface-2 sm:gap-6 sm:px-5"
+      className="group flex w-full items-center gap-4 border-b border-border px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-surface-2 sm:pr-2.5 sm:pl-[1.125rem]"
     >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="truncate font-mono text-sm text-ink transition-colors group-hover:text-accent">
-            {repo.fullName}
-          </span>
-          {repo.private && (
-            <span className="shrink-0 rounded-sm border border-border-strong px-1.5 py-0.5 text-[0.65rem] tracking-wide text-ink-faint uppercase">
-              Privado
-            </span>
-          )}
-          <IndexBadge status={status} />
-        </div>
-        {repo.description && (
-          <p className="mt-1 truncate text-sm text-ink-faint">{repo.description}</p>
-        )}
-        {error && <p className="mt-1 text-xs text-state-closed">{error}</p>}
-      </div>
+      <StatusDot on={indexed} />
 
-      <div className="flex shrink-0 items-center gap-4">
-        <div className="hidden text-right font-mono text-xs text-ink-faint sm:block">
-          <div className="text-ink-dim">{repo.defaultBranch}</div>
-          <div className="mt-1">{dateFormatter.format(new Date(repo.updatedAt))}</div>
-        </div>
-        {status?.status === 'indexed' && (
-          <button
-            type="button"
-            className="text-xs text-ink-faint underline decoration-dotted transition-colors hover:text-accent"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              navigate(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/graph`);
-            }}
-          >
-            Ver grafo
-          </button>
-        )}
-        <Button
-          type="button"
-          variant="secondary"
-          loading={busy}
-          disabled={busy}
-          className="min-h-9 px-3 py-1.5 text-xs"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            trigger();
-          }}
-        >
-          {buttonLabel}
-        </Button>
-      </div>
+      <RowMain
+        title={
+          <>
+            <span className="truncate transition-colors group-hover:text-accent">{repo.fullName}</span>
+            {repo.private && (
+              <span className="shrink-0 rounded-sm border border-border-strong px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-ink-faint uppercase">
+                privado
+              </span>
+            )}
+          </>
+        }
+        subtitle={error ? <span className="text-fail">{error}</span> : repo.description}
+      />
+
+      <RowMeta>
+        <span className="hidden sm:inline">
+          {repo.defaultBranch} · {dateFormatter.format(new Date(repo.updatedAt))}
+        </span>
+      </RowMeta>
+
+      <IndexChip status={status} busy={busy} />
+
+      <RowMenu
+        label={`Ações de ${repo.fullName}`}
+        items={[
+          {
+            label: busy ? 'Indexando…' : indexed && !status.stale ? 'Atualizar índice' : 'Indexar agora',
+            onSelect: trigger,
+            disabled: busy,
+          },
+          {
+            label: 'Ver grafo',
+            onSelect: () => navigate(graphPath),
+            disabled: !indexed,
+          },
+          { label: 'Abrir no GitHub', href: repo.htmlUrl },
+        ]}
+      />
     </Link>
   );
 }

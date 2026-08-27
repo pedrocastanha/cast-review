@@ -5,6 +5,7 @@ import { openaiKeyStore } from '../api/openai-key-store';
 import { repositoriesApi } from '../api/repositories.api';
 import { projectsApi } from '../api/projects.api';
 import { AgentStepper } from '../components/analysis/AgentStepper';
+import { Console, ConsoleMeter, ConsoleStream } from '../components/analysis/Console';
 import { AnalysisHistoryList } from '../components/analysis/AnalysisHistoryList';
 import { AnalysisStatusBadge } from '../components/analysis/AnalysisStatusBadge';
 import { ApprovalGate } from '../components/analysis/ApprovalGate';
@@ -12,10 +13,10 @@ import { IterationHistory } from '../components/analysis/IterationHistory';
 import { ReportView } from '../components/analysis/ReportView';
 import { ThoughtLog } from '../components/analysis/ThoughtLog';
 import { GithubCommentsStatus } from '../components/analysis/GithubCommentsStatus';
-import { UsageStrip } from '../components/analysis/UsageStrip';
+import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { Button } from '../components/ui/Button';
+import { Card, PageHead } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
-import { Spinner } from '../components/ui/Spinner';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
 import { useRepoAnalyses } from '../hooks/useRepoAnalyses';
 import { hasReviewContent } from '../lib/assemble-report';
@@ -23,9 +24,10 @@ import type { EligibleProject, PullRequest, SpecPayload } from '../types';
 
 const DEFAULT_MODEL = 'gpt-4o';
 
-const POLICY_LABEL_CLASS = 'text-xs font-semibold tracking-wide text-ink-faint uppercase';
+const POLICY_LABEL_CLASS =
+  'font-mono text-[10.5px] font-medium tracking-[0.12em] text-ink-faint uppercase';
 const POLICY_SELECT_CLASS =
-  'min-h-11 rounded-sm border border-border bg-surface-1 px-3 py-2.5 text-base text-ink transition-colors hover:border-border-strong focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25';
+  'min-h-11 rounded-sm border border-border bg-surface-1 px-3 py-2.5 font-mono text-sm text-ink transition-colors hover:border-border-strong focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent-soft';
 
 function ProjectImpactReadiness({
   project,
@@ -197,6 +199,7 @@ export function AnalysisPage() {
   const visibleReport =
     report ?? (phase === 'idle' && hasReviewContent(saved?.report) ? saved?.report : undefined);
   const visibleThoughts = phase === 'idle' && !report ? (saved?.thoughts ?? {}) : thoughts;
+  const liveThought = Object.values(visibleThoughts).filter(Boolean).at(-1) ?? '';
 
   const activeAnalysis = analyses?.find((item) => item.status === 'awaiting_approval');
   const iterationsSource = activeAnalysis ?? saved;
@@ -247,34 +250,34 @@ export function AnalysisPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <Link to={pullsPath} className="text-sm text-ink-faint hover:text-ink">
-          ← Pull requests
-        </Link>
-        <p className="mt-3 mb-1 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
-          03 · Análise
-        </p>
-        <h1 className="font-display text-xl font-semibold text-ink">
-          {pull ? `#${pull.number} ${pull.title}` : `PR #${pullNumber}`}
-        </h1>
-        <p className="mt-1 font-mono text-xs text-ink-faint">
-          {owner}/{repo}
-          {pull && (
-            <>
-              {' '}
-              · {pull.headRef} → {pull.baseRef}
-            </>
-          )}
-        </p>
-      </div>
+      <Breadcrumb
+        items={[
+          { label: 'Repositórios', to: '/repos' },
+          { label: `${owner}/${repo}`, to: pullsPath },
+          { label: `#${pullNumber}` },
+        ]}
+      />
+
+      <PageHead
+        eyebrow="Execução da revisão"
+        title={pull ? pull.title : `PR #${pullNumber}`}
+        description={
+          pull ? `#${pull.number} · ${pull.headRef} → ${pull.baseRef} · ${owner}/${repo}` : `${owner}/${repo}`
+        }
+      />
 
       {loadError && (
-        <p className="mb-6 rounded-sm border border-state-closed/40 bg-state-closed-dim px-4 py-3 text-sm">
+        <p className="mb-6 rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">
           {loadError}
         </p>
       )}
 
-      <form onSubmit={onSubmit} className="mb-8 flex flex-col gap-4">
+      <Card className="mb-6 p-6">
+      <h2 className="font-display text-[17px] font-bold text-ink">Configurar execução</h2>
+      <p className="mt-1 mb-4.5 text-sm text-ink-dim">
+        A chave fica só nesta aba e é usada em memória durante o processamento. Nada é gravado.
+      </p>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Field
           label="OpenAI API key"
           type="password"
@@ -342,13 +345,13 @@ export function AnalysisPage() {
             </select>
           </div>
         </div>
-        <section className="rounded-md border border-border bg-surface-1/55 p-4 sm:p-5">
+        <section className="rounded-sm border border-border bg-surface-2 p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
               <p className="font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">
                 Escopo da análise
               </p>
-              <h2 className="mt-1 font-display text-base font-semibold text-ink">
+              <h2 className="mt-1 font-display text-base font-bold text-ink">
                 {projectImpactEnabled ? 'Projeto conectado' : 'Apenas esta PR'}
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-ink-faint">
@@ -373,7 +376,7 @@ export function AnalysisPage() {
             <p className="mt-4 font-mono text-xs text-ink-faint">Verificando projetos elegíveis…</p>
           )}
           {!eligibilityLoading && eligibilityError && (
-            <p className="mt-4 text-xs text-state-closed">
+            <p className="mt-4 text-xs text-fail">
               Não foi possível verificar os projetos. A análise local continua disponível.
             </p>
           )}
@@ -421,26 +424,30 @@ export function AnalysisPage() {
             </div>
           )}
         </section>
-        <div className="flex gap-3">
-          <Button type="submit" loading={phase === 'running'} disabled={!canStart}>
-            {phase === 'running' ? 'Rodando' : 'Rodar análise'}
-          </Button>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
           {phase !== 'idle' && phase !== 'running' && (
             <Button type="button" variant="secondary" onClick={newExecution}>
               Nova execução
             </Button>
           )}
+          <Button type="submit" loading={phase === 'running'} disabled={!canStart}>
+            {phase === 'running' ? 'Rodando' : 'Rodar revisão'}
+          </Button>
         </div>
       </form>
+      </Card>
 
       {phase !== 'idle' && (
-        <div className="mb-8">
-          <AgentStepper
-            events={events}
-            running={phase === 'running'}
-            failed={phase === 'error'}
-            awaitingApproval={phase === 'awaiting_approval'}
-          />
+        <div className="mb-6">
+          <Console meter={<ConsoleMeter usage={report?.usage} model={testModel} />}>
+            <AgentStepper
+              events={events}
+              running={phase === 'running'}
+              failed={phase === 'error'}
+              awaitingApproval={phase === 'awaiting_approval'}
+            />
+            <ConsoleStream text={liveThought} live={phase === 'running'} />
+          </Console>
         </div>
       )}
 
@@ -467,28 +474,15 @@ export function AnalysisPage() {
         </div>
       )}
 
-      {report?.usage && (
-        <div className="mb-8">
-          <UsageStrip usage={report.usage} />
-        </div>
-      )}
-
       {report?.githubComments && (
         <div className="mb-8">
           <GithubCommentsStatus result={report.githubComments} />
         </div>
       )}
 
-      {phase === 'running' && (
-        <div className="mb-6 flex items-center gap-3 text-sm text-ink-faint">
-          <Spinner />
-          A IA está escrevendo…
-        </div>
-      )}
-
-      {(phase === 'running' || Object.keys(visibleThoughts).length > 0) && (
+      {Object.keys(visibleThoughts).length > 0 && (
         <div className="mb-8">
-          <h2 className="mb-3 font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
+          <h2 className="mb-3 font-mono text-[11px] tracking-[0.14em] text-ink-faint uppercase">
             Pensamento
           </h2>
           <ThoughtLog thoughts={visibleThoughts} running={phase === 'running'} />
@@ -496,7 +490,7 @@ export function AnalysisPage() {
       )}
 
       {errorMessage && (
-        <p className="mb-6 rounded-sm border border-state-closed/40 bg-state-closed-dim px-4 py-3 text-sm">
+        <p className="mb-6 rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">
           {errorMessage}
         </p>
       )}
@@ -535,7 +529,7 @@ export function AnalysisPage() {
               {resumable.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-border bg-surface-1/55 px-4 py-3"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-border bg-surface-1 px-4 py-3"
                 >
                   <div className="flex items-center gap-3">
                     <AnalysisStatusBadge status={item.status} />

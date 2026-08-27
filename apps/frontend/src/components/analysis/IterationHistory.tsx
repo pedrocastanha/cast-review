@@ -25,7 +25,7 @@ export function IterationHistory({ iterations }: IterationHistoryProps) {
       {iterations.map((iteration, index) => (
         <li
           key={index}
-          className="rounded-sm border border-border bg-surface-1/55 px-4 py-3"
+          className="rounded-sm border border-border bg-surface-1 px-4 py-3"
         >
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-mono text-xs tabular-nums text-ink-faint">v{index + 1}</span>

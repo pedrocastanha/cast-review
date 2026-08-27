@@ -52,7 +52,7 @@ export function PullRequestDetailModal({
       <div className="flex flex-col gap-6">
         <div className="border-b border-border pb-5">
           <PullRequestStatusBadge pull={pull} />
-          <h3 className="mt-3 font-display text-lg font-semibold text-ink">{pull.title}</h3>
+          <h3 className="mt-3 font-display text-lg font-bold text-ink">{pull.title}</h3>
           <a href={pull.htmlUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-sm text-ink-faint transition-colors hover:text-accent">
             Abrir pull request no GitHub ↗
           </a>
@@ -100,7 +100,7 @@ export function PullRequestDetailModal({
                         setSelectedAnalysisId(analysis.id);
                         setTab('overview');
                       }}
-                      className={`min-w-44 rounded-sm border p-3 text-left transition-colors xl:min-w-0 ${selectedAnalysisId === analysis.id ? 'border-accent bg-accent-quiet/20' : 'border-border bg-surface-1/50 hover:border-border-strong hover:bg-surface-2'}`}
+                      className={`min-w-44 rounded-sm border p-3 text-left transition-colors xl:min-w-0 ${selectedAnalysisId === analysis.id ? 'border-accent bg-accent-soft' : 'border-border bg-surface-1 hover:border-border-strong hover:bg-surface-2'}`}
                     >
                       <AnalysisStatusBadge status={analysis.status} />
                       <p className="mt-2 font-mono text-xs text-ink">{Number.isNaN(when.getTime()) ? 'Data indisponível' : dateTimeFormatter.format(when)}</p>
@@ -132,14 +132,14 @@ export function PullRequestDetailModal({
                 <ReportView report={selectedReport} focus={tab === 'overview' ? 'all' : tab} />
               </>
             ) : selectedAnalysis ? (
-              <div className="rounded-lg border border-dashed border-border-strong bg-surface-1/50 p-6">
+              <div className="rounded-lg border border-dashed border-border-strong bg-surface-1 p-6">
                 <AnalysisStatusBadge status={selectedAnalysis.status} />
-                <h4 className="mt-4 font-display text-lg font-semibold text-ink">Esta execução não gerou uma review</h4>
+                <h4 className="mt-4 font-display text-lg font-bold text-ink">Esta execução não gerou uma review</h4>
                 <p className="mt-2 text-sm leading-6 text-ink-faint">{selectedAnalysis.errorMessage ?? 'A análise ainda não possui conteúdo para exibir.'}</p>
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-border-strong bg-surface-1/50 p-6">
-                <h4 className="font-display text-lg font-semibold text-ink">Nenhuma análise ainda</h4>
+              <div className="rounded-lg border border-dashed border-border-strong bg-surface-1 p-6">
+                <h4 className="font-display text-lg font-bold text-ink">Nenhuma análise ainda</h4>
                 <p className="mt-2 text-sm leading-6 text-ink-faint">Rode uma análise para visualizar o PRD, a especificação e os pareceres aqui.</p>
               </div>
             )}

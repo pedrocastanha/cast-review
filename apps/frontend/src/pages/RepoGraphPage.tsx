@@ -418,18 +418,11 @@ export function RepoGraphPage() {
 
   return (
     <div>
-      <div className="mb-6 border-b border-border pb-6">
-        <Link to={`/repos/${owner}/${repo}/pulls`} className="text-sm text-ink-faint transition-colors hover:text-ink">
-          ← {owner}/{repo}
-        </Link>
-        <p className="mt-5 mb-1 font-mono text-xs tracking-[0.14em] text-accent uppercase">Grafo de código</p>
-        <h1 className="font-display text-xl font-semibold text-ink sm:text-2xl">{owner}/{repo}</h1>
-        {tree?.stats.truncated && (
-          <p className="mt-2 text-sm text-ink-faint">
-            Comece pela raiz e clique em qualquer pasta ou arquivo para expandir e recolher apenas aquele ramo.
-          </p>
-        )}
-      </div>
+      {tree?.stats.truncated && (
+        <p className="mb-6 text-sm text-ink-dim">
+          Comece pela raiz e clique em qualquer pasta ou arquivo para expandir e recolher apenas aquele ramo.
+        </p>
+      )}
 
       {loading && (
         <div className="flex justify-center py-16">

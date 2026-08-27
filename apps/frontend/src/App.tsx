@@ -1,5 +1,6 @@
 import { Navigate, Route, BrowserRouter, Routes } from 'react-router-dom';
 import { GuestRoute } from './components/layout/GuestRoute';
+import { RepositoryLayout } from './components/repos/RepositoryLayout';
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
@@ -10,6 +11,7 @@ import { PullRequestsPage } from './pages/PullRequestsPage';
 import { PullRequestReviewPage } from './pages/PullRequestReviewPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { RepoGraphPage } from './pages/RepoGraphPage';
+import { RepoRunsPage } from './pages/RepoRunsPage';
 import { ReposPage } from './pages/ReposPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { BenchmarksPage } from './pages/BenchmarksPage';
@@ -55,7 +57,7 @@ function App() {
           />
           <Route
             path="/projects/:id"
-            element={<ProtectedRoute><Layout><ProjectGraphPage /></Layout></ProtectedRoute>}
+            element={<ProtectedRoute><Layout wide><ProjectGraphPage /></Layout></ProtectedRoute>}
           />
           <Route
             path="/repos"
@@ -71,7 +73,7 @@ function App() {
             path="/benchmarks"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout wide>
                   <BenchmarksPage />
                 </Layout>
               </ProtectedRoute>
@@ -91,8 +93,22 @@ function App() {
             path="/repos/:owner/:repo/pulls"
             element={
               <ProtectedRoute>
-                <Layout>
-                  <PullRequestsPage />
+                <Layout wide>
+                  <RepositoryLayout>
+                    <PullRequestsPage />
+                  </RepositoryLayout>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/repos/:owner/:repo/runs"
+            element={
+              <ProtectedRoute>
+                <Layout wide>
+                  <RepositoryLayout>
+                    <RepoRunsPage />
+                  </RepositoryLayout>
                 </Layout>
               </ProtectedRoute>
             }
@@ -101,7 +117,7 @@ function App() {
             path="/repos/:owner/:repo/pulls/:pullNumber"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout wide>
                   <PullRequestReviewPage />
                 </Layout>
               </ProtectedRoute>
@@ -111,7 +127,7 @@ function App() {
             path="/repos/:owner/:repo/analyses/:analysisId"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout wide>
                   <AnalysisRecordPage />
                 </Layout>
               </ProtectedRoute>
@@ -121,8 +137,10 @@ function App() {
             path="/repos/:owner/:repo/graph"
             element={
               <ProtectedRoute>
-                <Layout>
-                  <RepoGraphPage />
+                <Layout wide>
+                  <RepositoryLayout>
+                    <RepoGraphPage />
+                  </RepositoryLayout>
                 </Layout>
               </ProtectedRoute>
             }
@@ -131,7 +149,7 @@ function App() {
             path="/repos/:owner/:repo/pulls/:pullNumber/run"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout wide>
                   <AnalysisPage />
                 </Layout>
               </ProtectedRoute>

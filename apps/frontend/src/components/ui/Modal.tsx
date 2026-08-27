@@ -24,18 +24,18 @@ export function Modal({ title, onClose, children, footer, wide = false }: ModalP
 
   return createPortal(
     <div
-      className="fixed inset-0 z-40 grid animate-overlay-in place-items-center bg-surface/80 p-4 backdrop-blur-[2px] sm:p-8"
+      className="fixed inset-0 z-40 grid animate-overlay-in place-items-center bg-machine/55 p-4 backdrop-blur-[2px] sm:p-8"
       onMouseDown={onOverlayClick}
       role="presentation"
     >
       <div
-        className={`w-full ${wide ? 'max-w-6xl' : 'max-w-120'} max-h-[90vh] animate-modal-in overflow-y-auto rounded-lg border border-border-strong bg-surface-2 p-5 sm:p-6`}
+        className={`w-full ${wide ? 'max-w-6xl' : 'max-w-120'} max-h-[90vh] animate-modal-in overflow-y-auto rounded-md border border-border bg-surface-1 p-5 shadow-card sm:p-6`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
         <div className="mb-6 flex items-start justify-between gap-6">
-          <h2 className="font-display text-lg font-semibold text-ink">{title}</h2>
+          <h2 className="font-display text-lg font-bold text-ink">{title}</h2>
           <button
             type="button"
             onClick={onClose}

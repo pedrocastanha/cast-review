@@ -16,8 +16,8 @@ function inline(text: string) {
 }
 
 function headingClass(level: number) {
-  if (level === 1) return 'font-display text-lg font-semibold text-ink';
-  if (level === 2) return 'mt-2 font-display text-base font-semibold text-ink';
+  if (level === 1) return 'font-display text-lg font-bold text-ink';
+  if (level === 2) return 'mt-2 font-display text-base font-bold text-ink';
   return 'font-mono text-xs tracking-wide text-ink-faint uppercase';
 }
 
