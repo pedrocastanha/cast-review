@@ -595,3 +595,97 @@ export interface AnalysisRecord {
   specIterations: Iteration[];
   resumedCount: number;
 }
+
+export type ChatScopeMode = 'repository' | 'project';
+
+export interface ChatScopeRepository {
+  repoId: string;
+  sha: string | null;
+  included: boolean;
+  omissionReason: string | null;
+}
+
+export interface ChatScope {
+  mode: ChatScopeMode;
+  projectId?: string;
+  projectName?: string;
+  repositories: ChatScopeRepository[];
+}
+
+export interface ChatCitation {
+  repoId: string;
+  path: string;
+  line: number | null;
+  symbolId: string | null;
+  symbolName: string | null;
+}
+
+export interface ChatToolCallRecord {
+  iteration: number;
+  name: string;
+  args: Record<string, unknown>;
+  itemCount: number;
+  truncated: boolean;
+  durationMs: number;
+  note: string | null;
+}
+
+export interface ChatUsage {
+  promptTokens: number;
+  completionTokens: number;
+  cachedTokens: number;
+  costUsd: number;
+}
+
+export interface ChatMention {
+  repoId: string;
+  path: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  mentions: ChatMention[];
+  toolCalls: ChatToolCallRecord[];
+  citations: ChatCitation[];
+  usage: ChatUsage | null;
+  truncated: boolean;
+  createdAt: string;
+}
+
+export interface ChatThread {
+  id: string;
+  title: string;
+  scope: ChatScope;
+  repoId: string | null;
+  projectId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatMessage[];
+  staleRepositories?: string[];
+}
+
+export interface ChatFile {
+  repoId: string;
+  path: string;
+}
+
+export type ChatEventType =
+  | 'tool_call'
+  | 'tool_result'
+  | 'token'
+  | 'message_done'
+  | 'error';
+
+export interface ChatEvent {
+  type: ChatEventType;
+  payload: Record<string, unknown>;
+}
+
+export interface SendChatMessagePayload {
+  content: string;
+  mentions: ChatMention[];
+  model: string;
+  apiKeys: { openai: string };
+}

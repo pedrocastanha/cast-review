@@ -10,12 +10,14 @@ import { LoginPage } from './pages/LoginPage';
 import { PullRequestsPage } from './pages/PullRequestsPage';
 import { PullRequestReviewPage } from './pages/PullRequestReviewPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { RepoChatPage } from './pages/RepoChatPage';
 import { RepoGraphPage } from './pages/RepoGraphPage';
 import { RepoRunsPage } from './pages/RepoRunsPage';
 import { ReposPage } from './pages/ReposPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { BenchmarksPage } from './pages/BenchmarksPage';
 import { ProjectFormPage } from './pages/ProjectFormPage';
+import { ProjectChatPage } from './pages/ProjectChatPage';
 import { ProjectGraphPage } from './pages/ProjectGraphPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 
@@ -129,6 +131,22 @@ function App() {
               <ProtectedRoute>
                 <Layout wide>
                   <AnalysisRecordPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:id/chat"
+            element={<ProtectedRoute><Layout wide><ProjectChatPage /></Layout></ProtectedRoute>}
+          />
+          <Route
+            path="/repos/:owner/:repo/chat"
+            element={
+              <ProtectedRoute>
+                <Layout wide>
+                  <RepositoryLayout>
+                    <RepoChatPage />
+                  </RepositoryLayout>
                 </Layout>
               </ProtectedRoute>
             }

@@ -47,6 +47,7 @@ export function RepositoryLayout({ children }: { children: ReactNode }) {
     { to: `${path}/pulls`, label: 'Pull requests' },
     { to: `${path}/graph`, label: 'Grafo' },
     { to: `${path}/runs`, label: 'Execuções' },
+    { to: `${path}/chat`, label: 'Chat' },
   ];
 
   return (
