@@ -22,6 +22,7 @@ log = get_logger(__name__)
 MAX_ITERATIONS = 8
 MAX_HISTORY_MESSAGES = 20
 MAX_REPEATED_CALLS = 2
+MAX_CITATIONS = 12
 _DONE = object()
 
 
@@ -55,6 +56,8 @@ def _validate_citations(
             continue
         seen.add(key)
         valid.append(citation)
+        if len(valid) >= MAX_CITATIONS:
+            break
     return valid
 
 

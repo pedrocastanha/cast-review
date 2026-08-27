@@ -496,3 +496,4 @@ describe('ChatService.sendMessage', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+

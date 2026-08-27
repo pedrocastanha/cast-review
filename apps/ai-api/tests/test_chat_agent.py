@@ -274,3 +274,49 @@ async def test_citation_pointing_outside_the_index_is_dropped(monkeypatch):
     events = await _collect(FakeCache(graph), _request())
 
     assert events[-1].payload["citations"] == []
+
+
+@pytest.mark.asyncio
+async def test_citations_are_capped_and_deduplicated(monkeypatch):
+    from app.chat.agent import MAX_CITATIONS
+
+    _patch_llm(
+        monkeypatch,
+        [
+            _calls(ToolCall(id="c1", name="list_endpoints", arguments={})),
+            _answer("ok"),
+        ],
+    )
+    graph = _graph()
+    for index in range(40):
+        path = f"src/mod{index}.ts"
+        graph.nodes[f"n{index}"] = Symbol(
+            id=f"n{index}",
+            kind="function",
+            path=path,
+            name=f"handler{index}",
+            line=1,
+            end_line=3,
+            signature=f"function handler{index}()",
+            body="{}",
+        )
+        for duplicate in range(2):
+            graph.endpoints.append(
+                HttpEndpoint(
+                    id=f"e{index}-{duplicate}",
+                    role="provider",
+                    method="GET",
+                    route=f"/r{index}",
+                    normalized_route=f"/r{index}",
+                    path=path,
+                    line=1,
+                    framework="nestjs",
+                )
+            )
+
+    events = await _collect(FakeCache(graph), _request())
+    citations = events[-1].payload["citations"]
+
+    assert len(citations) == MAX_CITATIONS
+    keys = [(item["repoId"], item["path"], item["line"]) for item in citations]
+    assert len(set(keys)) == len(keys)
