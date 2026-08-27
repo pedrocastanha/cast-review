@@ -4,7 +4,7 @@ import type { Job } from 'bullmq';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import { UserService } from '../../users/user.service';
-import { fetchRepoTree } from '../helpers/tree-fetcher.helper';
+import { fetchRepoTree } from './tree-fetcher.helper';
 import { CODE_INDEX_QUEUE, IndexJobData, IndexJobResult } from './index-queue.constants';
 
 const PROGRESS_STARTED = 5;

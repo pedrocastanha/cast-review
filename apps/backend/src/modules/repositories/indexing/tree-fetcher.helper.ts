@@ -1,14 +1,5 @@
 import type { Octokit } from '@octokit/rest';
-
-export interface RepoFile {
-  path: string;
-  content: string;
-}
-
-export interface RepoTreeResult {
-  files: RepoFile[];
-  truncated: boolean;
-}
+import { RepoFile, RepoTreeResult } from '../types/tree-fetcher.type';
 
 const SUPPORTED_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.py'];
 

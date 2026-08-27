@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError } from '../api/http';
 import { repositoriesApi } from '../api/repositories.api';
+import { ConcurrencyQueue } from '../lib/concurrency-queue';
 import type { RepositoryIndexStatus } from '../types';
 
 const POLL_INTERVAL_MS = 3000;
+
+// Compartilhada entre todos os RepositoryCard montados — sem isso, uma lista
+// com muitos repos dispara 1 requisição pra cada de uma vez e estoura conexão
+// simultânea com a API do Github (erro de socket, não HTTP, no backend).
+const githubStatusQueue = new ConcurrencyQueue(4);
 
 export function useRepositoryIndexStatus(repo: string, owner: string) {
   const [status, setStatus] = useState<RepositoryIndexStatus | null>(null);
@@ -12,7 +18,9 @@ export function useRepositoryIndexStatus(repo: string, owner: string) {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const next = await repositoriesApi.getIndexStatus(repo, owner);
+      const next = await githubStatusQueue.run(() =>
+        repositoriesApi.getIndexStatus(repo, owner),
+      );
       setStatus(next);
       setError(null);
     } catch (err) {
@@ -35,7 +43,9 @@ export function useRepositoryIndexStatus(repo: string, owner: string) {
     setTriggering(true);
     setError(null);
     try {
-      await repositoriesApi.indexRepository(repo, owner);
+      await githubStatusQueue.run(() =>
+        repositoriesApi.indexRepository(repo, owner),
+      );
       setStatus((prev) => ({
         status: 'queued',
         sha: prev?.sha ?? null,
