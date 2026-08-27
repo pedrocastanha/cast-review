@@ -55,7 +55,7 @@ function App() {
           />
           <Route
             path="/projects/:id"
-            element={<ProtectedRoute><Layout><ProjectGraphPage /></Layout></ProtectedRoute>}
+            element={<ProtectedRoute><Layout wide><ProjectGraphPage /></Layout></ProtectedRoute>}
           />
           <Route
             path="/repos"
@@ -71,7 +71,7 @@ function App() {
             path="/benchmarks"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout wide>
                   <BenchmarksPage />
                 </Layout>
               </ProtectedRoute>
@@ -101,7 +101,7 @@ function App() {
             path="/repos/:owner/:repo/pulls/:pullNumber"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout wide>
                   <PullRequestReviewPage />
                 </Layout>
               </ProtectedRoute>
@@ -111,7 +111,7 @@ function App() {
             path="/repos/:owner/:repo/analyses/:analysisId"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout wide>
                   <AnalysisRecordPage />
                 </Layout>
               </ProtectedRoute>
@@ -121,7 +121,7 @@ function App() {
             path="/repos/:owner/:repo/graph"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout wide>
                   <RepoGraphPage />
                 </Layout>
               </ProtectedRoute>
@@ -131,7 +131,7 @@ function App() {
             path="/repos/:owner/:repo/pulls/:pullNumber/run"
             element={
               <ProtectedRoute>
-                <Layout>
+                <Layout wide>
                   <AnalysisPage />
                 </Layout>
               </ProtectedRoute>
