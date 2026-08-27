@@ -8,7 +8,7 @@ const labels: Record<AnalysisStatus, string> = {
 };
 
 const styles: Record<AnalysisStatus, string> = {
-  running: 'text-accent bg-accent-quiet/40',
+  running: 'text-accent bg-accent-soft',
   completed: 'text-state-open bg-state-open-dim',
   error: 'text-state-closed bg-state-closed-dim',
   awaiting_approval: 'text-state-draft bg-state-draft-dim',
