@@ -1,19 +1,39 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { AnalysisHistoryList } from '../components/analysis/AnalysisHistoryList';
 import { PullRequestCard } from '../components/pulls/PullRequestCard';
-import { Breadcrumb } from '../components/ui/Breadcrumb';
-import { PageHead } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import { List } from '../components/ui/List';
 import { Spinner } from '../components/ui/Spinner';
 import { usePullRequests } from '../hooks/usePullRequests';
 import { useRepoAnalyses } from '../hooks/useRepoAnalyses';
+import type { PullRequest } from '../types';
+
+type StateFilter = 'open' | 'closed' | 'all';
+
+const FILTERS: { id: StateFilter; label: string }[] = [
+  { id: 'open', label: 'Abertas' },
+  { id: 'closed', label: 'Fechadas' },
+  { id: 'all', label: 'Todas' },
+];
+
+function matches(pull: PullRequest, filter: StateFilter) {
+  if (filter === 'all') return true;
+  if (filter === 'closed') return pull.state === 'closed';
+  return pull.state !== 'closed';
+}
 
 export function PullRequestsPage() {
   const { owner = '', repo = '' } = useParams();
   const { pulls, error, loading } = usePullRequests(repo, owner);
-  const { analyses, error: analysesError, loading: analysesLoading } = useRepoAnalyses(owner, repo);
+  const { analyses } = useRepoAnalyses(owner, repo);
+  const [filter, setFilter] = useState<StateFilter>('open');
+  const [settled, setSettled] = useState(false);
+
+  useEffect(() => {
+    if (settled || !pulls) return;
+    setSettled(true);
+    if (!pulls.some((pull) => matches(pull, 'open'))) setFilter('all');
+  }, [pulls, settled]);
 
   const countByPull = useMemo(() => {
     const counts = new Map<number, number>();
@@ -23,38 +43,67 @@ export function PullRequestsPage() {
     return counts;
   }, [analyses]);
 
-  return (
-    <div>
-      <Breadcrumb items={[{ label: 'Repositórios', to: '/repos' }, { label: `${owner}/${repo}` }]} />
+  const counts = useMemo(
+    () => ({
+      open: (pulls ?? []).filter((pull) => matches(pull, 'open')).length,
+      closed: (pulls ?? []).filter((pull) => matches(pull, 'closed')).length,
+      all: pulls?.length ?? 0,
+    }),
+    [pulls],
+  );
 
-      <PageHead
-        eyebrow="Pull requests"
-        title={`${owner}/${repo}`}
-        description="Pull requests sincronizadas do GitHub. Abra uma PR para rodar a revisão."
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <p className="rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">{error}</p>;
+  }
+
+  if (!pulls || pulls.length === 0) {
+    return (
+      <EmptyState
+        title="Nenhuma pull request"
+        description="Esse repositório ainda não tem pull requests abertas ou fechadas."
       />
+    );
+  }
 
-      {loading && (
-        <div className="flex justify-center py-16">
-          <Spinner size="lg" />
-        </div>
-      )}
+  const visible = pulls.filter((pull) => matches(pull, filter));
 
-      {!loading && error && (
-        <p className="rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">
-          {error}
-        </p>
-      )}
+  return (
+    <section>
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {FILTERS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={filter === item.id}
+            onClick={() => setFilter(item.id)}
+            className={`min-h-11 cursor-pointer rounded-full border px-3.5 text-sm font-semibold transition-colors ${
+              filter === item.id
+                ? 'border-ink bg-ink text-surface-1'
+                : 'border-border bg-surface-1 text-ink-dim hover:border-ink-faint hover:text-ink'
+            }`}
+          >
+            {item.label}
+            <span className="ml-1.5 font-mono text-[11px] opacity-65">{counts[item.id]}</span>
+          </button>
+        ))}
+      </div>
 
-      {!loading && !error && pulls && pulls.length === 0 && (
+      {visible.length === 0 ? (
         <EmptyState
-          title="Nenhuma pull request"
-          description="Esse repositório ainda não tem pull requests abertas ou fechadas."
+          title={filter === 'open' ? 'Nenhuma pull request aberta' : 'Nenhuma pull request fechada'}
+          description="Troque o filtro para ver as outras pull requests deste repositório."
         />
-      )}
-
-      {!loading && !error && pulls && pulls.length > 0 && (
+      ) : (
         <List>
-          {pulls.map((pull) => (
+          {visible.map((pull) => (
             <PullRequestCard
               key={pull.id}
               pull={pull}
@@ -65,28 +114,6 @@ export function PullRequestsPage() {
           ))}
         </List>
       )}
-
-      <section className="mt-12 border-t border-border pt-8">
-        <p className="mb-1 font-mono text-[11px] tracking-[0.14em] text-ink-faint uppercase">Atividade</p>
-        <h2 className="mb-2 font-display text-lg font-bold text-ink">Histórico deste repositório</h2>
-        <p className="mb-6 text-sm text-ink-dim">Execuções anteriores, resultados e custo de cada revisão.</p>
-
-        {analysesLoading && (
-          <div className="flex justify-center py-10">
-            <Spinner />
-          </div>
-        )}
-
-        {!analysesLoading && analysesError && (
-          <p className="rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">
-            {analysesError}
-          </p>
-        )}
-
-        {!analysesLoading && !analysesError && analyses && (
-          <AnalysisHistoryList owner={owner} repo={repo} analyses={analyses} />
-        )}
-      </section>
-    </div>
+    </section>
   );
 }

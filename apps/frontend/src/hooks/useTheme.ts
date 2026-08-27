@@ -23,7 +23,6 @@ export function useTheme() {
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
-      // modo privado sem storage: o tema vale só nesta sessão
     }
     for (const listener of listeners) listener();
   }, []);

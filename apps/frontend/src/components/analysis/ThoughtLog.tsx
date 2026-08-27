@@ -76,7 +76,6 @@ function Scalar({ value }: { value: unknown }) {
   );
 }
 
-/** `path` + `line`/`endLine` viram uma linha só, no formato que o editor entende. */
 function collapseLocation(finding: Record<string, unknown>) {
   const entries = Object.entries(finding).filter(([key]) => key !== 'status' && key !== 'title');
   if (typeof finding.path !== 'string') return entries;
@@ -193,7 +192,6 @@ function summarize(value: unknown, text: string) {
   return `${text.length} chars`;
 }
 
-/** O cabeçalho do accordion já mostra `title`; repetir no corpo só ocupa espaço. */
 function withoutSummaryField(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
   const record = value as Record<string, unknown>;

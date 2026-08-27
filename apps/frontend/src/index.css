@@ -1,16 +1,6 @@
 @import 'tailwindcss';
 
-/* ==========================================================================
-   Cast Review — design tokens (Tailwind v4 theme)
-
-   Duas zonas independentes:
-   - "máquina": rail de navegação e console de execução. Sempre escura.
-   - "documento": o conteúdo das páginas. Alterna claro/escuro via
-     data-theme no <html>.
-   ========================================================================== */
-
 @theme {
-  /* ---- zona máquina (fixa, nunca alterna) ---- */
   --color-machine: oklch(19% 0.010 350);
   --color-machine-2: oklch(23% 0.011 350);
   --color-machine-3: oklch(27% 0.012 350);
@@ -20,7 +10,6 @@
   --color-machine-fg-3: oklch(50% 0.014 350);
   --color-machine-accent: oklch(72% 0.19 350);
 
-  /* ---- zona documento (valores do tema claro; ver override dark abaixo) ---- */
   --color-surface: #e6e8ec;
   --color-surface-1: #ffffff;
   --color-surface-2: #f4f5f8;
@@ -44,7 +33,6 @@
   --color-fail: #b3261e;
   --color-fail-soft: #fadfdc;
 
-  /* ---- estado de PR (domínio próprio, não reaproveita severidade) ---- */
   --color-state-open: #0f6b55;
   --color-state-open-dim: #ddede8;
   --color-state-closed: #b3261e;
@@ -52,7 +40,6 @@
   --color-state-draft: #868e9b;
   --color-state-draft-dim: #f4f5f8;
 
-  /* ---- tipografia ---- */
   --font-display: 'Bricolage Grotesque', Georgia, serif;
   --font-body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
@@ -65,7 +52,6 @@
   --text-2xl: 2.125rem;
   --text-3xl: 2.375rem;
 
-  /* ---- forma ---- */
   --radius-sm: 5px;
   --radius-md: 9px;
   --radius-lg: 14px;
@@ -82,10 +68,6 @@
   --animate-node-halo: node-halo 1.6s ease-out infinite;
   --animate-caret: caret 1s steps(2) infinite;
 }
-
-/* ==========================================================================
-   Tema escuro — só a zona documento muda
-   ========================================================================== */
 
 :root[data-theme='dark'] {
   --color-surface: oklch(13% 0.007 350);
@@ -171,10 +153,6 @@
     opacity: 0;
   }
 }
-
-/* ==========================================================================
-   Base
-   ========================================================================== */
 
 body {
   background-color: var(--color-surface);
