@@ -73,7 +73,7 @@ export function AnalysisHistoryList({
           <Link
             key={analysis.id}
             to={href}
-            className="group flex w-full items-center justify-between gap-4 rounded-md border border-border bg-surface-1/55 px-4 py-4 text-left transition-[background-color,border-color] duration-200 hover:border-border-strong hover:bg-surface-2 sm:gap-6 sm:px-5"
+            className="group flex w-full items-center justify-between gap-4 rounded-md border border-border bg-surface-1 px-4 py-4 text-left transition-[background-color,border-color] duration-200 hover:border-border-strong hover:bg-surface-2 sm:gap-6 sm:px-5"
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">

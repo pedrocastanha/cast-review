@@ -127,7 +127,7 @@ function SnapshotGraph({ snapshot, filter }: { snapshot: AnalysisContextSnapshot
     <div
       ref={containerRef}
       style={{ width: '100%', height: '29rem' }}
-      className="overflow-hidden rounded-md border border-border bg-surface-1/45"
+      className="overflow-hidden rounded-md border border-border bg-surface-1"
     >
       {ready && (
         <ReactFlow nodes={nodes} edges={edges} nodesDraggable={false} fitView minZoom={0.25}>
@@ -152,13 +152,13 @@ function CrossRepoSnapshot({ snapshot }: { snapshot: AnalysisContextSnapshot }) 
   const warning = snapshot.scope.status !== 'exact';
 
   return (
-    <div className="flex flex-col gap-4 rounded-md border border-border bg-surface-1/55 p-4 sm:p-5">
+    <div className="flex flex-col gap-4 rounded-md border border-border bg-surface-1 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] tracking-[0.14em] text-accent uppercase">
             Impacto entre repositórios
           </p>
-          <h3 className="mt-1 font-display text-base font-semibold text-ink">
+          <h3 className="mt-1 font-display text-base font-bold text-ink">
             {snapshot.scope.projectName ?? 'Projeto indisponível'}
           </h3>
         </div>
@@ -354,7 +354,7 @@ export function GraphContextPanel({ analysisId }: { analysisId: string }) {
               <CrossRepoSnapshot snapshot={snapshot} />
 
               {snapshot.graph.stale && (
-                <p className="rounded-sm border border-state-closed/50 bg-state-closed-dim px-4 py-3 text-sm text-ink">
+                <p className="rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">
                   Contexto stale — o índice disponível é de outro SHA. Relações são evidência auxiliar, não certeza.
                 </p>
               )}
@@ -398,7 +398,7 @@ export function GraphContextPanel({ analysisId }: { analysisId: string }) {
                 </p>
               )}
 
-              <details className="rounded-sm border border-border bg-surface-1/55">
+              <details className="rounded-sm border border-border bg-surface-1">
                 <summary className="cursor-pointer px-4 py-3 font-mono text-xs text-ink-dim">
                   Ver bloco textual enviado aos reviewers
                 </summary>
