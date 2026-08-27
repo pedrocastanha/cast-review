@@ -38,6 +38,7 @@ DEFINITION_NODE_TYPES = (
     "method_definition",
 )
 
+MAX_SYMBOL_BODY_CHARS = 20000
 CANDIDATE_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx", ".py")
 INDEX_FILENAMES = ("index.ts", "index.tsx", "index.js", "index.jsx", "__init__.py")
 
@@ -67,6 +68,13 @@ def _signature(node: Node, source: bytes) -> str:
     body = node.child_by_field_name("body")
     end = body.start_byte if body is not None else node.end_byte
     return source[node.start_byte : end].decode("utf-8", errors="replace").strip()
+
+
+def _body(node: Node, source: bytes) -> str:
+    text = source[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
+    if len(text) <= MAX_SYMBOL_BODY_CHARS:
+        return text
+    return text[:MAX_SYMBOL_BODY_CHARS] + "\n… (corpo truncado na indexação)"
 
 
 def _symbol_id(path: str, name: str, start_byte: int) -> str:
@@ -158,6 +166,7 @@ def parse_file(path: str, content: str) -> ParsedSymbols:
                     line=def_node.start_point.row + 1,
                     end_line=def_node.end_point.row + 1,
                     signature=_signature(def_node, source),
+                    body=_body(def_node, source),
                     decorators=_collect_decorators(def_node, source),
                 )
                 symbols.append(symbol)
