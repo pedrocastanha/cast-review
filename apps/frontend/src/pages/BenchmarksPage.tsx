@@ -4,6 +4,7 @@ import { benchmarksApi } from '../api/benchmarks.api';
 import { ApiError } from '../api/http';
 import { openaiKeyStore } from '../api/openai-key-store';
 import { ReportMarkdown } from '../components/analysis/ReportMarkdown';
+import { PageHead } from '../components/ui/Card';
 import { Spinner } from '../components/ui/Spinner';
 import {
   cleanPullRequestBody,
@@ -53,11 +54,11 @@ function PullRequestContext({ benchmarkCase }: { benchmarkCase: BenchmarkCase })
     .join('\n\n');
 
   return (
-    <section className="border-b border-border bg-surface-1/45 px-4 py-6 sm:px-6" aria-labelledby="benchmark-pr-context-title">
+    <section className="border-b border-border bg-surface-1 px-4 py-6 sm:px-6" aria-labelledby="benchmark-pr-context-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] tracking-[0.14em] text-accent uppercase">Antes de comparar</p>
-          <h2 id="benchmark-pr-context-title" className="mt-2 font-display text-lg font-semibold text-ink">
+          <h2 id="benchmark-pr-context-title" className="mt-2 font-display text-lg font-bold text-ink">
             O que esta PR propõe
           </h2>
         </div>
@@ -137,7 +138,7 @@ function Comparison({ run }: { run: BenchmarkRun }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="font-mono text-xs tracking-[0.14em] text-accent uppercase">Comparação exploratória</p>
-          <h2 className="mt-2 font-display text-lg font-semibold text-ink">Mesma evidência, leituras diferentes</h2>
+          <h2 className="mt-2 font-display text-lg font-bold text-ink">Mesma evidência, leituras diferentes</h2>
         </div>
         <p className="max-w-md text-xs leading-5 text-ink-faint">
           Sem ground truth não existe vencedor automático. Exclusivo significa divergente, não necessariamente correto.
@@ -152,7 +153,7 @@ function Comparison({ run }: { run: BenchmarkRun }) {
             <article key={result.model} className="min-w-0 bg-surface-1 p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="truncate font-display text-base font-semibold text-ink">{result.model}</p>
+                  <p className="truncate font-display text-base font-bold text-ink">{result.model}</p>
                   <p className="mt-1 font-mono text-[10px] text-ink-faint">
                     {(result.durationMs / 1000).toFixed(1)}s · {usd(result.report?.usage?.costUsd)}
                   </p>
@@ -248,7 +249,7 @@ function CaseWorkspace({ benchmarkCase }: { benchmarkCase: BenchmarkCase }) {
           {source.category && <span className="text-ink-dim">· {source.category}</span>}
           {difficulty && <span className="text-ink-dim">· {difficulty}</span>}
         </div>
-        <h1 className="mt-3 font-display text-xl font-semibold text-ink sm:text-2xl">{benchmarkCase.title}</h1>
+        <h1 className="mt-3 font-display text-xl font-bold text-ink sm:text-2xl">{benchmarkCase.title}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-ink-faint">
           <span>{sourceLabel}</span>
           {source.url && (
@@ -348,12 +349,12 @@ function CaseWorkspace({ benchmarkCase }: { benchmarkCase: BenchmarkCase }) {
         <div><dt className="text-ink-faint">Histórico</dt><dd className="mt-1 text-ink">{runs.length} {runs.length === 1 ? 'run' : 'runs'}</dd></div>
       </dl>
 
-      {error && <p className="mt-5 rounded-sm border border-state-closed/50 bg-state-closed-dim px-4 py-3 text-sm text-ink">{error}</p>}
+      {error && <p className="mt-5 rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">{error}</p>}
       {latest?.results && <Comparison run={latest} />}
       {!latest && !error && (
         <div className="py-14 text-center">
-          <p className="font-display text-lg font-semibold text-ink">Esse caso está pronto para repetir.</p>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-faint">Escolha os modelos. Diff, arquivos, convenções e Graph snapshot permanecem idênticos.</p>
+          <p className="font-display text-lg font-bold text-ink">Esse caso está pronto para repetir.</p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-dim">Escolha os modelos. Diff, arquivos, convenções e Graph snapshot permanecem idênticos.</p>
         </div>
       )}
     </div>
@@ -384,27 +385,25 @@ export function BenchmarksPage() {
 
   return (
     <div>
-      <header className="mb-8 border-b border-border pb-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="mb-2 font-mono text-xs tracking-[0.14em] text-accent uppercase">Laboratório · 03</p>
-            <h1 className="font-display text-xl font-semibold text-ink sm:text-2xl">Benchmark Lab</h1>
-          </div>
-          {!loading && (
-            <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
+      <PageHead
+        eyebrow="Laboratório"
+        title="Benchmark Lab"
+        description="Mesma PR, mesmo commit congelado, mesma visão estrutural. Só o modelo muda entre uma execução e outra."
+        actions={
+          !loading ? (
+            <p className="font-mono text-[11px] tracking-[0.08em] text-ink-faint uppercase">
               {officialCases.length} PRs oficiais · {privateCases.length} privadas
             </p>
-          )}
-        </div>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-faint">Compare modelos contra exatamente a mesma PR e a mesma visão estrutural. Sem mover o alvo entre uma execução e outra.</p>
-      </header>
+          ) : undefined
+        }
+      />
 
-      {error && <p className="rounded-sm border border-state-closed/50 bg-state-closed-dim px-4 py-3 text-sm text-ink">{error}</p>}
+      {error && <p className="rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">{error}</p>}
 
       {!error && cases.length === 0 && (
         <div className="py-16 text-center">
-          <p className="font-display text-lg font-semibold text-ink">Nenhum caso congelado ainda.</p>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-faint">Abra uma análise salva e use “Salvar como benchmark”. O caso continuará disponível mesmo se a PR mudar.</p>
+          <p className="font-display text-lg font-bold text-ink">Nenhum caso congelado ainda.</p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-dim">Abra uma análise salva e use “Salvar como benchmark”. O caso continuará disponível mesmo se a PR mudar.</p>
         </div>
       )}
 
@@ -423,7 +422,7 @@ export function BenchmarksPage() {
                       key={item.id}
                       type="button"
                       onClick={() => setSearchParams({ case: item.id })}
-                      className={`min-w-56 rounded-sm border p-3 text-left transition-colors xl:min-w-0 ${item.id === selected.id ? 'border-accent bg-accent-quiet/30' : 'border-border bg-surface-1/40 hover:border-border-strong'}`}
+                      className={`min-w-56 rounded-sm border p-3 text-left transition-colors xl:min-w-0 ${item.id === selected.id ? 'border-accent bg-accent-soft' : 'border-border bg-surface-1 hover:border-border-strong'}`}
                     >
                       <p className="line-clamp-2 text-sm font-medium leading-5 text-ink">{item.title}</p>
                       <p className="mt-1 font-mono text-[10px] text-ink-faint">

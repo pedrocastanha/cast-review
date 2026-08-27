@@ -36,18 +36,25 @@ export function LoginPage() {
 
   return (
     <div className="grid min-h-screen place-items-center px-5 py-8 sm:px-8 sm:py-12">
-      <div className="grid w-full max-w-5xl overflow-hidden rounded-lg border border-border bg-surface/80 shadow-[0_24px_90px_oklch(5%_0.01_350_/_0.3)] backdrop-blur-sm md:grid-cols-[0.9fr_1.1fr]">
-        <aside className="border-b border-border bg-surface-1/70 p-7 md:border-r md:border-b-0 md:p-10">
-          <p className="font-display text-base font-semibold tracking-tight text-ink">CAST<span className="text-accent">·</span>REVIEW</p>
+      <div className="grid w-full max-w-5xl overflow-hidden rounded-md border border-border bg-surface-1 shadow-card md:grid-cols-[0.9fr_1.1fr]">
+        <aside className="border-b border-border bg-machine p-7 text-machine-fg md:border-r md:border-b-0 md:p-10">
+          <span className="inline-flex items-center gap-2.5">
+            <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-md bg-accent">
+              <span className="block h-3 w-0.5 skew-x-[-20deg] rounded-sm bg-white" />
+            </span>
+            <span className="font-display text-base leading-none tracking-tight">
+              <b className="font-extrabold">Cast</b> <i className="font-normal text-machine-fg-2 not-italic">Review</i>
+            </span>
+          </span>
           <div className="mt-12 hidden md:block">
-            <p className="font-mono text-xs tracking-[0.14em] text-accent uppercase">Code review, com contexto</p>
-            <p className="mt-4 max-w-xs font-display text-xl leading-tight text-ink">Menos ruído. Decisões de revisão mais claras.</p>
-            <p className="mt-4 max-w-xs text-sm leading-6 text-ink-faint">Centralize pull requests, análises e evidências técnicas em um só lugar.</p>
+            <p className="font-mono text-[11px] tracking-[0.14em] text-machine-accent uppercase">Code review, com contexto</p>
+            <p className="mt-4 max-w-xs font-display text-xl leading-tight font-bold">Menos ruído. Decisões de revisão mais claras.</p>
+            <p className="mt-4 max-w-xs text-sm leading-6 text-machine-fg-2">Centralize pull requests, análises e evidências técnicas em um só lugar.</p>
           </div>
         </aside>
         <div className="w-full p-7 sm:p-10">
-          <p className="mb-2 font-mono text-xs tracking-[0.18em] text-ink-faint uppercase">Acesso à plataforma</p>
-          <h1 className="mb-8 font-display text-2xl font-semibold text-ink">Entrar</h1>
+          <p className="mb-2 font-mono text-[11px] tracking-[0.14em] text-ink-faint uppercase">Acesso à plataforma</p>
+          <h1 className="mb-8 font-display text-2xl font-bold text-ink">Entrar</h1>
 
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <Field
@@ -69,7 +76,7 @@ export function LoginPage() {
           />
 
           {error && (
-            <p className="rounded-sm border border-state-closed/40 bg-state-closed-dim px-3 py-2 text-sm text-ink">
+            <p className="rounded-sm border border-fail/40 bg-fail-soft px-3 py-2 text-sm text-fail">
               {error}
             </p>
           )}
@@ -79,7 +86,7 @@ export function LoginPage() {
           </Button>
           </form>
 
-          <p className="mt-6 text-sm text-ink-faint">
+          <p className="mt-6 text-sm text-ink-dim">
             Ainda não tem conta?{' '}
             <Link to="/register" className="text-ink underline decoration-border-strong underline-offset-4 hover:text-accent">
               Criar conta

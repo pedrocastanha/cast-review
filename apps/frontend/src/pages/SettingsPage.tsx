@@ -2,7 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError } from '../api/http';
 import { usersApi } from '../api/users.api';
 import { Button } from '../components/ui/Button';
+import { Card, PageHead } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
+import { StatusDot } from '../components/ui/List';
 import { useAuth } from '../context/AuthContext';
 
 export function SettingsPage() {
@@ -73,15 +75,16 @@ export function SettingsPage() {
 
   return (
     <div>
-      <header className="mb-8 border-b border-border pb-6">
-        <p className="mb-2 font-mono text-xs tracking-[0.14em] text-accent uppercase">Área pessoal · 02</p>
-        <h1 className="font-display text-xl font-semibold text-ink sm:text-2xl">Configurações</h1>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-ink-faint">Gerencie suas informações e a conexão usada para ler os repositórios.</p>
-      </header>
+      <PageHead
+        eyebrow="Conta"
+        title="Configurações"
+        description="Seus dados e a conexão usada para ler os repositórios."
+      />
 
-      <div className="grid gap-8 xl:grid-cols-2">
-        <section className="rounded-lg border border-border bg-surface-1/45 p-5 sm:p-6">
-          <div className="mb-6"><p className="font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">Perfil</p><h2 className="mt-2 font-display text-lg font-semibold text-ink">Suas informações</h2></div>
+      <div className="grid items-start gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(21.25rem,100%),1fr))]">
+        <Card className="p-6">
+          <h2 className="font-display text-lg font-bold text-ink">Seu perfil</h2>
+          <p className="mt-1 mb-5 text-sm text-ink-dim">Como você aparece nas revisões publicadas.</p>
           <form onSubmit={profileSubmit} className="flex flex-col gap-4">
             <Field label="Nome" value={name} onChange={(event) => setName(event.target.value)} required />
             <Field label="Usuário" value={username} onChange={(event) => setUsername(event.target.value)} hint="Opcional. Usado para seu identificador no Cast Review." />
@@ -89,21 +92,33 @@ export function SettingsPage() {
             {profileMessage && <p className="text-sm text-ink-dim">{profileMessage}</p>}
             <Button type="submit" loading={savingProfile} className="self-start">Salvar perfil</Button>
           </form>
-        </section>
+        </Card>
 
-        <section className="rounded-lg border border-border bg-surface-1/45 p-5 sm:p-6">
-          <div className="mb-6"><p className="font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">Integração</p><h2 className="mt-2 font-display text-lg font-semibold text-ink">GitHub</h2></div>
-          <div className="mb-6 rounded-sm border border-border bg-surface px-4 py-3">
+        <Card className="p-6">
+          <h2 className="font-display text-lg font-bold text-ink">GitHub</h2>
+          <p className="mt-1 mb-5 text-sm text-ink-dim">O token é usado para ler repositórios, pull requests e publicar comentários de revisão.</p>
+          <div className={`mb-5 flex items-center gap-3 rounded-sm border px-4 py-3 ${user.githubConnected ? 'border-pass/35 bg-pass-soft' : 'border-border bg-surface-2'}`}>
             {user.githubConnected ? (
-              <><p className="text-sm text-ink">Conectado como <span className="font-mono text-state-open">{user.githubLogin}</span></p><p className="mt-1 font-mono text-xs text-ink-faint">Token salvo · •••• {user.githubTokenLastFour ?? '—'}</p></>
-            ) : <p className="text-sm text-ink-faint">Nenhuma conta do GitHub conectada.</p>}
+              <>
+                <StatusDot on />
+                <div>
+                  <p className="font-mono text-sm font-semibold text-pass">{user.githubLogin}</p>
+                  <p className="font-mono text-[11.5px] text-pass/75">token salvo · final {user.githubTokenLastFour ?? '—'}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <StatusDot on={false} />
+                <p className="text-sm text-ink-dim">Nenhuma conta do GitHub conectada.</p>
+              </>
+            )}
           </div>
           <form onSubmit={tokenSubmit} className="flex flex-col gap-4">
             <Field label={user.githubConnected ? 'Novo personal access token' : 'Personal access token'} type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="ghp_…" hint="Pedimos somente o token. Guardamos os quatro últimos caracteres separadamente para identificação." required />
             {tokenMessage && <p className="text-sm text-ink-dim">{tokenMessage}</p>}
             <div className="flex flex-wrap gap-3"><Button type="submit" loading={savingToken}>{user.githubConnected ? 'Trocar token' : 'Conectar GitHub'}</Button>{user.githubConnected && <Button type="button" variant="danger" onClick={disconnect} loading={removingToken}>Desconectar</Button>}</div>
           </form>
-        </section>
+        </Card>
       </div>
     </div>
   );

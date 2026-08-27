@@ -1,8 +1,11 @@
 import { useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { AnalysisHistoryList } from '../components/analysis/AnalysisHistoryList';
 import { PullRequestCard } from '../components/pulls/PullRequestCard';
+import { Breadcrumb } from '../components/ui/Breadcrumb';
+import { PageHead } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
+import { List } from '../components/ui/List';
 import { Spinner } from '../components/ui/Spinner';
 import { usePullRequests } from '../hooks/usePullRequests';
 import { useRepoAnalyses } from '../hooks/useRepoAnalyses';
@@ -22,18 +25,13 @@ export function PullRequestsPage() {
 
   return (
     <div>
-      <div className="mb-8 border-b border-border pb-6">
-        <Link to="/repos" className="text-sm text-ink-faint transition-colors hover:text-ink">
-          ← Repositórios
-        </Link>
-        <p className="mt-5 mb-1 font-mono text-xs tracking-[0.14em] text-accent uppercase">
-          Workspace · 02
-        </p>
-        <h1 className="font-display text-xl font-semibold text-ink sm:text-2xl">
-          {owner}/{repo}
-        </h1>
-        <p className="mt-2 text-sm text-ink-faint">Pull requests sincronizadas do GitHub para este repositório.</p>
-      </div>
+      <Breadcrumb items={[{ label: 'Repositórios', to: '/repos' }, { label: `${owner}/${repo}` }]} />
+
+      <PageHead
+        eyebrow="Pull requests"
+        title={`${owner}/${repo}`}
+        description="Pull requests sincronizadas do GitHub. Abra uma PR para rodar a revisão."
+      />
 
       {loading && (
         <div className="flex justify-center py-16">
@@ -42,7 +40,7 @@ export function PullRequestsPage() {
       )}
 
       {!loading && error && (
-        <p className="rounded-sm border border-state-closed/40 bg-state-closed-dim px-4 py-3 text-sm text-ink">
+        <p className="rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">
           {error}
         </p>
       )}
@@ -55,7 +53,7 @@ export function PullRequestsPage() {
       )}
 
       {!loading && !error && pulls && pulls.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <List>
           {pulls.map((pull) => (
             <PullRequestCard
               key={pull.id}
@@ -65,13 +63,13 @@ export function PullRequestsPage() {
               analysisCount={countByPull.get(pull.number) ?? 0}
             />
           ))}
-        </div>
+        </List>
       )}
 
       <section className="mt-12 border-t border-border pt-8">
-        <p className="mb-1 font-mono text-xs tracking-[0.14em] text-accent uppercase">Atividade</p>
-        <h2 className="mb-2 font-display text-lg font-semibold text-ink">Histórico deste repositório</h2>
-        <p className="mb-6 text-sm text-ink-faint">Execuções anteriores, resultados e custo de cada revisão.</p>
+        <p className="mb-1 font-mono text-[11px] tracking-[0.14em] text-ink-faint uppercase">Atividade</p>
+        <h2 className="mb-2 font-display text-lg font-bold text-ink">Histórico deste repositório</h2>
+        <p className="mb-6 text-sm text-ink-dim">Execuções anteriores, resultados e custo de cada revisão.</p>
 
         {analysesLoading && (
           <div className="flex justify-center py-10">
@@ -80,7 +78,7 @@ export function PullRequestsPage() {
         )}
 
         {!analysesLoading && analysesError && (
-          <p className="rounded-sm border border-state-closed/40 bg-state-closed-dim px-4 py-3 text-sm text-ink">
+          <p className="rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">
             {analysesError}
           </p>
         )}

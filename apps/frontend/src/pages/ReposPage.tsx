@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { RepositoryCard } from '../components/repos/RepositoryCard';
+import { PageHead } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
+import { List } from '../components/ui/List';
 import { Spinner } from '../components/ui/Spinner';
 import { useAuth } from '../context/AuthContext';
 import { useRepositories } from '../hooks/useRepositories';
@@ -11,20 +13,16 @@ export function ReposPage() {
 
   return (
     <div>
-      <div className="mb-8 flex flex-col justify-between gap-5 border-b border-border pb-6 sm:flex-row sm:items-end">
-        <div>
-          <p className="mb-2 font-mono text-xs tracking-[0.14em] text-accent uppercase">
-            Workspace · 01
-          </p>
-          <h1 className="font-display text-xl font-semibold text-ink sm:text-2xl">Seus repositórios</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-ink-faint">
-            Escolha uma base de código para consultar pull requests e iniciar revisões assistidas.
-          </p>
-        </div>
-        <Link to="/settings" className="inline-flex min-h-11 items-center justify-center rounded-sm border border-border-strong px-4.5 py-2.5 text-sm font-semibold tracking-wide text-ink transition-colors hover:border-ink-faint hover:bg-surface-2">
-          {user?.githubConnected ? 'Configurar GitHub' : 'Conectar GitHub'}
-        </Link>
-      </div>
+      <PageHead
+        eyebrow="Workspace"
+        title="Repositórios"
+        description="Escolha uma base de código para ver as pull requests e rodar uma revisão."
+        actions={
+          <Link to="/settings" className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-sm border border-border-strong bg-surface-1 px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-ink-faint hover:bg-surface-2">
+            {user?.githubConnected ? 'Configurar GitHub' : 'Conectar GitHub'}
+          </Link>
+        }
+      />
 
       {!user?.githubConnected && (
         <EmptyState
@@ -41,7 +39,7 @@ export function ReposPage() {
       )}
 
       {user?.githubConnected && error && (
-        <p className="rounded-sm border border-state-closed/40 bg-state-closed-dim px-4 py-3 text-sm text-ink">
+        <p className="rounded-sm border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">
           {error}
         </p>
       )}
@@ -55,17 +53,17 @@ export function ReposPage() {
 
       {user?.githubConnected && !loading && !error && repos && repos.length > 0 && (
         <section aria-labelledby="repositories-list">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3.5 flex items-center justify-between">
             <h2 id="repositories-list" className="font-mono text-xs tracking-[0.14em] text-ink-faint uppercase">
               Repositórios disponíveis
             </h2>
-            <span className="font-mono text-xs tabular-nums text-ink-faint">{repos.length} total</span>
+            <span className="font-mono text-xs tabular-nums text-ink-faint">{repos.length} repositórios</span>
           </div>
-          <div className="flex flex-col gap-2">
-          {repos.map((repo) => (
-            <RepositoryCard key={repo.id} repo={repo} />
-          ))}
-          </div>
+          <List>
+            {repos.map((repo) => (
+              <RepositoryCard key={repo.id} repo={repo} />
+            ))}
+          </List>
         </section>
       )}
     </div>

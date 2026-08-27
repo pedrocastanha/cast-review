@@ -57,7 +57,7 @@ export function ProjectFormPage() {
       <header className="mb-8 border-b border-border pb-6">
         <Link to={id ? `/projects/${id}` : '/projects'} className="font-mono text-xs text-ink-faint hover:text-ink">← voltar</Link>
         <p className="mt-6 font-mono text-xs tracking-[0.14em] text-accent uppercase">Definição do sistema</p>
-        <h1 className="mt-2 font-display text-xl font-semibold text-ink sm:text-2xl">{editing ? 'Editar projeto' : 'Conectar repositórios'}</h1>
+        <h1 className="mt-2 font-display text-xl font-bold text-ink sm:text-2xl">{editing ? 'Editar projeto' : 'Conectar repositórios'}</h1>
       </header>
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,0.75fr)_minmax(24rem,1.25fr)]">
@@ -78,7 +78,7 @@ export function ProjectFormPage() {
             <span className="mb-3 shrink-0 font-mono text-xs text-accent">{selected.length} selecionados</span>
           </div>
           {selected.length > 0 && <div className="mt-4 flex flex-wrap gap-2" aria-label="Repositórios selecionados">
-            {selected.map((fullName) => <button key={fullName} type="button" onClick={() => toggle(fullName)} aria-label={`Remover ${fullName}`} className="inline-flex min-h-11 items-center gap-2 border border-accent-quiet bg-accent-quiet/20 px-3 font-mono text-[10px] text-ink transition-colors hover:border-accent hover:bg-accent-quiet/35">
+            {selected.map((fullName) => <button key={fullName} type="button" onClick={() => toggle(fullName)} aria-label={`Remover ${fullName}`} className="inline-flex min-h-11 items-center gap-2 border border-accent/40 bg-accent-soft px-3 font-mono text-[10px] text-ink transition-colors hover:border-accent hover:bg-accent-soft">
               {fullName}<span aria-hidden="true" className="text-accent">×</span>
             </button>)}
           </div>}
@@ -87,11 +87,11 @@ export function ProjectFormPage() {
             <Link to="/settings" className="mt-3 inline-flex min-h-11 items-center font-semibold text-accent hover:text-accent-hover">Abrir configurações →</Link>
           </div>}
           {reposLoading && <div className="flex justify-center py-12"><Spinner /></div>}
-          {(reposError || error) && <p className="mt-4 border border-state-closed/40 bg-state-closed-dim px-4 py-3 text-sm text-ink">{reposError || error}</p>}
+          {(reposError || error) && <p className="mt-4 border border-fail/40 bg-fail-soft px-4 py-3 text-sm text-fail">{reposError || error}</p>}
           {repos && <div className="mt-4 max-h-[30rem] overflow-y-auto border border-border">
             {filtered.map((repo) => {
               const checked = selected.includes(repo.fullName);
-              return <label key={repo.id} className={`flex min-h-16 cursor-pointer items-center gap-4 border-b border-border px-4 py-3 last:border-b-0 ${checked ? 'bg-accent-quiet/35' : 'bg-surface-1 hover:bg-surface-2'}`}>
+              return <label key={repo.id} className={`flex min-h-16 cursor-pointer items-center gap-4 border-b border-border px-4 py-3 last:border-b-0 ${checked ? 'bg-accent-soft' : 'bg-surface-1 hover:bg-surface-2'}`}>
                 <input type="checkbox" checked={checked} onChange={() => toggle(repo.fullName)} className="size-4 accent-[var(--color-accent)]" />
                 <span className="min-w-0 flex-1"><span className="block truncate font-mono text-xs text-ink">{repo.fullName}</span><span className="mt-1 block truncate text-xs text-ink-faint">{repo.description || (repo.private ? 'Repositório privado' : 'Repositório público')}</span></span>
                 <span className="font-mono text-[9px] uppercase text-ink-faint">{repo.defaultBranch}</span>
