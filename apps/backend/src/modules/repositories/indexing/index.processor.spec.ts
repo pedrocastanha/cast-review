@@ -2,10 +2,10 @@
 // do Jest deste projeto (ver `analyses.service.spec.ts`) — mocka a construção do
 // client em vez de deixar o processor instanciar um `Octokit` de verdade.
 jest.mock('@octokit/rest', () => ({ Octokit: jest.fn() }));
-jest.mock('../helpers/tree-fetcher.helper');
+jest.mock('./tree-fetcher.helper');
 
 import type { AppLogger } from 'src/shared/logger/logger.service';
-import { fetchRepoTree } from '../helpers/tree-fetcher.helper';
+import { fetchRepoTree } from './tree-fetcher.helper';
 import { IndexProcessor } from './index.processor';
 
 const fetchRepoTreeMock = fetchRepoTree as jest.MockedFunction<
@@ -132,6 +132,35 @@ describe('IndexProcessor', () => {
     expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('truncada'),
       expect.objectContaining({ owner: 'octocat', repo: 'hello-world' }),
+    );
+  });
+
+  it('logs the failure and rethrows when the ai-api build fails', async () => {
+    const err = new Error('ai-api indisponível');
+    const aiApiClient = { buildIndex: jest.fn().mockRejectedValue(err) };
+    const logger = fakeLogger();
+    const processor = new IndexProcessor(
+      fakeUserService(),
+      aiApiClient as any,
+      logger,
+    );
+    const job = fakeJob({
+      owner: 'octocat',
+      repo: 'hello-world',
+      sha: 'sha1',
+      userId: 'user-1',
+    });
+
+    await expect(processor.process(job)).rejects.toBe(err);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('falhou'),
+      expect.objectContaining({
+        exception: err,
+        owner: 'octocat',
+        repo: 'hello-world',
+        sha: 'sha1',
+      }),
     );
   });
 });
