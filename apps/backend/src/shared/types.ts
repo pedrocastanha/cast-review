@@ -207,3 +207,58 @@ export interface AgentResumeRequest {
   policies: Policies;
   decision?: ApprovalDecision | null;
 }
+
+export interface ChatRunScopeRepository {
+  repoId: string;
+  sha: string;
+}
+
+export interface ChatRunMention {
+  repoId: string;
+  path: string;
+  content: string;
+}
+
+export interface ChatRunHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRunRequest {
+  threadId: string;
+  mode: 'repository' | 'project';
+  projectId?: string | null;
+  repositories: ChatRunScopeRepository[];
+  history: ChatRunHistoryMessage[];
+  question: string;
+  mentions: ChatRunMention[];
+  model: string;
+  apiKeys: {
+    openai: string;
+  };
+}
+
+export type ChatEventType =
+  | 'tool_call'
+  | 'tool_result'
+  | 'token'
+  | 'message_done'
+  | 'error';
+
+export interface ChatEvent {
+  type: ChatEventType;
+  payload: Record<string, unknown>;
+}
+
+export interface IndexFileResult {
+  repoId: string;
+  sha: string;
+  path: string;
+  content: string;
+}
+
+export interface IndexFilesResult {
+  repoId: string;
+  sha: string;
+  paths: string[];
+}
