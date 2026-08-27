@@ -14,13 +14,9 @@ import { UpdateUserDto } from './dtos/update-user.dto';
 import { toUserResponse, UserResponseDto } from './dtos/user-response.dto';
 import { User } from './user.entity';
 import { UserRepository } from './user.repository';
+import { GithubCredentials } from './types/github-credentials.type';
 
 const REQUIRED_CLASSIC_SCOPES = ['repo', 'public_repo'];
-
-export type GithubCredentials = {
-  token: string;
-  login: string | null;
-};
 
 @Injectable()
 export class UserService extends BaseService {

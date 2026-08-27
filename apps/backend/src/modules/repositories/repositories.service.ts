@@ -1,62 +1,52 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import {
-  ForbiddenException,
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { Octokit } from '@octokit/rest';
+import { Injectable } from '@nestjs/common';
 import type { Queue } from 'bullmq';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import { BaseService } from 'src/shared/services/base.service';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { UserService } from '../users/user.service';
+import { GithubSessionProvider } from './use-cases/shared/github-session.provider';
 import {
-  buildIndexJobId,
   CODE_INDEX_QUEUE,
   IndexJobData,
 } from './indexing/index-queue.constants';
-
-export type IndexStatus = 'not_indexed' | 'queued' | 'indexing' | 'indexed';
-
-export interface RepositoryIndexStatus {
-  status: IndexStatus;
-  sha: string | null;
-  stale: boolean;
-  progress?: number;
-}
-
-type GithubPull = {
-  id: number;
-  number: number;
-  title: string;
-  state: string;
-  user: { login: string } | null;
-  created_at: string;
-  updated_at: string;
-  html_url: string;
-  draft?: boolean;
-  head: { ref: string; sha: string };
-  base: { ref: string; sha: string };
-};
-
-type GithubSession = {
-  octokit: Octokit;
-  owner: string;
-};
-
-type GithubPullFile = {
-  filename: string;
-  status: string;
-  patch?: string;
-};
-
-const REPO_AFFILIATION = 'owner,collaborator,organization_member';
+import { GithubPullFile } from './types/github-pull.type';
+import { RepositoryIndexStatus } from './types/repository-index-status.type';
+import { CreatePullReviewInput } from './use-cases/create-pull-review/create-pull-review.dto';
+import { CreatePullReviewUseCase } from './use-cases/create-pull-review/create-pull-review.use-case';
+import { DeletePullReviewCommentUseCase } from './use-cases/delete-pull-review-comment/delete-pull-review-comment.use-case';
+import { EnqueueIndexJobUseCase } from './use-cases/enqueue-index-job/enqueue-index-job.use-case';
+import { GetConventionsUseCase } from './use-cases/get-conventions/get-conventions.use-case';
+import { GetFileContentUseCase } from './use-cases/get-file-content/get-file-content.use-case';
+import { GetPullByNumberUseCase } from './use-cases/get-pull-by-number/get-pull-by-number.use-case';
+import { GetPullDiffUseCase } from './use-cases/get-pull-diff/get-pull-diff.use-case';
+import { GetPullHeadShaUseCase } from './use-cases/get-pull-head-sha/get-pull-head-sha.use-case';
+import { GetRepositoryGraphUseCase } from './use-cases/get-repository-graph/get-repository-graph.use-case';
+import { GetRepositoryIndexStatusUseCase } from './use-cases/get-repository-index-status/get-repository-index-status.use-case';
+import { ListPullFilesUseCase } from './use-cases/list-pull-files/list-pull-files.use-case';
+import { ListPullReviewCommentsUseCase } from './use-cases/list-pull-review-comments/list-pull-review-comments.use-case';
+import { ListPullsUseCase } from './use-cases/list-pulls/list-pulls.use-case';
+import { ListReposUseCase } from './use-cases/list-repos/list-repos.use-case';
 
 @Injectable()
 export class RepositoriesService extends BaseService {
+  private readonly githubSession: GithubSessionProvider;
+  private readonly listReposUseCase: ListReposUseCase;
+  private readonly listPullsUseCase: ListPullsUseCase;
+  private readonly getPullByNumberUseCase: GetPullByNumberUseCase;
+  private readonly getPullDiffUseCase: GetPullDiffUseCase;
+  private readonly listPullFilesUseCase: ListPullFilesUseCase;
+  private readonly getFileContentUseCase: GetFileContentUseCase;
+  private readonly getConventionsUseCase: GetConventionsUseCase;
+  private readonly getPullHeadShaUseCase: GetPullHeadShaUseCase;
+  private readonly createPullReviewUseCase: CreatePullReviewUseCase;
+  private readonly listPullReviewCommentsUseCase: ListPullReviewCommentsUseCase;
+  private readonly deletePullReviewCommentUseCase: DeletePullReviewCommentUseCase;
+  private readonly enqueueIndexJobUseCase: EnqueueIndexJobUseCase;
+  private readonly getRepositoryIndexStatusUseCase: GetRepositoryIndexStatusUseCase;
+  private readonly getRepositoryGraphUseCase: GetRepositoryGraphUseCase;
+
   constructor(
     private readonly userService: UserService,
     @InjectQueue(CODE_INDEX_QUEUE)
@@ -65,46 +55,47 @@ export class RepositoriesService extends BaseService {
     logger: AppLogger,
   ) {
     super(logger);
-  }
 
-  private async session(currentUser: CurrentUserData): Promise<GithubSession> {
-    const { token, login } = await this.userService.getGithubCredentials(
-      currentUser.id,
+    this.githubSession = new GithubSessionProvider(userService, logger);
+    this.listReposUseCase = new ListReposUseCase(this.githubSession);
+    this.listPullsUseCase = new ListPullsUseCase(this.githubSession);
+    this.getPullByNumberUseCase = new GetPullByNumberUseCase(
+      this.githubSession,
     );
-
-    const octokit = new Octokit({ auth: token });
-    const owner = login ?? (await this.backfillLogin(octokit, currentUser.id));
-
-    return { octokit, owner };
+    this.getPullDiffUseCase = new GetPullDiffUseCase(this.githubSession);
+    this.listPullFilesUseCase = new ListPullFilesUseCase(this.githubSession);
+    this.getFileContentUseCase = new GetFileContentUseCase(this.githubSession);
+    this.getConventionsUseCase = new GetConventionsUseCase(
+      this.getFileContentUseCase,
+    );
+    this.getPullHeadShaUseCase = new GetPullHeadShaUseCase(this.githubSession);
+    this.createPullReviewUseCase = new CreatePullReviewUseCase(
+      this.githubSession,
+    );
+    this.listPullReviewCommentsUseCase = new ListPullReviewCommentsUseCase(
+      this.githubSession,
+    );
+    this.deletePullReviewCommentUseCase = new DeletePullReviewCommentUseCase(
+      this.githubSession,
+    );
+    this.enqueueIndexJobUseCase = new EnqueueIndexJobUseCase(
+      this.githubSession,
+      indexQueue,
+      logger,
+    );
+    this.getRepositoryIndexStatusUseCase = new GetRepositoryIndexStatusUseCase(
+      this.githubSession,
+      indexQueue,
+      aiApiClient,
+    );
+    this.getRepositoryGraphUseCase = new GetRepositoryGraphUseCase(
+      this.githubSession,
+      aiApiClient,
+    );
   }
 
   async listRepos(currentUser: CurrentUserData) {
-    const { octokit } = await this.session(currentUser);
-
-    try {
-      const repos = await octokit.paginate(
-        octokit.repos.listForAuthenticatedUser,
-        {
-          per_page: 100,
-          sort: 'updated',
-          affiliation: REPO_AFFILIATION,
-        },
-      );
-
-      return repos.map((repo) => ({
-        id: repo.id,
-        name: repo.name,
-        fullName: repo.full_name,
-        owner: repo.owner.login,
-        private: repo.private,
-        description: repo.description,
-        htmlUrl: repo.html_url,
-        updatedAt: repo.updated_at,
-        defaultBranch: repo.default_branch,
-      }));
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.listReposUseCase.execute({ currentUser });
   }
 
   async listPulls(
@@ -112,23 +103,7 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ) {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      const pulls = await session.octokit.paginate(session.octokit.pulls.list, {
-        owner,
-        repo,
-        per_page: 100,
-        sort: 'updated',
-        direction: 'desc',
-        state: 'all',
-      });
-
-      return pulls.map((pull) => this.toPullSummary(pull));
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.listPullsUseCase.execute({ repo, currentUser, ownerOverride });
   }
 
   async getPullByNumber(
@@ -137,20 +112,12 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ) {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      const { data } = await session.octokit.pulls.get({
-        owner,
-        repo,
-        pull_number: pullNumber,
-      });
-
-      return this.toPullSummary(data);
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.getPullByNumberUseCase.execute({
+      repo,
+      pullNumber,
+      currentUser,
+      ownerOverride,
+    });
   }
 
   async getPullDiff(
@@ -159,21 +126,12 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ): Promise<string> {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      const { data } = await session.octokit.pulls.get({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        mediaType: { format: 'diff' },
-      });
-
-      return data as unknown as string;
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.getPullDiffUseCase.execute({
+      repo,
+      pullNumber,
+      currentUser,
+      ownerOverride,
+    });
   }
 
   async listPullFiles(
@@ -182,23 +140,12 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ): Promise<GithubPullFile[]> {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      const files = await session.octokit.paginate(
-        session.octokit.pulls.listFiles,
-        { owner, repo, pull_number: pullNumber, per_page: 100 },
-      );
-
-      return files.map((file) => ({
-        filename: file.filename,
-        status: file.status,
-        patch: file.patch,
-      }));
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.listPullFilesUseCase.execute({
+      repo,
+      pullNumber,
+      currentUser,
+      ownerOverride,
+    });
   }
 
   async getFileContent(
@@ -208,28 +155,13 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ): Promise<string | null> {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      const { data } = await session.octokit.repos.getContent({
-        owner,
-        repo,
-        path,
-        ref,
-      });
-
-      if (Array.isArray(data) || data.type !== 'file' || !data.content) {
-        return null;
-      }
-
-      return Buffer.from(data.content, 'base64').toString('utf-8');
-    } catch (err) {
-      if ((err as { status?: number }).status === 404) {
-        return null;
-      }
-      this.handleGithubError(err);
-    }
+    return this.getFileContentUseCase.execute({
+      repo,
+      path,
+      ref,
+      currentUser,
+      ownerOverride,
+    });
   }
 
   async getConventions(
@@ -238,71 +170,12 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ): Promise<string> {
-    const content = await this.getFileContent(
+    return this.getConventionsUseCase.execute({
       repo,
-      'conventions.md',
       ref,
       currentUser,
       ownerOverride,
-    );
-
-    return content ?? '';
-  }
-
-  private async backfillLogin(
-    octokit: Octokit,
-    userId: string,
-  ): Promise<string> {
-    try {
-      const { data } = await octokit.users.getAuthenticated();
-      await this.userService.setGithubLogin(userId, data.login);
-
-      return data.login;
-    } catch (err) {
-      this.handleGithubError(err);
-    }
-  }
-
-  private handleGithubError(err: unknown): never {
-    this.logger.error('Falha na chamada à API do Github', { exception: err });
-
-    const status = (err as { status?: number }).status;
-
-    if (status === 401) {
-      throw new UnauthorizedException('Token do Github expirado ou inválido.');
-    }
-
-    if (status === 403 || status === 429) {
-      throw new ForbiddenException(
-        'Acesso negado pelo Github: permissão insuficiente ou limite de requisições atingido.',
-      );
-    }
-
-    if (status === 404) {
-      throw new NotFoundException('Recurso não encontrado no Github');
-    }
-
-    throw new InternalServerErrorException(
-      'Erro inesperado ao consultar a API do Github',
-    );
-  }
-
-  private toPullSummary(pull: GithubPull) {
-    return {
-      id: pull.id,
-      number: pull.number,
-      title: pull.title,
-      state: pull.state,
-      user: pull.user?.login ?? null,
-      createdAt: pull.created_at,
-      updatedAt: pull.updated_at,
-      htmlUrl: pull.html_url,
-      draft: pull.draft ?? false,
-      headRef: pull.head.ref,
-      headSha: pull.head.sha,
-      baseRef: pull.base.ref,
-      baseSha: pull.base.sha,
-    };
+    });
   }
 
   async getPullHeadSha(
@@ -311,70 +184,28 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ): Promise<string> {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      const { data } = await session.octokit.pulls.get({
-        owner,
-        repo,
-        pull_number: pullNumber,
-      });
-      return data.head.sha;
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.getPullHeadShaUseCase.execute({
+      repo,
+      pullNumber,
+      currentUser,
+      ownerOverride,
+    });
   }
 
   async createPullReview(
     repo: string,
     pullNumber: number,
-    input: {
-      commitId: string;
-      body: string;
-      comments: {
-        path: string;
-        line: number;
-        startLine?: number;
-        body: string;
-      }[];
-    },
+    input: CreatePullReviewInput,
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ): Promise<{ id: number; htmlUrl: string | null }> {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      const { data } = await session.octokit.pulls.createReview({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        commit_id: input.commitId,
-        event: 'COMMENT',
-        body: input.body,
-        ...(input.comments.length > 0
-          ? {
-              comments: input.comments.map((comment) => ({
-                path: comment.path,
-                body: comment.body,
-                line: comment.line,
-                side: 'RIGHT' as const,
-                ...(comment.startLine
-                  ? {
-                      start_line: comment.startLine,
-                      start_side: 'RIGHT' as const,
-                    }
-                  : {}),
-              })),
-            }
-          : {}),
-      });
-
-      return { id: data.id, htmlUrl: data.html_url ?? null };
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.createPullReviewUseCase.execute({
+      repo,
+      pullNumber,
+      input,
+      currentUser,
+      ownerOverride,
+    });
   }
 
   async listPullReviewComments(
@@ -383,22 +214,12 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ) {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      const comments = await session.octokit.paginate(
-        session.octokit.pulls.listReviewComments,
-        { owner, repo, pull_number: pullNumber, per_page: 100 },
-      );
-      return comments.map((comment) => ({
-        id: comment.id,
-        body: comment.body,
-        user: comment.user?.login ?? null,
-      }));
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.listPullReviewCommentsUseCase.execute({
+      repo,
+      pullNumber,
+      currentUser,
+      ownerOverride,
+    });
   }
 
   async deletePullReviewComment(
@@ -407,18 +228,12 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ) {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      await session.octokit.pulls.deleteReviewComment({
-        owner,
-        repo,
-        comment_id: commentId,
-      });
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.deletePullReviewCommentUseCase.execute({
+      repo,
+      commentId,
+      currentUser,
+      ownerOverride,
+    });
   }
 
   async enqueueIndexJob(
@@ -426,29 +241,11 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ): Promise<{ jobId: string; status: 'queued' }> {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      const sha = await this.resolveDefaultBranchSha(
-        session.octokit,
-        owner,
-        repo,
-      );
-      const jobId = buildIndexJobId(owner, repo, sha);
-      await this.indexQueue.add(
-        'build',
-        { owner, repo, sha, userId: currentUser.id },
-
-        { jobId, removeOnComplete: true, removeOnFail: true },
-      );
-
-      this.logger.log('Indexação enfileirada', { owner, repo, sha, jobId });
-
-      return { jobId, status: 'queued' };
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.enqueueIndexJobUseCase.execute({
+      repo,
+      currentUser,
+      ownerOverride,
+    });
   }
 
   async getRepositoryIndexStatus(
@@ -456,39 +253,11 @@ export class RepositoriesService extends BaseService {
     currentUser: CurrentUserData,
     ownerOverride?: string,
   ): Promise<RepositoryIndexStatus> {
-    const session = await this.session(currentUser);
-    const owner = ownerOverride?.trim() || session.owner;
-
-    try {
-      const headSha = await this.resolveDefaultBranchSha(
-        session.octokit,
-        owner,
-        repo,
-      );
-      const jobId = buildIndexJobId(owner, repo, headSha);
-      const job = await this.indexQueue.getJob(jobId);
-
-      if (job) {
-        const state = await job.getState();
-        return {
-          status: state === 'active' ? 'indexing' : 'queued',
-          sha: null,
-          stale: false,
-          progress: typeof job.progress === 'number' ? job.progress : 0,
-        };
-      }
-
-      const repoId = `${owner}/${repo}`;
-      const { indexed, sha } = await this.aiApiClient.getIndexStatus(repoId);
-
-      return {
-        status: indexed ? 'indexed' : 'not_indexed',
-        sha,
-        stale: indexed && sha !== headSha,
-      };
-    } catch (err) {
-      this.handleGithubError(err);
-    }
+    return this.getRepositoryIndexStatusUseCase.execute({
+      repo,
+      currentUser,
+      ownerOverride,
+    });
   }
 
   async getRepositoryGraph(
@@ -499,34 +268,18 @@ export class RepositoriesService extends BaseService {
     focus?: string,
     depth?: number,
   ) {
-    const owner = ownerOverride?.trim() || (await this.loginFor(currentUser));
-    const repoId = `${owner}/${repo}`;
-
-    const resolvedSha =
-      sha ?? (await this.aiApiClient.getIndexStatus(repoId)).sha;
-    if (!resolvedSha) {
-      return { nodes: [], edges: [], stats: { indexed: false } };
-    }
-
-    return this.aiApiClient.getGraph(repoId, resolvedSha, focus, depth);
-  }
-
-  private async resolveDefaultBranchSha(
-    octokit: Octokit,
-    owner: string,
-    repo: string,
-  ): Promise<string> {
-    const { data: repoData } = await octokit.repos.get({ owner, repo });
-    const { data: ref } = await octokit.git.getRef({
-      owner,
+    return this.getRepositoryGraphUseCase.execute({
       repo,
-      ref: `heads/${repoData.default_branch}`,
+      currentUser,
+      ownerOverride,
+      sha,
+      focus,
+      depth,
     });
-    return ref.object.sha;
   }
 
   async loginFor(currentUser: CurrentUserData): Promise<string> {
-    const session = await this.session(currentUser);
+    const session = await this.githubSession.getSession(currentUser);
     return session.owner;
   }
 }

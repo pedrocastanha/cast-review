@@ -1,11 +1,19 @@
 // `@octokit/rest` é ESM-only e não totalmente coberto pelo `transformIgnorePatterns`
 // do Jest deste projeto (ver `analyses.service.spec.ts`) — mocka a construção do
-// client. Este arquivo cobre só `enqueueIndexJob` (T10) — os demais métodos de
-// `RepositoriesService` nunca tiveram teste unitário direto por esse mesmo motivo,
-// fora de escopo desta feature reabrir isso.
+// client. Os demais métodos de `RepositoriesService` têm cobertura própria nos
+// specs de cada use-case em `use-cases/*/*.use-case.spec.ts`.
 const octokitInstance = {
-  repos: { get: jest.fn() },
+  repos: { get: jest.fn(), getContent: jest.fn() },
   git: { getRef: jest.fn() },
+  pulls: {
+    list: jest.fn(),
+    get: jest.fn(),
+    listFiles: jest.fn(),
+    createReview: jest.fn(),
+    listReviewComments: jest.fn(),
+    deleteReviewComment: jest.fn(),
+  },
+  paginate: jest.fn(),
 };
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn(() => octokitInstance),
@@ -257,5 +265,190 @@ describe('RepositoriesService.getRepositoryGraph', () => {
 
     expect(aiApiClient.getGraph).not.toHaveBeenCalled();
     expect(result).toEqual({ nodes: [], edges: [], stats: { indexed: false } });
+  });
+});
+
+describe('RepositoriesService pull/file delegation', () => {
+  function makeService() {
+    return new RepositoriesService(
+      fakeUserService(),
+      fakeQueue(null),
+      fakeAiApiClient(),
+      fakeLogger(),
+    );
+  }
+
+  const rawPull = {
+    id: 1,
+    number: 7,
+    title: 'Add feature',
+    state: 'open',
+    user: { login: 'octocat' },
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-02T00:00:00Z',
+    html_url: 'https://github.com/octocat/hello-world/pull/7',
+    draft: false,
+    head: { ref: 'feature', sha: 'sha-head' },
+    base: { ref: 'main', sha: 'sha-base' },
+  };
+
+  it('listRepos delegates to the authenticated-user repos listing', async () => {
+    octokitInstance.paginate.mockResolvedValue([
+      {
+        id: 1,
+        name: 'hello-world',
+        full_name: 'octocat/hello-world',
+        owner: { login: 'octocat' },
+        private: false,
+        description: null,
+        html_url: 'https://github.com/octocat/hello-world',
+        updated_at: '2024-01-01T00:00:00Z',
+        default_branch: 'main',
+      },
+    ]);
+
+    const result = await makeService().listRepos(currentUser);
+
+    expect(result).toEqual([
+      expect.objectContaining({ id: 1, fullName: 'octocat/hello-world' }),
+    ]);
+  });
+
+  it('listPulls delegates to the pulls listing for the session owner', async () => {
+    octokitInstance.paginate.mockResolvedValue([rawPull]);
+
+    const result = await makeService().listPulls('hello-world', currentUser);
+
+    expect(result).toEqual([expect.objectContaining({ id: 1, number: 7 })]);
+  });
+
+  it('getPullByNumber delegates to a single pull lookup', async () => {
+    octokitInstance.pulls.get.mockResolvedValue({ data: rawPull });
+
+    const result = await makeService().getPullByNumber(
+      'hello-world',
+      7,
+      currentUser,
+    );
+
+    expect(result).toMatchObject({ id: 1, number: 7 });
+  });
+
+  it('getPullDiff delegates to a diff-formatted pull lookup', async () => {
+    octokitInstance.pulls.get.mockResolvedValue({ data: 'diff --git a b' });
+
+    const result = await makeService().getPullDiff(
+      'hello-world',
+      7,
+      currentUser,
+    );
+
+    expect(result).toBe('diff --git a b');
+  });
+
+  it('listPullFiles delegates to the paginated pull files listing', async () => {
+    octokitInstance.paginate.mockResolvedValue([
+      { filename: 'src/a.ts', status: 'modified', patch: '@@ -1 +1 @@' },
+    ]);
+
+    const result = await makeService().listPullFiles(
+      'hello-world',
+      7,
+      currentUser,
+    );
+
+    expect(result).toEqual([
+      { filename: 'src/a.ts', status: 'modified', patch: '@@ -1 +1 @@' },
+    ]);
+  });
+
+  it('getFileContent delegates to the repo content lookup and decodes it', async () => {
+    octokitInstance.repos.getContent.mockResolvedValue({
+      data: { type: 'file', content: Buffer.from('hello').toString('base64') },
+    });
+
+    const result = await makeService().getFileContent(
+      'hello-world',
+      'README.md',
+      'main',
+      currentUser,
+    );
+
+    expect(result).toBe('hello');
+  });
+
+  it('getConventions falls back to an empty string when conventions.md is missing', async () => {
+    octokitInstance.repos.getContent.mockRejectedValue({ status: 404 });
+
+    const result = await makeService().getConventions(
+      'hello-world',
+      'main',
+      currentUser,
+    );
+
+    expect(result).toBe('');
+  });
+
+  it('getPullHeadSha delegates to the pull lookup head sha', async () => {
+    octokitInstance.pulls.get.mockResolvedValue({ data: rawPull });
+
+    const result = await makeService().getPullHeadSha(
+      'hello-world',
+      7,
+      currentUser,
+    );
+
+    expect(result).toBe('sha-head');
+  });
+
+  it('createPullReview delegates to the review creation call', async () => {
+    octokitInstance.pulls.createReview.mockResolvedValue({
+      data: { id: 1, html_url: 'https://x' },
+    });
+
+    const result = await makeService().createPullReview(
+      'hello-world',
+      7,
+      { commitId: 'sha-head', body: 'LGTM', comments: [] },
+      currentUser,
+    );
+
+    expect(result).toEqual({ id: 1, htmlUrl: 'https://x' });
+  });
+
+  it('listPullReviewComments delegates to the paginated review comments listing', async () => {
+    octokitInstance.paginate.mockResolvedValue([
+      { id: 1, body: 'nit', user: { login: 'octocat' } },
+    ]);
+
+    const result = await makeService().listPullReviewComments(
+      'hello-world',
+      7,
+      currentUser,
+    );
+
+    expect(result).toEqual([{ id: 1, body: 'nit', user: 'octocat' }]);
+  });
+
+  it('deletePullReviewComment delegates to the review comment deletion call', async () => {
+    octokitInstance.pulls.deleteReviewComment.mockResolvedValue(undefined);
+
+    await makeService().deletePullReviewComment(
+      'hello-world',
+      42,
+      currentUser,
+    );
+
+    expect(octokitInstance.pulls.deleteReviewComment).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello-world',
+      comment_id: 42,
+    });
+  });
+
+  it('loginFor resolves the session owner', async () => {
+    const result = await makeService().loginFor(currentUser);
+
+    expect(result).toBe('octocat');
   });
 });
