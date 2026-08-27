@@ -8,18 +8,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const base =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-sm px-4.5 py-2.5 ' +
-  'text-sm font-semibold tracking-wide transition-[background-color,border-color,color,box-shadow,transform] duration-150 ' +
-  'disabled:cursor-not-allowed disabled:opacity-45 active:not-disabled:translate-y-px';
+  'inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-sm px-4 py-2.5 whitespace-nowrap ' +
+  'text-sm font-semibold transition-[background-color,border-color,color] duration-150 ' +
+  'disabled:pointer-events-none disabled:opacity-45';
 
 const variants: Record<Variant, string> = {
-  primary:
-    'bg-accent text-accent-ink border border-accent shadow-[0_6px_18px_oklch(38%_0.10_350_/_0.22)] hover:not-disabled:bg-accent-hover hover:not-disabled:border-accent-hover',
-  secondary:
-    'bg-transparent text-ink border border-border-strong hover:not-disabled:bg-surface-2 hover:not-disabled:border-ink-faint',
-  ghost: 'bg-transparent text-ink-dim border border-transparent px-2 hover:not-disabled:text-ink',
-  danger:
-    'bg-transparent text-state-closed border border-border-strong hover:not-disabled:border-state-closed hover:not-disabled:bg-state-closed-dim',
+  primary: 'border border-accent bg-accent text-accent-ink hover:bg-accent-hover hover:border-accent-hover',
+  secondary: 'border border-border-strong bg-surface-1 text-ink hover:bg-surface-2 hover:border-ink-faint',
+  ghost: 'border border-transparent bg-transparent px-2.5 text-ink-dim hover:bg-surface-1 hover:text-ink',
+  danger: 'border border-fail/35 bg-transparent text-fail hover:bg-fail-soft hover:border-fail',
 };
 
 export function Button({
