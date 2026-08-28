@@ -62,7 +62,7 @@ export class BenchmarksController {
   runCase(
     @Param('caseId') caseId: string,
     @CurrentUser() currentUser: CurrentUserData,
-    @Body() body: { models: string[]; apiKeys: { openai: string } },
+    @Body() body: { models: string[] },
   ) {
     return this.benchmarksService.runCase(caseId, currentUser, body);
   }

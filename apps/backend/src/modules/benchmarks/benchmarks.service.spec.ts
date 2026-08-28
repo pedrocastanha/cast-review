@@ -19,15 +19,18 @@ function buildService() {
   const caseRepository = repository();
   const runRepository = repository();
   const aiApiClient = { runAgent: jest.fn() };
+  const userService = { getOpenaiKey: jest.fn(async () => 'sk-do-banco') };
   const service = new BenchmarksService(
     analysisRepository as any,
     snapshotRepository as any,
     caseRepository as any,
     runRepository as any,
     aiApiClient as any,
+    userService as any,
   );
   return {
     service,
+    userService,
     analysisRepository,
     snapshotRepository,
     caseRepository,
@@ -151,7 +154,6 @@ describe('BenchmarksService', () => {
 
     const result = await service.runCase('case-1', user, {
       models: ['gpt-5-mini', 'gpt-5.1'],
-      apiKeys: { openai: 'sk-never-persist' },
     });
 
     expect(aiApiClient.runAgent).toHaveBeenCalledTimes(2);
