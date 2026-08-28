@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { benchmarksApi } from '../api/benchmarks.api';
 import { ApiError } from '../api/http';
-import { openaiKeyStore } from '../api/openai-key-store';
 import { ReportMarkdown } from '../components/analysis/ReportMarkdown';
 import { PageHead } from '../components/ui/Card';
 import { Spinner } from '../components/ui/Spinner';
@@ -198,7 +197,6 @@ function Comparison({ run }: { run: BenchmarkRun }) {
 function CaseWorkspace({ benchmarkCase }: { benchmarkCase: BenchmarkCase }) {
   const [runs, setRuns] = useState<BenchmarkRun[]>([]);
   const [models, setModels] = useState(['gpt-4o', '']);
-  const [openaiKey, setOpenaiKey] = useState(openaiKeyStore.get);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -214,15 +212,14 @@ function CaseWorkspace({ benchmarkCase }: { benchmarkCase: BenchmarkCase }) {
 
   const run = async () => {
     const selected = [...new Set(models.map((model) => model.trim()).filter(Boolean))];
-    if (selected.length === 0 || !openaiKey.trim()) {
-      setError('Informe ao menos um modelo e a chave OpenAI.');
+    if (selected.length === 0) {
+      setError('Informe ao menos um modelo.');
       return;
     }
-    openaiKeyStore.set(openaiKey);
     setRunning(true);
     setError(null);
     try {
-      const result = await benchmarksApi.runCase(benchmarkCase.id, selected, openaiKey);
+      const result = await benchmarksApi.runCase(benchmarkCase.id, selected);
       setRuns((current) => [result, ...current]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha ao executar o benchmark.');
@@ -322,16 +319,9 @@ function CaseWorkspace({ benchmarkCase }: { benchmarkCase: BenchmarkCase }) {
           )}
         </div>
         <div>
-          <label className="flex flex-col gap-1.5 text-xs text-ink-faint">
-            Chave OpenAI da sessão
-            <input
-              type="password"
-              value={openaiKey}
-              onChange={(event) => setOpenaiKey(event.target.value)}
-              placeholder="sk-…"
-              className="min-h-11 rounded-sm border border-border bg-surface px-3 font-mono text-sm text-ink outline-none transition-colors focus:border-accent"
-            />
-          </label>
+          <p className="text-xs text-ink-faint">
+            Usa a chave da OpenAI salva em Configurações.
+          </p>
           <button
             type="button"
             onClick={() => void run()}

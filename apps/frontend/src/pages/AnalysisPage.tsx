@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { ApproveStagePayload, ApprovePublishPayload } from '../api/analyses.api';
-import { openaiKeyStore } from '../api/openai-key-store';
 import { repositoriesApi } from '../api/repositories.api';
 import { projectsApi } from '../api/projects.api';
 import { AgentStepper } from '../components/analysis/AgentStepper';
@@ -17,6 +16,7 @@ import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { Button } from '../components/ui/Button';
 import { Card, PageHead } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
+import { useAuth } from '../context/AuthContext';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
 import { useRepoAnalyses } from '../hooks/useRepoAnalyses';
 import { hasReviewContent } from '../lib/assemble-report';
@@ -111,6 +111,7 @@ function formatSpecMarkdown(spec: SpecPayload | null | undefined): string {
 }
 
 export function AnalysisPage() {
+  const { user } = useAuth();
   const { owner = '', repo = '', pullNumber = '' } = useParams();
   const number = Number(pullNumber);
   const {
@@ -141,7 +142,6 @@ export function AnalysisPage() {
 
   const [pull, setPull] = useState<PullRequest | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [openaiKey, setOpenaiKey] = useState(openaiKeyStore.get);
   const [testModel, setTestModel] = useState(DEFAULT_MODEL);
   const [archModel, setArchModel] = useState(DEFAULT_MODEL);
   const [prdPolicy, setPrdPolicy] = useState<'manual' | 'auto'>('manual');
@@ -191,7 +191,7 @@ export function AnalysisPage() {
   }, [owner, repo]);
 
   const canStart =
-    openaiKey.trim().length > 0 &&
+    Boolean(user?.openaiConnected) &&
     phase !== 'running' &&
     (!projectImpactEnabled || Boolean(selectedProjectId));
   const pullsPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`;
@@ -214,10 +214,8 @@ export function AnalysisPage() {
   const onSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!canStart) return;
-    openaiKeyStore.set(openaiKey);
     void start(repo, number, owner, {
       models: { testReviewer: testModel, architectureReviewer: archModel },
-      apiKeys: { openai: openaiKey.trim() },
       policies: { prd: prdPolicy, spec: specPolicy, publish: publishPolicy },
       impactScope: projectImpactEnabled
         ? { mode: 'project', projectId: selectedProjectId }
@@ -241,9 +239,7 @@ export function AnalysisPage() {
 
   const onResume = (analysisId: string) => {
     if (!canStart) return;
-    openaiKeyStore.set(openaiKey);
     void resume(analysisId, {
-      apiKeys: { openai: openaiKey.trim() },
       models: { testReviewer: testModel, architectureReviewer: archModel },
     });
   };
@@ -278,14 +274,11 @@ export function AnalysisPage() {
         A chave fica só nesta aba e é usada em memória durante o processamento. Nada é gravado.
       </p>
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <Field
-          label="OpenAI API key"
-          type="password"
-          autoComplete="off"
-          value={openaiKey}
-          onChange={(event) => setOpenaiKey(event.target.value)}
-          hint="Fica só nesta aba (sessionStorage). O Nest encaminha ao Python em memória de request."
-        />
+        {!user?.openaiConnected && (
+          <p className="rounded-sm border border-warn/45 bg-warn-soft px-3 py-2 text-sm text-warn">
+            Configure sua chave da OpenAI em Configurações para rodar a análise.
+          </p>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label="Modelo · Test Reviewer"
@@ -458,7 +451,6 @@ export function AnalysisPage() {
             stage={awaitingStage}
             content={approvalContent}
             iteration={iteration}
-            apiKeys={{ openai: openaiKey }}
             models={{ testReviewer: testModel, architectureReviewer: archModel }}
             onApprove={(payload) =>
               awaitingStage === 'publish'

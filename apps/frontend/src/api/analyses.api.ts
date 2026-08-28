@@ -13,9 +13,6 @@ export interface ResumeAnalysisPayload {
     testReviewer: string;
     architectureReviewer: string;
   };
-  apiKeys: {
-    openai: string;
-  };
 }
 
 export interface ApproveStagePayload {
@@ -25,9 +22,6 @@ export interface ApproveStagePayload {
   models: {
     testReviewer: string;
     architectureReviewer: string;
-  };
-  apiKeys: {
-    openai: string;
   };
 }
 

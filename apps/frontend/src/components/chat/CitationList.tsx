@@ -14,25 +14,25 @@ function githubLink(citation: ChatCitation, sha: string | undefined): string | n
 export function CitationList({ citations, shaByRepo }: CitationListProps) {
   if (citations.length === 0) return null;
 
-  const chipClass =
-    'inline-flex items-baseline gap-1.5 rounded-sm border border-border bg-surface-2 px-2 py-1 font-mono text-[11px] text-ink-dim';
+  const chip =
+    'inline-flex max-w-full items-baseline gap-1.5 rounded-md border border-border bg-surface-1 px-2 py-1 font-mono text-[11px] text-ink-dim';
 
   return (
-    <div className="mt-3">
-      <p className="font-mono text-[10.5px] tracking-[0.08em] text-ink-faint uppercase">
+    <div className="mt-4">
+      <p className="font-mono text-[10px] tracking-[0.1em] text-ink-faint uppercase">
         Evidência
       </p>
-      <ul className="mt-1.5 flex flex-wrap gap-1.5">
+      <ul className="mt-2 flex flex-wrap gap-1.5">
         {citations.map((citation) => {
           const href = githubLink(citation, shaByRepo[citation.repoId]);
           const label = (
             <>
-              <span className="max-w-[22rem] truncate">{citation.path}</span>
+              <span className="truncate">{citation.path.split('/').pop()}</span>
               {citation.line !== null && (
                 <span className="text-ink-faint">:{citation.line}</span>
               )}
               {citation.symbolName && (
-                <span className="text-accent">{citation.symbolName}</span>
+                <span className="truncate text-accent">{citation.symbolName}</span>
               )}
             </>
           );
@@ -47,12 +47,12 @@ export function CitationList({ citations, shaByRepo }: CitationListProps) {
                   target="_blank"
                   rel="noreferrer"
                   title={`${citation.repoId} → ${citation.path}`}
-                  className={`${chipClass} transition-colors hover:border-accent hover:text-ink`}
+                  className={`${chip} transition-colors hover:border-accent hover:text-ink`}
                 >
                   {label}
                 </a>
               ) : (
-                <span title={citation.repoId} className={chipClass}>
+                <span title={`${citation.repoId} → ${citation.path}`} className={chip}>
                   {label}
                 </span>
               )}

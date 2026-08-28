@@ -7,6 +7,8 @@ export interface User {
   githubConnected: boolean;
   githubLogin: string | null;
   githubTokenLastFour: string | null;
+  openaiConnected: boolean;
+  openaiKeyLastFour: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +36,7 @@ export interface UpdateUserPayload {
   username?: string;
   email?: string;
   githubToken?: string;
+  openaiKey?: string;
 }
 
 export interface VizNode {
@@ -248,9 +251,6 @@ export interface RunAnalysisPayload {
   models: {
     testReviewer: string;
     architectureReviewer: string;
-  };
-  apiKeys: {
-    openai: string;
   };
   policies: Policies;
   impactScope?:
@@ -687,5 +687,4 @@ export interface SendChatMessagePayload {
   content: string;
   mentions: ChatMention[];
   model: string;
-  apiKeys: { openai: string };
 }

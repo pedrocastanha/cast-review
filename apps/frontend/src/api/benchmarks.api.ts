@@ -15,12 +15,12 @@ export const benchmarksApi = {
       `/benchmarks/cases/${encodeURIComponent(caseId)}/runs`,
     ),
 
-  runCase: (caseId: string, models: string[], openaiKey: string) =>
+  runCase: (caseId: string, models: string[]) =>
     request<BenchmarkRun>(
       `/benchmarks/cases/${encodeURIComponent(caseId)}/runs`,
       {
         method: 'POST',
-        body: { models, apiKeys: { openai: openaiKey } },
+        body: { models },
       },
     ),
 };

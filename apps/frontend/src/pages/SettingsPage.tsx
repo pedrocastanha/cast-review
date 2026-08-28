@@ -13,11 +13,15 @@ export function SettingsPage() {
   const [username, setUsername] = useState(user?.username ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [token, setToken] = useState('');
+  const [openaiKey, setOpenaiKey] = useState('');
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [tokenMessage, setTokenMessage] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingToken, setSavingToken] = useState(false);
   const [removingToken, setRemovingToken] = useState(false);
+  const [openaiMessage, setOpenaiMessage] = useState<string | null>(null);
+  const [savingOpenai, setSavingOpenai] = useState(false);
+  const [removingOpenai, setRemovingOpenai] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -56,6 +60,36 @@ export function SettingsPage() {
       setTokenMessage(error instanceof ApiError ? error.message : 'Não foi possível atualizar o token.');
     } finally {
       setSavingToken(false);
+    }
+  };
+
+  const openaiSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setOpenaiMessage(null);
+    setSavingOpenai(true);
+    try {
+      await usersApi.update(user.id, { openaiKey: openaiKey.trim() });
+      setOpenaiKey('');
+      await refreshUser();
+      setOpenaiMessage('Chave da OpenAI salva.');
+    } catch (error) {
+      setOpenaiMessage(error instanceof ApiError ? error.message : 'Não foi possível salvar a chave.');
+    } finally {
+      setSavingOpenai(false);
+    }
+  };
+
+  const disconnectOpenai = async () => {
+    setOpenaiMessage(null);
+    setRemovingOpenai(true);
+    try {
+      await usersApi.disconnectOpenai(user.id);
+      await refreshUser();
+      setOpenaiMessage('Chave da OpenAI removida.');
+    } catch (error) {
+      setOpenaiMessage(error instanceof ApiError ? error.message : 'Não foi possível remover a chave.');
+    } finally {
+      setRemovingOpenai(false);
     }
   };
 
@@ -117,6 +151,32 @@ export function SettingsPage() {
             <Field label={user.githubConnected ? 'Novo personal access token' : 'Personal access token'} type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="ghp_…" hint="Pedimos somente o token. Guardamos os quatro últimos caracteres separadamente para identificação." required />
             {tokenMessage && <p className="text-sm text-ink-dim">{tokenMessage}</p>}
             <div className="flex flex-wrap gap-3"><Button type="submit" loading={savingToken}>{user.githubConnected ? 'Trocar token' : 'Conectar GitHub'}</Button>{user.githubConnected && <Button type="button" variant="danger" onClick={disconnect} loading={removingToken}>Desconectar</Button>}</div>
+          </form>
+        </Card>
+
+        <Card className="p-6">
+          <h2 className="font-display text-lg font-bold text-ink">OpenAI</h2>
+          <p className="mt-1 mb-5 text-sm text-ink-dim">A chave alimenta o chat, as revisões de pull request e o Benchmark Lab. Ela é guardada cifrada no banco e nunca volta para o navegador.</p>
+          <div className={`mb-5 flex items-center gap-3 rounded-sm border px-4 py-3 ${user.openaiConnected ? 'border-pass/35 bg-pass-soft' : 'border-border bg-surface-2'}`}>
+            {user.openaiConnected ? (
+              <>
+                <StatusDot on />
+                <div>
+                  <p className="font-mono text-sm font-semibold text-pass">chave salva</p>
+                  <p className="font-mono text-[11.5px] text-pass/75">final {user.openaiKeyLastFour ?? '—'}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <StatusDot on={false} />
+                <p className="text-sm text-ink-dim">Nenhuma chave da OpenAI configurada.</p>
+              </>
+            )}
+          </div>
+          <form onSubmit={openaiSubmit} className="flex flex-col gap-4">
+            <Field label={user.openaiConnected ? 'Nova chave' : 'Chave da OpenAI'} type="password" autoComplete="off" value={openaiKey} onChange={(event) => setOpenaiKey(event.target.value)} placeholder="sk-…" hint="Guardamos os quatro últimos caracteres separadamente só para você identificar a chave." required />
+            {openaiMessage && <p className="text-sm text-ink-dim">{openaiMessage}</p>}
+            <div className="flex flex-wrap gap-3"><Button type="submit" loading={savingOpenai}>{user.openaiConnected ? 'Trocar chave' : 'Salvar chave'}</Button>{user.openaiConnected && <Button type="button" variant="danger" onClick={disconnectOpenai} loading={removingOpenai}>Remover</Button>}</div>
           </form>
         </Card>
       </div>
