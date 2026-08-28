@@ -17,11 +17,6 @@ export class ChatMentionDto {
   path!: string;
 }
 
-export class ChatApiKeysDto {
-  @IsString()
-  openai!: string;
-}
-
 export class SendChatMessageDto {
   @IsString()
   @Length(1, 8000)
@@ -36,8 +31,4 @@ export class SendChatMessageDto {
 
   @IsString()
   model!: string;
-
-  @ValidateNested()
-  @Type(() => ChatApiKeysDto)
-  apiKeys!: ChatApiKeysDto;
 }

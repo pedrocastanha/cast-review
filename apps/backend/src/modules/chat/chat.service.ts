@@ -16,6 +16,7 @@ import type {
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import type { ProjectsService } from '../projects/projects.service';
 import type { RepositoriesService } from '../repositories/repositories.service';
+import type { UserService } from '../users/user.service';
 import type { ChatMessage } from './chat-message.entity';
 import { ChatMessageRepository } from './chat-message.repository';
 import type { ChatThread } from './chat-thread.entity';
@@ -49,6 +50,8 @@ export class ChatService {
     private readonly repositoriesService: RepositoriesService,
     @Inject('PROJECTS_SERVICE')
     private readonly projectsService: ProjectsService,
+    @Inject('USER_SERVICE')
+    private readonly userService: UserService,
     private readonly aiApiClient: AiApiClient,
     private readonly logger: AppLogger,
   ) {}
@@ -155,6 +158,7 @@ export class ChatService {
       );
     }
 
+    const openai = await this.userService.getOpenaiKey(currentUser.id);
     const history = await this.messages(thread.id);
     const mentions = await this.resolveMentions(
       thread,
@@ -199,7 +203,7 @@ export class ChatService {
       question: dto.content,
       mentions,
       model: dto.model,
-      apiKeys: { openai: dto.apiKeys.openai },
+      apiKeys: { openai },
     };
 
     const abortController = new AbortController();

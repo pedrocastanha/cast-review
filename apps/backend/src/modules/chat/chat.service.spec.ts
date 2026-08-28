@@ -70,6 +70,10 @@ function buildService(overrides: any = {}) {
     })),
     ...overrides.projectsService,
   };
+  const userService = {
+    getOpenaiKey: jest.fn(async () => 'sk-do-banco'),
+    ...overrides.userService,
+  };
   const aiApiClient = {
     getIndexFile: jest.fn(async () => ({
       repoId: 'acme/back',
@@ -92,11 +96,20 @@ function buildService(overrides: any = {}) {
     messages as any,
     repositoriesService as any,
     projectsService as any,
+    userService as any,
     aiApiClient as any,
     logger as any,
   );
 
-  return { service, threads, messages, repositoriesService, projectsService, aiApiClient };
+  return {
+    service,
+    threads,
+    messages,
+    repositoriesService,
+    projectsService,
+    userService,
+    aiApiClient,
+  };
 }
 
 function seedThread(overrides: any = {}) {
@@ -286,7 +299,6 @@ describe('ChatService.sendMessage', () => {
         content: 'quem faz login?',
         mentions: [],
         model: 'gpt-4o',
-        apiKeys: { openai: 'sk-test' },
       },
       currentUser,
       req,
@@ -317,7 +329,6 @@ describe('ChatService.sendMessage', () => {
         content: 'e esse arquivo?',
         mentions: [{ repoId: 'acme/back', path: 'src/a.ts' }],
         model: 'gpt-4o',
-        apiKeys: { openai: 'sk-test' },
       },
       currentUser,
       req,
@@ -353,7 +364,6 @@ describe('ChatService.sendMessage', () => {
         content: 'e o readme?',
         mentions: [{ repoId: 'acme/back', path: 'README.md' }],
         model: 'gpt-4o',
-        apiKeys: { openai: 'sk-test' },
       },
       currentUser,
       req,
@@ -385,7 +395,6 @@ describe('ChatService.sendMessage', () => {
         content: 'e isso?',
         mentions: [{ repoId: 'outro/repo', path: 'src/x.ts' }],
         model: 'gpt-4o',
-        apiKeys: { openai: 'sk-test' },
       },
       currentUser,
       req,
@@ -412,7 +421,7 @@ describe('ChatService.sendMessage', () => {
 
     await service.sendMessage(
       'thread-1',
-      { content: 'depois', mentions: [], model: 'gpt-4o', apiKeys: { openai: 'sk-test' } },
+      { content: 'depois', mentions: [], model: 'gpt-4o' },
       currentUser,
       req,
       res,
@@ -435,7 +444,7 @@ describe('ChatService.sendMessage', () => {
 
     await service.sendMessage(
       'thread-1',
-      { content: 'como funciona o login?', mentions: [], model: 'gpt-4o', apiKeys: { openai: 'sk' } },
+      { content: 'como funciona o login?', mentions: [], model: 'gpt-4o' },
       currentUser,
       req,
       res,
@@ -461,7 +470,7 @@ describe('ChatService.sendMessage', () => {
 
     await service.sendMessage(
       'thread-1',
-      { content: 'oi', mentions: [], model: 'gpt-4o', apiKeys: { openai: 'sk' } },
+      { content: 'oi', mentions: [], model: 'gpt-4o' },
       currentUser,
       doubles.req,
       doubles.res,
@@ -488,7 +497,7 @@ describe('ChatService.sendMessage', () => {
     await expect(
       service.sendMessage(
         'thread-1',
-        { content: 'oi', mentions: [], model: 'gpt-4o', apiKeys: { openai: 'sk' } },
+        { content: 'oi', mentions: [], model: 'gpt-4o' },
         currentUser,
         req,
         res,
@@ -497,3 +506,66 @@ describe('ChatService.sendMessage', () => {
   });
 });
 
+
+describe('ChatService e a chave da OpenAI', () => {
+  function httpDoubles() {
+    const req: any = { on: jest.fn() };
+    const res: any = {
+      writeHead: jest.fn(),
+      flushHeaders: jest.fn(),
+      write: jest.fn(),
+      end: jest.fn(),
+    };
+    return { req, res };
+  }
+
+  it('manda ao ai-api a chave guardada no banco do dono da thread', async () => {
+    const threads = threadRepository([seedThread()]);
+    const { service, aiApiClient, userService } = buildService({
+      threads,
+      aiApiClient: {
+        runChat: jest.fn(async function* () {}),
+      },
+    });
+    const { req, res } = httpDoubles();
+
+    await service.sendMessage(
+      'thread-1',
+      { content: 'oi', mentions: [], model: 'gpt-4o' },
+      currentUser,
+      req,
+      res,
+    );
+
+    expect(userService.getOpenaiKey).toHaveBeenCalledWith('user-1');
+    const payload = (aiApiClient.runChat as jest.Mock).mock.calls[0][0];
+    expect(payload.apiKeys).toEqual({ openai: 'sk-do-banco' });
+  });
+
+  it('nem abre o stream quando o usuário não configurou a chave', async () => {
+    const threads = threadRepository([seedThread()]);
+    const { service, aiApiClient } = buildService({
+      threads,
+      userService: {
+        getOpenaiKey: jest.fn(async () => {
+          throw new BadRequestException('Configure sua chave da OpenAI');
+        }),
+      },
+      aiApiClient: { runChat: jest.fn() },
+    });
+    const { req, res } = httpDoubles();
+
+    await expect(
+      service.sendMessage(
+        'thread-1',
+        { content: 'oi', mentions: [], model: 'gpt-4o' },
+        currentUser,
+        req,
+        res,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(res.writeHead).not.toHaveBeenCalled();
+    expect(aiApiClient.runChat).not.toHaveBeenCalled();
+  });
+});
