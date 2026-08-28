@@ -19,4 +19,9 @@ export class UpdateUserDto {
   @IsNotEmpty()
   @IsOptional()
   githubToken?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  openaiKey?: string;
 }
