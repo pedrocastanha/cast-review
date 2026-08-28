@@ -7,6 +7,10 @@ import type {
 import type { CurrentUserData } from '../../auth/utils/current-user-decorator';
 import type { RepositoriesService } from '../../repositories/repositories.service';
 import type { RunAnalysisDto } from '../dtos/run-analysis.dto';
+
+export type RunAnalysisInput = RunAnalysisDto & {
+  apiKeys: { openai: string };
+};
 import {
   candidatePathsFor,
   extractRelativeImportPaths,
@@ -20,7 +24,7 @@ export async function buildAgentRunRequest(
   repo: string,
   pullNumber: number,
   currentUser: CurrentUserData,
-  dto: RunAnalysisDto,
+  dto: RunAnalysisInput,
   analysisId: string,
   owner?: string,
   impactScope?: FrozenImpactScope,

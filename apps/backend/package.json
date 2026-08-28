@@ -84,7 +84,7 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(@octokit)/)"
+      "node_modules/(?!(@octokit|universal-user-agent|before-after-hook)/)"
     ],
     "testPathIgnorePatterns": [
       "/node_modules/",

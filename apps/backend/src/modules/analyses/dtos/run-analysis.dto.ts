@@ -27,11 +27,6 @@ export class ReviewModelsDto {
   architectureReviewer!: string;
 }
 
-export class ApiKeysDto {
-  @IsString()
-  openai!: string;
-}
-
 export class PoliciesDto {
   @IsOptional()
   @IsIn(['manual', 'auto'])
@@ -50,10 +45,6 @@ export class RunAnalysisDto {
   @ValidateNested()
   @Type(() => ReviewModelsDto)
   models!: ReviewModelsDto;
-
-  @ValidateNested()
-  @Type(() => ApiKeysDto)
-  apiKeys!: ApiKeysDto;
 
   @IsOptional()
   @ValidateNested()
