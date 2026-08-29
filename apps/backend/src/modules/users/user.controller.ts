@@ -30,4 +30,9 @@ export class UserController {
   async removeGithubToken(@Param('id') id: string) {
     return this.userService.removeGithubToken(id);
   }
+
+  @Delete(':id/openai-key')
+  async removeOpenaiKey(@Param('id') id: string) {
+    return this.userService.removeOpenaiKey(id);
+  }
 }

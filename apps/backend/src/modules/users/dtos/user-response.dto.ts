@@ -9,6 +9,8 @@ export class UserResponseDto {
   githubConnected: boolean;
   githubLogin: string | null;
   githubTokenLastFour: string | null;
+  openaiConnected: boolean;
+  openaiKeyLastFour: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +25,8 @@ export function toUserResponse(user: User): UserResponseDto {
     githubConnected: Boolean(user.githubLogin),
     githubLogin: user.githubLogin ?? null,
     githubTokenLastFour: user.githubTokenLastFour ?? null,
+    openaiConnected: Boolean(user.openaiKeyLastFour),
+    openaiKeyLastFour: user.openaiKeyLastFour ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

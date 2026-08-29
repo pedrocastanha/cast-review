@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import type { AgentRunRequest } from 'src/shared/types';
+import type { UserService } from '../users/user.service';
 import { AnalysisRepository } from '../analyses/analysis.repository';
 import { AnalysisContextSnapshotRepository } from '../analyses/analysis-context-snapshot.repository';
 import {
@@ -26,7 +28,6 @@ interface CreateCaseInput {
 
 interface RunCaseInput {
   models: string[];
-  apiKeys: { openai: string };
 }
 
 @Injectable()
@@ -37,6 +38,8 @@ export class BenchmarksService {
     private readonly caseRepository: BenchmarkCaseRepository,
     private readonly runRepository: BenchmarkRunRepository,
     private readonly aiApiClient: AiApiClient,
+    @Inject('USER_SERVICE')
+    private readonly userService: UserService,
   ) {}
 
   async createFromAnalysis(
@@ -127,9 +130,7 @@ export class BenchmarksService {
   ): Promise<BenchmarkRun> {
     const benchmarkCase = await this.getCase(caseId, currentUser);
     const models = this.normalizeModels(input.models);
-    if (!input.apiKeys?.openai?.trim()) {
-      throw new BadRequestException('Chave OpenAI é obrigatória');
-    }
+    const openaiKey = await this.userService.getOpenaiKey(currentUser.id);
 
     let run = await this.runRepository.save(
       this.runRepository.create({
@@ -149,7 +150,7 @@ export class BenchmarksService {
     const results: BenchmarkModelResult[] = [];
     for (const model of models) {
       results.push(
-        await this.runModel(benchmarkCase, model, input.apiKeys.openai),
+        await this.runModel(benchmarkCase, model, openaiKey),
       );
     }
 

@@ -9,4 +9,7 @@ export const usersApi = {
 
   disconnectGithub: (id: string) =>
     request<User>(`/users/${id}/github-token`, { method: 'DELETE' }),
+
+  disconnectOpenai: (id: string) =>
+    request<User>(`/users/${id}/openai-key`, { method: 'DELETE' }),
 };

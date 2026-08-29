@@ -121,6 +121,16 @@ export interface IndexStatusResult {
   sha: string | null;
 }
 
+export interface IndexRepositoryCatalogEntry {
+  repoId: string;
+  sha: string;
+}
+
+export interface IndexRepositoriesResult {
+  repositories: IndexRepositoryCatalogEntry[];
+  nextCursor: string | null;
+}
+
 export interface VizNode {
   id: string;
   label: string;
@@ -206,4 +216,63 @@ export interface AgentResumeRequest {
   };
   policies: Policies;
   decision?: ApprovalDecision | null;
+}
+
+export interface ChatRunScopeRepository {
+  repoId: string;
+  sha: string;
+}
+
+export interface ChatRunMention {
+  repoId: string;
+  path: string;
+  content: string;
+}
+
+export interface ChatRunHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRunRequest {
+  threadId: string;
+  mode: 'global' | 'repository';
+  repositories: ChatRunScopeRepository[];
+  history: ChatRunHistoryMessage[];
+  question: string;
+  mentions: ChatRunMention[];
+  model: string;
+  repositoryHint?: ChatRunScopeRepository | null;
+  catalog?: {
+    url: string;
+    grant: string;
+  } | null;
+  apiKeys: {
+    openai: string;
+  };
+}
+
+export type ChatEventType =
+  | 'tool_call'
+  | 'tool_result'
+  | 'token'
+  | 'message_done'
+  | 'error';
+
+export interface ChatEvent {
+  type: ChatEventType;
+  payload: Record<string, unknown>;
+}
+
+export interface IndexFileResult {
+  repoId: string;
+  sha: string;
+  path: string;
+  content: string;
+}
+
+export interface IndexFilesResult {
+  repoId: string;
+  sha: string;
+  paths: string[];
 }

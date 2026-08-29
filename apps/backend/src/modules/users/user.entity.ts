@@ -63,4 +63,23 @@ export class User extends DefaultEntity<User> {
   })
   @IsOptional()
   githubLogin: string | null;
+
+  @Column({
+    name: 'openai_key',
+    type: 'varchar',
+    nullable: true,
+    select: false,
+    transformer: encryptedColumn,
+  })
+  @IsOptional()
+  openaiKey: string | null;
+
+  @Column({
+    name: 'openai_key_last_four',
+    type: 'varchar',
+    length: 4,
+    nullable: true,
+  })
+  @IsOptional()
+  openaiKeyLastFour: string | null;
 }

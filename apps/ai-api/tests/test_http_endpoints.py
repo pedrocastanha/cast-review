@@ -158,6 +158,37 @@ client.patch(`/users/${userId}`);
     ]
 
 
+def test_extracts_consumers_from_named_axios_instances_across_files():
+    endpoints = extract_http_endpoints(
+        [
+            {
+                "path": "src/lib/api.ts",
+                "content": """
+import axios from 'axios'
+export const backApi = axios.create({ baseURL: `${backUrl}/api/v1` })
+export const pythonApi = axios.create({ baseURL: pythonUrl })
+""",
+            },
+            {
+                "path": "src/pages/AgentsPage.tsx",
+                "content": """
+import { backApi, pythonApi } from '@/lib/api'
+const res = await backApi.get(`/agents/${agentId}/documents`)
+await backApi.post('/integrations', payload)
+await pythonApi.post('/index/build', body)
+""",
+            },
+        ]
+    )
+
+    assert [(endpoint.method, endpoint.normalized_route) for endpoint in endpoints] == [
+        ("GET", "/agents/{param}/documents"),
+        ("POST", "/integrations"),
+        ("POST", "/index/build"),
+    ]
+    assert all(endpoint.role == "consumer" for endpoint in endpoints)
+
+
 def test_deduplicates_same_evidence_without_merging_different_files():
     files = [
         {"path": "src/a.ts", "content": "request('/health');\nrequest('/health');"},

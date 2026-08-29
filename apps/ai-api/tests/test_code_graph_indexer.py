@@ -214,3 +214,25 @@ export class UsersController {
     other_method = next(s for s in parsed.symbols if s.name == "other")
     assert any("Get" in d for d in list_method.decorators)
     assert other_method.decorators == []
+
+
+def test_parse_file_stores_full_symbol_body():
+    parsed = parse_file(
+        "src/a.ts",
+        "function foo(a) {\n  return a + 1;\n}\n",
+    )
+    symbol = next(s for s in parsed.symbols if s.name == "foo")
+    assert symbol.signature == "function foo(a)"
+    assert symbol.body == "function foo(a) {\n  return a + 1;\n}"
+
+
+def test_parse_file_truncates_oversized_body():
+    from app.code_graph.indexer import MAX_SYMBOL_BODY_CHARS
+
+    filler = "  const x = 1;\n" * 2000
+    parsed = parse_file("src/big.ts", f"function big() {{\n{filler}}}\n")
+    symbol = next(s for s in parsed.symbols if s.name == "big")
+    assert len(symbol.body) < len(filler)
+    assert symbol.body.endswith("(corpo truncado na indexação)")
+    assert symbol.body.startswith("function big()")
+    assert len(symbol.body) <= MAX_SYMBOL_BODY_CHARS + 40

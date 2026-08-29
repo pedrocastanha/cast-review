@@ -7,6 +7,8 @@ export interface User {
   githubConnected: boolean;
   githubLogin: string | null;
   githubTokenLastFour: string | null;
+  openaiConnected: boolean;
+  openaiKeyLastFour: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +36,7 @@ export interface UpdateUserPayload {
   username?: string;
   email?: string;
   githubToken?: string;
+  openaiKey?: string;
 }
 
 export interface VizNode {
@@ -248,9 +251,6 @@ export interface RunAnalysisPayload {
   models: {
     testReviewer: string;
     architectureReviewer: string;
-  };
-  apiKeys: {
-    openai: string;
   };
   policies: Policies;
   impactScope?:
@@ -594,4 +594,100 @@ export interface AnalysisRecord {
   prdIterations: Iteration[];
   specIterations: Iteration[];
   resumedCount: number;
+}
+
+export type ChatScopeMode = 'global' | 'repository';
+
+export interface ChatScopeRepository {
+  repoId: string;
+  sha: string | null;
+  included: boolean;
+  omissionReason: string | null;
+}
+
+export interface ChatScope {
+  mode: ChatScopeMode;
+  projectId?: string;
+  projectName?: string;
+  repositories: ChatScopeRepository[];
+}
+
+export interface ChatCitation {
+  repoId: string;
+  sha?: string | null;
+  path: string;
+  line: number | null;
+  symbolId: string | null;
+  symbolName: string | null;
+}
+
+export interface ChatToolCallRecord {
+  iteration: number;
+  name: string;
+  args: Record<string, unknown>;
+  itemCount: number;
+  truncated: boolean;
+  durationMs: number;
+  note: string | null;
+}
+
+export interface ChatUsage {
+  promptTokens: number;
+  completionTokens: number;
+  cachedTokens: number;
+  costUsd: number;
+}
+
+export interface ChatMention {
+  repoId: string;
+  path: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  model: string | null;
+  mentions: ChatMention[];
+  toolCalls: ChatToolCallRecord[];
+  citations: ChatCitation[];
+  usage: ChatUsage | null;
+  truncated: boolean;
+  createdAt: string;
+}
+
+export interface ChatThread {
+  id: string;
+  title: string;
+  scope: ChatScope;
+  repoId: string | null;
+  projectId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatMessage[];
+  staleRepositories?: string[];
+}
+
+export interface ChatFile {
+  repoId: string;
+  path: string;
+}
+
+export type ChatEventType =
+  | 'tool_call'
+  | 'tool_result'
+  | 'token'
+  | 'message_done'
+  | 'error';
+
+export interface ChatEvent {
+  type: ChatEventType;
+  payload: Record<string, unknown>;
+}
+
+export interface SendChatMessagePayload {
+  content: string;
+  mentions: ChatMention[];
+  model: string;
+  repositoryHint?: string;
 }

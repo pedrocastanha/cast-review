@@ -76,6 +76,7 @@ export function ProjectGraphPage() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-faint">{project.description || 'Relações técnicas entre os repositórios deste projeto.'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to={`/chat?projectId=${id}`} className="inline-flex min-h-11 items-center justify-center border border-border-strong px-4 text-sm font-semibold text-ink hover:bg-surface-2">Chat</Link>
           <Link to={`/projects/${id}/edit`} className="inline-flex min-h-11 items-center justify-center border border-border-strong px-4 text-sm font-semibold text-ink hover:bg-surface-2">Editar</Link>
           <Button onClick={indexAll} loading={indexing}>{(graph?.stats.indexedRepositories ?? 0) === project.repositories.length ? 'Reindexar projeto' : 'Indexar projeto'}</Button>
         </div>

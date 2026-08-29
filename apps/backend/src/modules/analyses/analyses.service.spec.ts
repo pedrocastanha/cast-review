@@ -104,17 +104,20 @@ function buildService() {
   };
   const projectsService = { resolveAnalysisScope: jest.fn() };
 
+  const userService = { getOpenaiKey: jest.fn(async () => 'sk-do-banco') };
   const service = new AnalysesService(
     repositoriesService as any,
     aiApiClient as any,
     analysisRepository as any,
     contextSnapshotRepository as any,
     projectsService as any,
+    userService as any,
     logger as any,
   );
 
   return {
     service,
+    userService,
     analysisRepository,
     aiApiClient,
     contextSnapshotRepository,
@@ -391,7 +394,6 @@ describe('AnalysesService#resume', () => {
   };
   const dto = {
     models: { testReviewer: 'gpt-4', architectureReviewer: 'gpt-4' },
-    apiKeys: { openai: 'sk-test' },
   };
 
   it('happy path: owned + running analysis resumes with decision:null, increments resumedCount, and streams via streamLeg', async () => {
@@ -425,7 +427,7 @@ describe('AnalysesService#resume', () => {
       expect.objectContaining({
         analysisId: analysis.id,
         models: dto.models,
-        apiKeys: dto.apiKeys,
+        apiKeys: { openai: 'sk-do-banco' },
         policies: { prd: 'manual', spec: 'manual' },
         decision: null,
       }),
@@ -474,7 +476,6 @@ describe('AnalysesService#approve', () => {
     email: 'user@example.com',
   };
   const stageDto = {
-    apiKeys: { openai: 'sk-test' },
     models: { testReviewer: 'gpt-4', architectureReviewer: 'gpt-4' },
   };
   const githubResult = {
@@ -666,7 +667,7 @@ describe('AnalysesService#approve', () => {
       expect(aiApiClient.resumeAgent).toHaveBeenCalledWith(
         expect.objectContaining({
           analysisId: analysis.id,
-          apiKeys: stageDto.apiKeys,
+          apiKeys: { openai: 'sk-do-banco' },
           models: stageDto.models,
           policies: { prd: 'manual', spec: 'manual' },
           decision: { stage: 'prd', action: 'reject', annotations },

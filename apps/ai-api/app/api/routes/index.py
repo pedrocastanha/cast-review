@@ -37,6 +37,16 @@ class IndexStatusResponse(BaseModel):
     sha: str | None
 
 
+class IndexRepositoryResponse(BaseModel):
+    repoId: str
+    sha: str
+
+
+class IndexRepositoriesResponse(BaseModel):
+    repositories: list[IndexRepositoryResponse]
+    nextCursor: str | None = None
+
+
 class IndexContextRequest(BaseModel):
     repoId: str
     sha: str
@@ -86,6 +96,25 @@ async def index_status(repoId: str, request: Request) -> IndexStatusResponse:
     cache = _get_cache(request)
     sha = await cache.get_latest_sha(repoId)
     return IndexStatusResponse(indexed=sha is not None, sha=sha)
+
+
+@router.get("/index/repositories", response_model=IndexRepositoriesResponse)
+async def index_repositories(
+    request: Request,
+    query: str | None = None,
+    limit: int = 50,
+    cursor: str | None = None,
+) -> IndexRepositoriesResponse:
+    bounded_limit = min(max(limit, 1), 200)
+    repositories, next_cursor = await _get_cache(request).list_repositories(
+        query,
+        bounded_limit,
+        cursor,
+    )
+    return IndexRepositoriesResponse(
+        repositories=repositories,
+        nextCursor=next_cursor,
+    )
 
 
 @router.post("/index/context", response_model=RelatedContext)

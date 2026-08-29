@@ -1,6 +1,7 @@
 import type { CurrentUserData } from '../../auth/utils/current-user-decorator';
 import type { RepositoriesService } from '../../repositories/repositories.service';
 import type { RunAnalysisDto } from '../dtos/run-analysis.dto';
+import type { RunAnalysisInput } from './context-builder.helper';
 import { buildAgentRunRequest } from './context-builder.helper';
 
 function fakeRepositoriesService(): RepositoriesService {
@@ -25,12 +26,12 @@ const currentUser: CurrentUserData = {
   email: 'octocat@example.com',
 };
 
-function baseDto(overrides: Partial<RunAnalysisDto> = {}): RunAnalysisDto {
+function baseDto(overrides: Partial<RunAnalysisInput> = {}): RunAnalysisInput {
   return {
     models: { testReviewer: 'gpt-4', architectureReviewer: 'gpt-4' },
     apiKeys: { openai: 'sk-test' },
     ...overrides,
-  } as RunAnalysisDto;
+  } as RunAnalysisInput;
 }
 
 describe('buildAgentRunRequest', () => {

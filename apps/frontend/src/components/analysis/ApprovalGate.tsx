@@ -14,7 +14,6 @@ interface ApprovalGateProps {
   stage: ApprovalGateStage;
   content: string;
   iteration: number | null;
-  apiKeys: { openai: string };
   models: { testReviewer: string; architectureReviewer: string };
   onApprove: (payload: ApprovalGatePayload) => void | Promise<void>;
   onReject: (payload: ApprovalGatePayload) => void | Promise<void>;
@@ -31,7 +30,6 @@ export function ApprovalGate({
   stage,
   content,
   iteration,
-  apiKeys,
   models,
   onApprove,
   onReject,
@@ -61,7 +59,6 @@ export function ApprovalGate({
       stage,
       decision: 'approve',
       models,
-      apiKeys,
     });
   };
 
@@ -72,7 +69,6 @@ export function ApprovalGate({
       decision: 'reject',
       annotations,
       models,
-      apiKeys,
     });
   };
 

@@ -22,7 +22,6 @@ export function parseRunAnalysisBody(body: unknown): RunAnalysisDto {
   }
 
   const models = body.models;
-  const apiKeys = body.apiKeys;
 
   if (
     !isRecord(models) ||
@@ -34,16 +33,11 @@ export function parseRunAnalysisBody(body: unknown): RunAnalysisDto {
     );
   }
 
-  if (!isRecord(apiKeys) || !isNonEmptyString(apiKeys.openai)) {
-    throw new BadRequestException('apiKeys.openai é obrigatório');
-  }
-
   return {
     models: {
       testReviewer: models.testReviewer,
       architectureReviewer: models.architectureReviewer,
     },
-    apiKeys: { openai: apiKeys.openai },
     policies: parsePolicies(body.policies),
     impactScope: parseImpactScope(body.impactScope),
   } as RunAnalysisDto;

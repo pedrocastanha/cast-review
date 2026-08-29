@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,6 +18,7 @@ import type {
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { ProjectsService } from '../projects/projects.service';
 import { RepositoriesService } from '../repositories/repositories.service';
+import type { UserService } from '../users/user.service';
 import type {
   AnalysisContextSnapshot,
   AnalysisRecord,
@@ -67,6 +69,8 @@ export class AnalysesService extends BaseService {
     private readonly analysisRepository: AnalysisRepository,
     private readonly contextSnapshotRepository: AnalysisContextSnapshotRepository,
     private readonly projectsService: ProjectsService,
+    @Inject('USER_SERVICE')
+    private readonly userService: UserService,
     logger: AppLogger,
   ) {
     super(logger);
@@ -86,7 +90,11 @@ export class AnalysesService extends BaseService {
     }
 
     const pullNumber = parsePullNumber(pullNumberRaw);
-    const dto = parseRunAnalysisBody(body);
+    const parsed = parseRunAnalysisBody(body);
+    const dto = {
+      ...parsed,
+      apiKeys: { openai: await this.userService.getOpenaiKey(currentUser.id) },
+    };
     const requestedOwner = owner?.trim() || '';
     const sourceOwner =
       dto.impactScope.mode === 'project'
@@ -235,7 +243,7 @@ export class AnalysesService extends BaseService {
     const payload: AgentResumeRequest = {
       analysisId: analysis.id,
       models: dto.models,
-      apiKeys: dto.apiKeys,
+      apiKeys: { openai: await this.userService.getOpenaiKey(currentUser.id) },
       policies: analysis.publishPolicy
         ? { prd: analysis.publishPolicy.prd, spec: analysis.publishPolicy.spec }
         : { prd: 'manual', spec: 'manual' },
@@ -373,7 +381,9 @@ export class AnalysesService extends BaseService {
     try {
       const payload: AgentResumeRequest = {
         analysisId: analysis.id,
-        apiKeys: dto.apiKeys!,
+        apiKeys: {
+          openai: await this.userService.getOpenaiKey(analysis.requestedBy),
+        },
         models: dto.models!,
         policies: analysis.publishPolicy
           ? {

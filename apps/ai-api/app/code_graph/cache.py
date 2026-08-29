@@ -144,6 +144,41 @@ class IndexCache:
             record = await result.single()
             return record["sha"] if record else None
 
+    async def list_repositories(
+        self,
+        query: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> tuple[list[dict[str, str]], str | None]:
+        try:
+            offset = max(0, int(cursor or "0"))
+        except ValueError:
+            offset = 0
+
+        normalized_query = query.strip().lower() if query and query.strip() else None
+        async with self._driver.session() as session:
+            result = await session.run(
+                """
+                MATCH (r:RepoIndex)
+                WHERE $searchQuery IS NULL OR toLower(r.repoId) CONTAINS $searchQuery
+                RETURN r.repoId AS repoId, r.sha AS sha
+                ORDER BY r.repoId
+                SKIP $offset
+                LIMIT $fetchLimit
+                """,
+                searchQuery=normalized_query,
+                offset=offset,
+                fetchLimit=limit + 1,
+            )
+            records = [record async for record in result]
+
+        page = [
+            {"repoId": record["repoId"], "sha": record["sha"]}
+            for record in records[:limit]
+        ]
+        next_cursor = str(offset + limit) if len(records) > limit else None
+        return page, next_cursor
+
     async def lookup(self, repo_id: str, sha: str) -> Graph | None:
         async with self._driver.session() as session:
             node_result = await session.run(

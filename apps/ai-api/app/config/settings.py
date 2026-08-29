@@ -2,7 +2,9 @@ import os
 
 APP_ENV = os.environ.get("APP_ENV", "development")
 
-OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_URL = os.environ.get(
+    "OPENAI_URL", "https://api.openai.com/v1/chat/completions"
+)
 
 LLM_TIMEOUT_SECONDS = 180.0
 

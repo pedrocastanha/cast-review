@@ -40,8 +40,19 @@ export class UserService extends BaseService {
   }
 
   async updateUser(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
-    const { githubToken, ...rest } = dto;
+    const { githubToken, openaiKey, ...rest } = dto;
     const patch: Partial<User> = { ...rest };
+
+    if (openaiKey !== undefined) {
+      const key = openaiKey.trim();
+
+      if (!key) {
+        throw new BadRequestException('Chave da OpenAI é obrigatória');
+      }
+
+      patch.openaiKey = key;
+      patch.openaiKeyLastFour = key.slice(-4);
+    }
 
     if (githubToken !== undefined) {
       const token = githubToken.trim();
@@ -118,6 +129,53 @@ export class UserService extends BaseService {
     return { token: user.githubToken, login: user.githubLogin };
   }
 
+  async removeOpenaiKey(id: string): Promise<UserResponseDto> {
+    const result = await this.safeExecute(() =>
+      this.userRepository.update(id, {
+        openaiKey: null,
+        openaiKeyLastFour: null,
+      }),
+    );
+
+    if (!result.affected) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    return this.getByIdOrFail(id);
+  }
+
+  async getOpenaiKey(id: string): Promise<string> {
+    let user: User | null;
+
+    try {
+      user = await this.userRepository.findOne({
+        where: { id },
+        select: { id: true, openaiKey: true },
+      });
+    } catch (err) {
+      if (err instanceof SecretDecryptionError) {
+        this.logger.error('Falha ao decifrar a chave da OpenAI', {
+          exception: err,
+          userId: id,
+        });
+
+        throw new BadRequestException(
+          'Chave da OpenAI ilegível. Reconfigure a chave em Configurações.',
+        );
+      }
+
+      throw err;
+    }
+
+    if (!user?.openaiKey?.trim()) {
+      throw new BadRequestException(
+        'Configure sua chave da OpenAI em Configurações antes de usar a IA.',
+      );
+    }
+
+    return user.openaiKey;
+  }
+
   async setGithubLogin(id: string, login: string): Promise<void> {
     await this.safeExecute(() =>
       this.userRepository.update(id, { githubLogin: login }),
@@ -139,6 +197,7 @@ export class UserService extends BaseService {
         active: true,
         githubLogin: true,
         githubTokenLastFour: true,
+        openaiKeyLastFour: true,
         createdAt: true,
         updatedAt: true,
       },

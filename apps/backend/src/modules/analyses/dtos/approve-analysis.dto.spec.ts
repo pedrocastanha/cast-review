@@ -33,12 +33,11 @@ describe('ApproveAnalysisDto', () => {
     expect(annotationsError?.constraints).toHaveProperty('annotationsRequiredOnReject');
   });
 
-  it('accepts prd+reject with at least one annotation (and required apiKeys/models)', async () => {
+  it('accepts prd+reject with at least one annotation and the required models', async () => {
     const dto = plainToInstance(ApproveAnalysisDto, {
       stage: 'prd',
       decision: 'reject',
       annotations: [{ excerpt: 'some code', note: 'please fix' }],
-      apiKeys: { openai: 'sk-test' },
       models: { testReviewer: 'gpt-4', architectureReviewer: 'gpt-4' },
     });
 
@@ -69,7 +68,7 @@ describe('ApproveAnalysisDto', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('requires apiKeys and models when stage is spec', async () => {
+  it('requires models when stage is spec', async () => {
     const dto = plainToInstance(ApproveAnalysisDto, {
       stage: 'spec',
       decision: 'approve',
@@ -78,14 +77,14 @@ describe('ApproveAnalysisDto', () => {
     const errors = await validate(dto);
     const properties = errors.map((e) => e.property);
 
-    expect(properties).toEqual(expect.arrayContaining(['apiKeys', 'models']));
+    expect(properties).toEqual(expect.arrayContaining(['models']));
+    expect(properties).not.toContain('apiKeys');
   });
 
-  it('accepts spec+approve when apiKeys and models are provided', async () => {
+  it('accepts spec+approve when models are provided', async () => {
     const dto = plainToInstance(ApproveAnalysisDto, {
       stage: 'spec',
       decision: 'approve',
-      apiKeys: { openai: 'sk-test' },
       models: { testReviewer: 'gpt-4', architectureReviewer: 'gpt-4' },
     });
 

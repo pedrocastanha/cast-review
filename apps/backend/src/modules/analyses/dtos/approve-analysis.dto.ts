@@ -10,7 +10,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
-import { ApiKeysDto, ReviewModelsDto } from './run-analysis.dto';
+import { ReviewModelsDto } from './run-analysis.dto';
 
 export class AnnotationDto {
   @IsString()
@@ -50,12 +50,6 @@ export class ApproveAnalysisDto {
   @Type(() => AnnotationDto)
   @Validate(AnnotationsRequiredOnRejectConstraint)
   annotations?: AnnotationDto[];
-
-  @ValidateIf((o: ApproveAnalysisDto) => o.stage === 'prd' || o.stage === 'spec')
-  @IsDefined()
-  @ValidateNested()
-  @Type(() => ApiKeysDto)
-  apiKeys?: ApiKeysDto;
 
   @ValidateIf((o: ApproveAnalysisDto) => o.stage === 'prd' || o.stage === 'spec')
   @IsDefined()

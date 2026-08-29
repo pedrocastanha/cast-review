@@ -15,6 +15,7 @@ import { RepoRunsPage } from './pages/RepoRunsPage';
 import { ReposPage } from './pages/ReposPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { BenchmarksPage } from './pages/BenchmarksPage';
+import { ChatPage } from './pages/ChatPage';
 import { ProjectFormPage } from './pages/ProjectFormPage';
 import { ProjectGraphPage } from './pages/ProjectGraphPage';
 import { ProjectsPage } from './pages/ProjectsPage';
@@ -114,6 +115,18 @@ function App() {
             }
           />
           <Route
+            path="/repos/:owner/:repo/chat"
+            element={
+              <ProtectedRoute>
+                <Layout wide>
+                  <RepositoryLayout>
+                    <ChatPage />
+                  </RepositoryLayout>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/repos/:owner/:repo/pulls/:pullNumber"
             element={
               <ProtectedRoute>
@@ -132,6 +145,10 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             }
+          />
+          <Route
+            path="/chat"
+            element={<ProtectedRoute><Layout fill><ChatPage /></Layout></ProtectedRoute>}
           />
           <Route
             path="/repos/:owner/:repo/graph"

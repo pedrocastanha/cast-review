@@ -6,52 +6,12 @@ import type {
   RunAnalysisPayload,
 } from '../types';
 import { authorizedFetch, request } from './http';
-
-function parseSseChunk(rawEvent: string): AgentEvent | null {
-  const dataLine = rawEvent.split('\n').find((line) => line.startsWith('data:'));
-  if (!dataLine) return null;
-  try {
-    return JSON.parse(dataLine.slice(5).trim()) as AgentEvent;
-  } catch {
-    return null;
-  }
-}
-
-async function* consumeSseStream(response: Response): AsyncGenerator<AgentEvent> {
-  if (!response.body) {
-    throw new Error('Resposta sem corpo (SSE).');
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const rawEvents = buffer.split('\n\n');
-      buffer = rawEvents.pop() ?? '';
-
-      for (const rawEvent of rawEvents) {
-        const event = parseSseChunk(rawEvent);
-        if (event) yield event;
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
+import { consumeSseStream } from './sse';
 
 export interface ResumeAnalysisPayload {
   models: {
     testReviewer: string;
     architectureReviewer: string;
-  };
-  apiKeys: {
-    openai: string;
   };
 }
 
@@ -62,9 +22,6 @@ export interface ApproveStagePayload {
   models: {
     testReviewer: string;
     architectureReviewer: string;
-  };
-  apiKeys: {
-    openai: string;
   };
 }
 
@@ -111,7 +68,7 @@ export const analysesApi = {
       signal,
     });
 
-    yield* consumeSseStream(response);
+    yield* consumeSseStream<AgentEvent>(response);
   },
 
   async *resume(
@@ -129,7 +86,7 @@ export const analysesApi = {
       signal,
     });
 
-    yield* consumeSseStream(response);
+    yield* consumeSseStream<AgentEvent>(response);
   },
 
   async *approveStage(
@@ -147,7 +104,7 @@ export const analysesApi = {
       signal,
     });
 
-    yield* consumeSseStream(response);
+    yield* consumeSseStream<AgentEvent>(response);
   },
 
   approvePublish: (analysisId: string, payload: ApprovePublishPayload) =>

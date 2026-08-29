@@ -7,6 +7,8 @@ from app.code_graph.models import Graph, HttpEndpoint
 HTTP_METHODS = "get|post|put|patch|delete"
 TEMPLATE_EXPRESSION = re.compile(r"\$\{[^}]+\}")
 PATH_PARAMETER = re.compile(r"(?<=/):[^/]+|\{[^/{}]+\}")
+DEFAULT_HTTP_CLIENTS = ("axios", "client")
+AXIOS_INSTANCE = re.compile(r"\b([A-Za-z_$][\w$]*)\s*=\s*axios\s*\.\s*create\s*\(")
 
 
 def normalize_route(route: str) -> str:
@@ -240,9 +242,19 @@ def _extract_call_consumers(path: str, content: str) -> list[HttpEndpoint]:
     return endpoints
 
 
-def _extract_axios_consumers(path: str, content: str) -> list[HttpEndpoint]:
+def _http_client_names(files: list[dict]) -> tuple[str, ...]:
+    names = set(DEFAULT_HTTP_CLIENTS)
+    for file in files:
+        path = file["path"]
+        if not path.endswith((".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")):
+            continue
+        names.update(match.group(1) for match in AXIOS_INSTANCE.finditer(file["content"]))
+    return tuple(sorted(names, key=len, reverse=True))
+
+
+def _extract_axios_consumers(path: str, content: str, clients: tuple[str, ...]) -> list[HttpEndpoint]:
     call_pattern = re.compile(
-        rf"\b(?P<client>axios|client)\.(?P<method>{HTTP_METHODS})\s*\(",
+        rf"\b(?P<client>{'|'.join(re.escape(name) for name in clients)})\.(?P<method>{HTTP_METHODS})\s*\(",
         re.IGNORECASE,
     )
     endpoints: list[HttpEndpoint] = []
@@ -289,13 +301,14 @@ def _attach_symbols(endpoints: list[HttpEndpoint], graph: Graph | None) -> None:
 
 def extract_http_endpoints(files: list[dict], graph: Graph | None = None) -> list[HttpEndpoint]:
     endpoints: list[HttpEndpoint] = []
+    clients = _http_client_names(files)
     for file in files:
         path = file["path"]
         content = file["content"]
         if path.endswith((".ts", ".tsx", ".js", ".jsx")):
             endpoints.extend(_extract_nest(path, content))
             endpoints.extend(_extract_call_consumers(path, content))
-            endpoints.extend(_extract_axios_consumers(path, content))
+            endpoints.extend(_extract_axios_consumers(path, content, clients))
         elif path.endswith(".py"):
             endpoints.extend(_extract_fastapi(path, content))
             endpoints.extend(_extract_call_consumers(path, content))
