@@ -27,6 +27,11 @@ class ChatScopeRepository(BaseModel):
     sha: str
 
 
+class ChatCatalogAccess(BaseModel):
+    url: str
+    grant: str
+
+
 class ChatMention(BaseModel):
     repoId: str
     path: str
@@ -40,13 +45,14 @@ class ChatHistoryMessage(BaseModel):
 
 class ChatRunRequest(BaseModel):
     threadId: str
-    mode: Literal["repository", "project"]
-    projectId: str | None = None
+    mode: Literal["global", "repository"]
     repositories: list[ChatScopeRepository]
     history: list[ChatHistoryMessage] = Field(default_factory=list)
     question: str
     mentions: list[ChatMention] = Field(default_factory=list)
     model: str
+    repositoryHint: ChatScopeRepository | None = None
+    catalog: ChatCatalogAccess | None = None
     apiKeys: ApiKeys
 
 

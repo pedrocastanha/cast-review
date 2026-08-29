@@ -70,7 +70,9 @@ def _patch_llm(monkeypatch, responses: list, captured: list | None = None):
 
     async def fake(*, system, messages, tools, model, api_key, on_delta=None):
         if captured is not None:
-            captured.append({"messages": list(messages), "tools": tools})
+            captured.append(
+                {"system": system, "messages": list(messages), "tools": tools, "model": model}
+            )
         result = queue.pop(0)
         if isinstance(result, Exception):
             raise result
@@ -231,22 +233,77 @@ async def test_mentions_and_history_enter_the_first_prompt(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_project_scope_exposes_cross_repo_tool(monkeypatch):
+async def test_global_scope_exposes_dynamic_catalog_without_loading_graph(monkeypatch):
     captured: list = []
     _patch_llm(monkeypatch, [_answer("ok")], captured)
 
     request = _request(
-        mode="project",
-        projectId="p1",
-        repositories=[
-            {"repoId": "acme/back", "sha": "sha1"},
-            {"repoId": "acme/front", "sha": "sha2"},
-        ],
+        mode="global",
+        repositories=[],
+        repositoryHint={"repoId": "acme/back", "sha": "sha1"},
+        catalog={"url": "http://backend/internal/chat/catalog", "grant": "grant"},
     )
-    await _collect(FakeCache(_graph()), request)
+    cache = FakeCache(_graph())
+    await _collect(cache, request)
 
     names = {tool["function"]["name"] for tool in captured[0]["tools"]}
-    assert "cross_repo_links" in names
+    assert "list_indexed_repositories" in names
+    assert "cross_repo_links" not in names
+    assert "acme/back" in captured[0]["messages"][0]["content"]
+    assert "sha1" not in captured[0]["messages"][0]["content"]
+    assert cache.calls == []
+
+
+@pytest.mark.asyncio
+async def test_global_scope_can_investigate_two_repositories(monkeypatch):
+    class FakeCatalogClient:
+        def __init__(self, access):
+            self.access = access
+
+        async def resolve(self, repo_id: str):
+            return {"repoId": repo_id, "sha": f"sha-{repo_id.split('/')[-1]}", "stale": False}
+
+        async def list(self, query=None, limit=20, cursor=None):
+            return {"repositories": [], "nextCursor": None}
+
+    monkeypatch.setattr("app.chat.agent.CatalogClient", FakeCatalogClient)
+    _patch_llm(
+        monkeypatch,
+        [
+            _calls(
+                ToolCall(
+                    id="c1",
+                    name="search_symbols",
+                    arguments={"repoId": "acme/back", "query": "login"},
+                )
+            ),
+            _calls(
+                ToolCall(
+                    id="c2",
+                    name="search_symbols",
+                    arguments={"repoId": "acme/front", "query": "login"},
+                )
+            ),
+            _answer("Os dois repositórios têm login."),
+        ],
+    )
+    request = _request(
+        mode="global",
+        repositories=[],
+        catalog={"url": "http://backend/internal/chat/catalog", "grant": "grant"},
+    )
+
+    events = await _collect(FakeCache(_graph()), request)
+
+    done = events[-1].payload
+    assert {citation["repoId"] for citation in done["citations"]} == {
+        "acme/back",
+        "acme/front",
+    }
+    assert [record["args"]["repoId"] for record in done["toolCalls"]] == [
+        "acme/back",
+        "acme/front",
+    ]
 
 
 @pytest.mark.asyncio

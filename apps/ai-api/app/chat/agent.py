@@ -4,6 +4,7 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
+from app.chat.catalog import CatalogClient
 from app.chat.models import (
     ChatEvent,
     ChatRunRequest,
@@ -12,7 +13,7 @@ from app.chat.models import (
     Citation,
 )
 from app.chat.prompt import SYSTEM_PROMPT, mention_block, scope_briefing
-from app.chat.tools import RepoWorkspace, ToolError, ToolExecutor
+from app.chat.tools import GlobalToolExecutor, RepoWorkspace, ToolError, ToolExecutor
 from app.infrastructure.llm.client import LlmError, complete_with_tools
 from app.infrastructure.llm.pricing import estimate_cost_usd
 from app.infrastructure.logging.setup import get_logger
@@ -31,7 +32,7 @@ def _signature(name: str, args: dict[str, Any]) -> str:
 
 
 def _validate_citations(
-    citations: list[Citation], executor: ToolExecutor
+    citations: list[Citation], executor: ToolExecutor | GlobalToolExecutor
 ) -> list[Citation]:
     known_paths = {
         (workspace.repo_id, symbol.path)
@@ -68,6 +69,7 @@ def _initial_messages(request: ChatRunRequest) -> list[dict[str, Any]]:
             "content": scope_briefing(
                 request.mode,
                 [(repo.repoId, repo.sha) for repo in request.repositories],
+                request.repositoryHint.repoId if request.repositoryHint else None,
             ),
         }
     ]
@@ -100,8 +102,13 @@ async def run_chat(cache, request: ChatRunRequest) -> AsyncIterator[ChatEvent]:
     async def produce() -> None:
         started = time.monotonic()
         try:
-            workspaces = await _load_workspaces(cache, request)
-            executor = ToolExecutor(workspaces, mode=request.mode)
+            if request.mode == "global":
+                if request.catalog is None:
+                    raise ToolError("catálogo de repositórios não configurado")
+                executor = GlobalToolExecutor(cache, CatalogClient(request.catalog))
+            else:
+                workspaces = await _load_workspaces(cache, request)
+                executor = ToolExecutor(workspaces)
             await _converse(queue, executor, request, bound)
         except ToolError as exc:
             await queue.put(ChatEvent(type="error", payload={"message": str(exc)}))
@@ -132,7 +139,7 @@ async def run_chat(cache, request: ChatRunRequest) -> AsyncIterator[ChatEvent]:
 
 async def _converse(
     queue: asyncio.Queue,
-    executor: ToolExecutor,
+    executor: ToolExecutor | GlobalToolExecutor,
     request: ChatRunRequest,
     bound,
 ) -> None:
@@ -220,7 +227,7 @@ async def _converse(
                     stop_after = True
             else:
                 try:
-                    tool_result = executor.execute(call.name, call.arguments)
+                    tool_result = await executor.execute_async(call.name, call.arguments)
                     citations.extend(tool_result.citations)
                     payload = tool_result.model_dump(exclude_none=True)
                     item_count = len(tool_result.items)
@@ -310,7 +317,7 @@ async def _finish(
     citations: list[Citation],
     records: list[ChatToolCallRecord],
     usage: ChatUsage,
-    executor: ToolExecutor,
+    executor: ToolExecutor | GlobalToolExecutor,
     truncated: bool,
 ) -> None:
     await queue.put(

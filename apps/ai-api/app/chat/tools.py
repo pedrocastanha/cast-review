@@ -1,7 +1,10 @@
 import json
+from collections import OrderedDict
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
+from app.chat.catalog import CatalogError
 from app.chat.models import Citation, ToolResult
 from app.code_graph.file_view import distinct_paths, render_file
 from app.code_graph.models import Graph, Symbol
@@ -138,6 +141,9 @@ class ToolExecutor:
             raise ToolError(f"ferramenta '{name}' indisponível neste escopo")
         handler = getattr(self, f"_tool_{name}")
         return _fit(handler(args))
+
+    async def execute_async(self, name: str, args: dict[str, Any]) -> ToolResult:
+        return self.execute(name, args)
 
     def _tool_list_files(self, args: dict[str, Any]) -> ToolResult:
         limit = min(int(args.get("limit") or 100), 300)
@@ -360,6 +366,108 @@ class ToolExecutor:
         )
 
 
+class GlobalToolExecutor:
+    def __init__(self, cache, catalog, *, max_workspaces: int = 3) -> None:
+        self._cache = cache
+        self._catalog = catalog
+        self._max_workspaces = max(1, max_workspaces)
+        self._workspaces: OrderedDict[str, RepoWorkspace] = OrderedDict()
+
+    @property
+    def workspaces(self) -> list[RepoWorkspace]:
+        return list(self._workspaces.values())
+
+    def available_tools(self) -> list[str]:
+        return [
+            "list_indexed_repositories",
+            "list_files",
+            "search_symbols",
+            "read_symbol",
+            "read_file",
+            "neighbors",
+            "list_endpoints",
+        ]
+
+    def definitions(self) -> list[dict[str, Any]]:
+        definitions: list[dict[str, Any]] = []
+        for name in self.available_tools():
+            definition = deepcopy(TOOL_SCHEMAS[name])
+            if name != "list_indexed_repositories":
+                required = definition["function"]["parameters"]["required"]
+                if "repoId" not in required:
+                    required.append("repoId")
+            definitions.append(definition)
+        return definitions
+
+    async def execute_async(self, name: str, args: dict[str, Any]) -> ToolResult:
+        if name not in self.available_tools():
+            raise ToolError(f"ferramenta '{name}' indisponível neste escopo")
+        if name == "list_indexed_repositories":
+            return await self._list_repositories(args)
+
+        repo_id = str(args.get("repoId") or "").strip()
+        if not repo_id:
+            raise ToolError(f"{name} exige 'repoId' no chat global")
+        workspace = await self._workspace(repo_id)
+        executor = ToolExecutor([workspace])
+        return executor.execute(name, args)
+
+    async def _list_repositories(self, args: dict[str, Any]) -> ToolResult:
+        try:
+            limit = max(1, min(int(args.get("limit") or 20), 20))
+        except (TypeError, ValueError) as exc:
+            raise ToolError("limit deve ser um número inteiro") from exc
+        try:
+            payload = await self._catalog.list(
+                query=str(args.get("query") or "").strip() or None,
+                limit=limit,
+                cursor=str(args.get("cursor") or "").strip() or None,
+            )
+        except CatalogError as exc:
+            raise ToolError(str(exc)) from exc
+        repositories = payload.get("repositories")
+        if not isinstance(repositories, list):
+            raise ToolError("catálogo de repositórios retornou dados inválidos")
+        items = [
+            {
+                "repoId": item.get("repoId"),
+                "stale": bool(item.get("stale")),
+            }
+            for item in repositories[:limit]
+            if isinstance(item, dict) and item.get("repoId")
+        ]
+        next_cursor = payload.get("nextCursor")
+        return ToolResult(
+            items=items,
+            truncated=bool(next_cursor),
+            note=f"próximo cursor: {next_cursor}" if next_cursor else None,
+        )
+
+    async def _workspace(self, repo_id: str) -> RepoWorkspace:
+        cached = self._workspaces.pop(repo_id, None)
+        if cached is not None:
+            self._workspaces[repo_id] = cached
+            return cached
+
+        try:
+            entry = await self._catalog.resolve(repo_id)
+        except CatalogError as exc:
+            raise ToolError(str(exc)) from exc
+        canonical_repo_id = str(entry.get("repoId") or "").strip()
+        sha = str(entry.get("sha") or "").strip()
+        if not canonical_repo_id or not sha:
+            raise ToolError(f"repositório '{repo_id}' não está indexado ou acessível")
+        graph = await self._cache.lookup(canonical_repo_id, sha)
+        if graph is None:
+            raise ToolError(f"índice de '{canonical_repo_id}' não está disponível")
+
+        workspace = RepoWorkspace(canonical_repo_id, sha, graph)
+        self._workspaces[repo_id] = workspace
+        while len(self._workspaces) > self._max_workspaces:
+            self._workspaces.popitem(last=False)
+        return workspace
+
+
 def _function(name: str, description: str, properties: dict, required: list[str]) -> dict[str, Any]:
     return {
         "type": "function",
@@ -382,6 +490,22 @@ _REPO_ID = {
 }
 
 TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
+    "list_indexed_repositories": _function(
+        "list_indexed_repositories",
+        "Lista sob demanda apenas repositórios indexados e acessíveis ao usuário. Use quando o repositório não estiver explícito ou para descobrir o repoId exato.",
+        {
+            "query": {
+                "type": "string",
+                "description": "Trecho de owner/repo para filtrar. Omita para listar a primeira página.",
+            },
+            "limit": {"type": "integer", "description": "Máximo de 20 resultados."},
+            "cursor": {
+                "type": "string",
+                "description": "Cursor informado pelo resultado anterior.",
+            },
+        },
+        [],
+    ),
     "list_files": _function(
         "list_files",
         "Lista caminhos de arquivos presentes no índice. Use para descobrir a estrutura antes de afirmar que algo não existe.",
