@@ -596,7 +596,7 @@ export interface AnalysisRecord {
   resumedCount: number;
 }
 
-export type ChatScopeMode = 'repository' | 'project';
+export type ChatScopeMode = 'global' | 'repository';
 
 export interface ChatScopeRepository {
   repoId: string;
@@ -614,6 +614,7 @@ export interface ChatScope {
 
 export interface ChatCitation {
   repoId: string;
+  sha?: string | null;
   path: string;
   line: number | null;
   symbolId: string | null;
@@ -646,6 +647,7 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  model: string | null;
   mentions: ChatMention[];
   toolCalls: ChatToolCallRecord[];
   citations: ChatCitation[];
@@ -687,4 +689,5 @@ export interface SendChatMessagePayload {
   content: string;
   mentions: ChatMention[];
   model: string;
+  repositoryHint?: string;
 }

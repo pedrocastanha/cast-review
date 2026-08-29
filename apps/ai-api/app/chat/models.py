@@ -9,6 +9,7 @@ ChatEventType = Literal["tool_call", "tool_result", "token", "message_done", "er
 
 class Citation(BaseModel):
     repoId: str
+    sha: str | None = None
     path: str
     line: int | None = None
     symbolId: str | None = None

@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { chatApi, type CreateChatThreadPayload } from '../api/chat.api';
 import { Composer } from '../components/chat/Composer';
 import { MessageTurn } from '../components/chat/MessageTurn';
-import { ScopePicker } from '../components/chat/ScopePicker';
 import { ThreadList } from '../components/chat/ThreadList';
 import { ToolTrace } from '../components/chat/ToolTrace';
 import { useAuth } from '../context/AuthContext';
+import { DEFAULT_AI_MODEL } from '../lib/ai-models';
 import type {
   ChatEvent,
   ChatMention,
@@ -14,12 +14,10 @@ import type {
   ChatToolCallRecord,
 } from '../types';
 
-const DEFAULT_MODEL = 'gpt-4o';
-
 const SUGGESTIONS = [
-  'Como funciona o fluxo de autenticação?',
-  'Quais endpoints o backend expõe?',
-  'Onde esse projeto trata erro de banco?',
+  'Quais repositórios indexados podem responder sobre autenticação?',
+  'Onde o sistema trata erros de banco?',
+  'Compare como dois repositórios expõem suas APIs.',
 ];
 
 interface LiveState {
@@ -30,23 +28,22 @@ interface LiveState {
 
 const IDLE: LiveState = { answer: '', calls: [], running: false };
 
-function initialScope(params: URLSearchParams): CreateChatThreadPayload | null {
-  const repoId = params.get('repoId');
-  if (repoId) return { mode: 'repository', repoId };
-  const projectId = params.get('projectId');
-  if (projectId) return { mode: 'project', projectId };
-  return null;
-}
-
 export function ChatPage() {
   const { user } = useAuth();
-  const [params] = useSearchParams();
-  const [scope, setScope] = useState<CreateChatThreadPayload | null>(() =>
-    initialScope(params),
+  const { owner, repo } = useParams();
+  const repoId = owner && repo ? `${owner}/${repo}` : null;
+  const scopeMode = repoId ? 'repository' : 'global';
+  const scope = useMemo<CreateChatThreadPayload>(
+    () =>
+      repoId
+        ? { mode: 'repository', repoId }
+        : { mode: 'global' },
+    [repoId],
   );
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [thread, setThread] = useState<ChatThread | null>(null);
   const [live, setLive] = useState<LiveState>(IDLE);
+  const [model, setModel] = useState(DEFAULT_AI_MODEL);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -55,13 +52,24 @@ export function ChatPage() {
 
   const refreshThreads = useCallback(async () => {
     try {
-      setThreads(await chatApi.list({}));
+      const listed = await chatApi.list(repoId ? { repoId } : {});
+      setThreads(
+        repoId
+          ? listed.filter(
+              (candidate) =>
+                candidate.scope.mode === 'repository' &&
+                candidate.repoId === repoId,
+            )
+          : listed.filter((candidate) => candidate.scope.mode === 'global'),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao listar conversas');
     }
-  }, []);
+  }, [repoId]);
 
   useEffect(() => {
+    setThread(null);
+    setLive(IDLE);
     void refreshThreads();
   }, [refreshThreads]);
 
@@ -82,16 +90,18 @@ export function ChatPage() {
 
   const openThread = async (id: string) => {
     setLive(IDLE);
+    setError(null);
     try {
       const opened = await chatApi.get(id);
+      const belongsHere = repoId
+        ? opened.scope.mode === 'repository' && opened.repoId === repoId
+        : opened.scope.mode === 'global';
+      if (!belongsHere) throw new Error('Conversa fora deste escopo');
       setThread(opened);
-      setScope(
-        opened.scope.mode === 'project' && opened.projectId
-          ? { mode: 'project', projectId: opened.projectId }
-          : opened.repoId
-            ? { mode: 'repository', repoId: opened.repoId }
-            : scope,
-      );
+      const latestModel = [...opened.messages]
+        .reverse()
+        .find((message) => message.model)?.model;
+      if (latestModel) setModel(latestModel);
       pinnedRef.current = true;
       return opened;
     } catch (err) {
@@ -101,15 +111,12 @@ export function ChatPage() {
   };
 
   const startThread = async () => {
-    if (!scope) {
-      setError('Escolha um repositório ou projeto primeiro.');
-      return;
-    }
     setCreating(true);
     setError(null);
     try {
       setThread(await chatApi.create(scope));
       setLive(IDLE);
+      setModel(DEFAULT_AI_MODEL);
       await refreshThreads();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao criar conversa');
@@ -134,14 +141,13 @@ export function ChatPage() {
       setLive((current) => ({ ...current, answer: current.answer + delta }));
       return;
     }
-    if (event.type === 'tool_call') {
-      setLive((current) => ({ ...current, answer: '' }));
-      return;
-    }
     if (event.type === 'tool_result') {
       setLive((current) => ({
         ...current,
-        calls: [...current.calls, event.payload as unknown as ChatToolCallRecord],
+        calls: [
+          ...current.calls,
+          event.payload as unknown as ChatToolCallRecord,
+        ],
       }));
       return;
     }
@@ -150,14 +156,19 @@ export function ChatPage() {
     }
   };
 
-  const send = async (content: string, mentions: ChatMention[]) => {
+  const send = async (
+    content: string,
+    mentions: ChatMention[],
+    repositoryHint: string | null,
+  ) => {
     let target = thread;
+    const selectedModel = model.trim();
+    if (!selectedModel) {
+      setError('Informe um modelo de IA.');
+      return;
+    }
 
     if (!target) {
-      if (!scope) {
-        setError('Escolha um repositório ou projeto primeiro.');
-        return;
-      }
       try {
         target = await chatApi.create(scope);
         setThread(target);
@@ -170,6 +181,7 @@ export function ChatPage() {
 
     setError(null);
     pinnedRef.current = true;
+    const pendingModel = selectedModel;
     setThread((current) =>
       current
         ? {
@@ -180,6 +192,7 @@ export function ChatPage() {
                 id: `pending-${Date.now()}`,
                 role: 'user',
                 content,
+                model: pendingModel,
                 mentions,
                 toolCalls: [],
                 citations: [],
@@ -200,7 +213,12 @@ export function ChatPage() {
     try {
       for await (const event of chatApi.sendMessage(
         target.id,
-        { content, mentions, model: DEFAULT_MODEL },
+        {
+          content,
+          mentions,
+          model: selectedModel,
+          ...(repositoryHint ? { repositoryHint } : {}),
+        },
         controller.signal,
       )) {
         applyEvent(event);
@@ -228,17 +246,38 @@ export function ChatPage() {
   const empty = !thread || thread.messages.length === 0;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-      <aside className="flex shrink-0 flex-col gap-3 border-b border-border p-3 lg:h-full lg:w-[17rem] lg:border-r lg:border-b-0">
-        <ScopePicker scope={scope} onChange={setScope} />
+    <div
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row ${
+        repoId
+          ? 'h-[calc(100dvh-15rem)] min-h-[38rem] rounded-lg border border-border bg-surface'
+          : ''
+      }`}
+    >
+      <aside className="flex shrink-0 flex-col gap-3 border-b border-border bg-surface/60 p-3 lg:h-full lg:w-[17rem] lg:border-r lg:border-b-0">
+        <div className="px-2 pt-1">
+          <p className="font-mono text-[9px] tracking-[0.14em] text-ink-faint uppercase">
+            {repoId ? 'Chat do repositório' : 'Chat global'}
+          </p>
+          <p className="mt-1 truncate font-mono text-[11px] text-ink-dim">
+            {repoId ?? 'consulta sob demanda'}
+          </p>
+        </div>
 
         <button
           type="button"
           onClick={startThread}
-          disabled={creating || !scope}
+          disabled={creating}
           className="flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface-1 px-3 text-sm font-semibold text-ink transition-colors hover:border-ink-faint hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className="size-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
             <path d="M12 5v14M5 12h14" />
           </svg>
           Nova conversa
@@ -254,7 +293,7 @@ export function ChatPage() {
         </div>
       </aside>
 
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
         {(missingKey || error || stale.length > 0) && (
           <div className="shrink-0 space-y-2 border-b border-border px-4 py-3">
             {missingKey && (
@@ -282,7 +321,7 @@ export function ChatPage() {
             {stale.length > 0 && (
               <p className="rounded-md border border-border bg-surface-2 px-3 py-2 text-[13px] text-ink-dim">
                 Índice mais novo disponível para {stale.join(', ')}. Esta conversa
-                responde sobre o commit indexado quando foi criada.
+                usa o commit congelado quando foi criada.
               </p>
             )}
           </div>
@@ -291,19 +330,27 @@ export function ChatPage() {
         {empty ? (
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-10">
             <div className="w-full max-w-[46rem]">
+              <div className="mx-auto mb-5 grid size-10 place-items-center rounded-xl border border-border-strong bg-surface-1 font-mono text-sm text-accent shadow-card">
+                {repoId ? '&gt;_' : '/_'}
+              </div>
               <h1 className="text-center font-display text-2xl leading-tight font-bold text-ink sm:text-3xl">
-                O que você quer entender do código?
+                {repoId
+                  ? `Explore ${repo}`
+                  : 'Pergunte sobre qualquer repositório indexado'}
               </h1>
-              <p className="mt-2 text-center text-[14px] leading-6 text-ink-dim">
-                {scope
-                  ? 'As respostas saem do índice, com arquivo e linha clicáveis.'
-                  : 'Escolha um repositório ou projeto à esquerda para começar.'}
+              <p className="mx-auto mt-2 max-w-xl text-center text-[14px] leading-6 text-ink-dim">
+                {repoId
+                  ? 'O commit indexado fica congelado nesta conversa, com evidências verificáveis.'
+                  : 'A IA descobre repositórios somente quando precisa. Comece com / para indicar um específico.'}
               </p>
 
               <div className="mt-7">
                 <Composer
                   threadId={thread?.id ?? null}
-                  disabled={live.running || !scope || missingKey}
+                  scopeMode={scopeMode}
+                  disabled={live.running || missingKey}
+                  model={model}
+                  onModelChange={setModel}
                   autoFocus
                   onSubmit={send}
                 />
@@ -314,8 +361,8 @@ export function ChatPage() {
                   <button
                     key={suggestion}
                     type="button"
-                    disabled={!scope || missingKey || live.running}
-                    onClick={() => void send(suggestion, [])}
+                    disabled={missingKey || live.running}
+                    onClick={() => void send(suggestion, [], null)}
                     className="cursor-pointer rounded-full border border-border bg-surface-1 px-3 py-1.5 text-[12.5px] text-ink-dim transition-colors hover:border-ink-faint hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {suggestion}
@@ -359,11 +406,14 @@ export function ChatPage() {
               </div>
             </div>
 
-            <div className="shrink-0 border-t border-border px-4 py-3">
+            <div className="shrink-0 border-t border-border bg-surface/95 px-4 py-3">
               <div className="mx-auto w-full max-w-[46rem]">
                 <Composer
                   threadId={thread.id}
+                  scopeMode={scopeMode}
                   disabled={live.running || missingKey}
+                  model={model}
+                  onModelChange={setModel}
                   onSubmit={send}
                 />
               </div>

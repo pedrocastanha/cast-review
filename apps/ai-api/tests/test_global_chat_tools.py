@@ -91,6 +91,8 @@ async def test_two_repositories_are_resolved_and_loaded_lazily():
 
     assert back.items[0]["repoId"] == "acme/back"
     assert front.items[0]["repoId"] == "acme/front"
+    assert back.citations[0].sha == "sha-back"
+    assert front.citations[0].sha == "sha-front"
     assert catalog.resolve_calls == ["acme/back", "acme/front"]
     assert cache.calls == [("acme/back", "sha-back"), ("acme/front", "sha-front")]
 

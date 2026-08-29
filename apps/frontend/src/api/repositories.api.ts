@@ -8,7 +8,12 @@ import type {
 import { request } from './http';
 
 export const repositoriesApi = {
-  list: () => request<Repository[]>('/repositories'),
+  list: (filters: { indexed?: boolean } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.indexed) params.set('indexed', 'true');
+    const query = params.toString();
+    return request<Repository[]>(`/repositories${query ? `?${query}` : ''}`);
+  },
 
   listPulls: (repo: string, owner: string) =>
     request<PullRequest[]>(

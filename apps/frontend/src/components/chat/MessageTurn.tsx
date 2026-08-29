@@ -32,12 +32,12 @@ export function MessageTurn({ message, shaByRepo }: MessageTurnProps) {
       <ToolTrace calls={message.toolCalls} />
       <CitationList citations={message.citations} shaByRepo={shaByRepo} />
 
-      {message.usage && (
-        <p className="mt-2 font-mono text-[10px] text-ink-faint">
-          {message.usage.promptTokens + message.usage.completionTokens} tokens · US$
-          {message.usage.costUsd.toFixed(4)}
-        </p>
-      )}
+      <p className="mt-2 font-mono text-[10px] text-ink-faint">
+        {message.model ?? 'modelo não registrado'}
+        {message.usage
+          ? ` · ${message.usage.promptTokens + message.usage.completionTokens} tokens · US$ ${message.usage.costUsd.toFixed(4)}`
+          : ''}
+      </p>
     </article>
   );
 }

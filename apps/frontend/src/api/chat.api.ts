@@ -8,8 +8,8 @@ import { authorizedFetch, request } from './http';
 import { consumeSseStream } from './sse';
 
 export type CreateChatThreadPayload =
-  | { mode: 'repository'; repoId: string }
-  | { mode: 'project'; projectId: string };
+  | { mode: 'global' }
+  | { mode: 'repository'; repoId: string };
 
 export const chatApi = {
   create: (scope: CreateChatThreadPayload) =>

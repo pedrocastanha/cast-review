@@ -1,3 +1,9 @@
+import { Link } from 'react-router-dom';
+import {
+  citationGithubUrl,
+  citationGraphUrl,
+  groupCitations,
+} from '../../lib/chat-citations';
 import type { ChatCitation } from '../../types';
 
 interface CitationListProps {
@@ -5,61 +11,91 @@ interface CitationListProps {
   shaByRepo: Record<string, string>;
 }
 
-function githubLink(citation: ChatCitation, sha: string | undefined): string | null {
-  if (!sha) return null;
-  const anchor = citation.line !== null ? `#L${citation.line}` : '';
-  return `https://github.com/${citation.repoId}/blob/${sha}/${citation.path}${anchor}`;
-}
-
 export function CitationList({ citations, shaByRepo }: CitationListProps) {
   if (citations.length === 0) return null;
-
-  const chip =
-    'inline-flex max-w-full items-baseline gap-1.5 rounded-md border border-border bg-surface-1 px-2 py-1 font-mono text-[11px] text-ink-dim';
+  const groups = groupCitations(citations);
 
   return (
-    <div className="mt-4">
-      <p className="font-mono text-[10px] tracking-[0.1em] text-ink-faint uppercase">
-        Evidência
-      </p>
-      <ul className="mt-2 flex flex-wrap gap-1.5">
-        {citations.map((citation) => {
-          const href = githubLink(citation, shaByRepo[citation.repoId]);
-          const label = (
-            <>
-              <span className="truncate">{citation.path.split('/').pop()}</span>
-              {citation.line !== null && (
-                <span className="text-ink-faint">:{citation.line}</span>
-              )}
-              {citation.symbolName && (
-                <span className="truncate text-accent">{citation.symbolName}</span>
-              )}
-            </>
-          );
+    <details className="group/evidence mt-4 rounded-lg border border-border bg-surface-1">
+      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 font-mono text-[10.5px] text-ink-dim marker:hidden hover:text-ink">
+        <span className="grid size-5 place-items-center rounded border border-border bg-surface-2 text-[10px] text-accent">
+          {citations.length}
+        </span>
+        <span className="font-semibold tracking-[0.08em] uppercase">
+          Evidências
+        </span>
+        <span className="text-ink-faint">
+          {groups.length} repo{groups.length === 1 ? '' : 's'}
+        </span>
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          aria-hidden="true"
+          className="ml-auto size-3.5 text-ink-faint transition-transform group-open/evidence:rotate-180"
+        >
+          <path d="m4 6 4 4 4-4" />
+        </svg>
+      </summary>
 
-          return (
-            <li
-              key={`${citation.repoId}:${citation.path}:${citation.line}:${citation.symbolId}`}
-            >
-              {href ? (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={`${citation.repoId} → ${citation.path}`}
-                  className={`${chip} transition-colors hover:border-accent hover:text-ink`}
-                >
-                  {label}
-                </a>
-              ) : (
-                <span title={`${citation.repoId} → ${citation.path}`} className={chip}>
-                  {label}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+      <div className="border-t border-border px-3 py-3">
+        <div className="space-y-4">
+          {groups.map((group) => (
+            <section key={group.repoId}>
+              <h3 className="flex items-center gap-2 font-mono text-[10px] tracking-[0.08em] text-accent uppercase">
+                <span className="size-1.5 rounded-full bg-accent" />
+                {group.repoId}
+              </h3>
+              <ul className="mt-1.5 divide-y divide-border border-y border-border">
+                {group.citations.map((citation) => {
+                  const githubUrl = citationGithubUrl(citation, shaByRepo);
+                  const graphUrl = citationGraphUrl(citation);
+                  return (
+                    <li
+                      key={`${citation.repoId}:${citation.path}:${citation.line}:${citation.symbolId}`}
+                      className="flex min-w-0 items-center gap-2 py-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        {githubUrl ? (
+                          <a
+                            href={githubUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={`${citation.repoId} → ${citation.path}`}
+                            className="block truncate font-mono text-[11px] text-ink-dim transition-colors hover:text-accent"
+                          >
+                            {citation.path}
+                            {citation.line !== null ? `:${citation.line}` : ''}
+                          </a>
+                        ) : (
+                          <span className="block truncate font-mono text-[11px] text-ink-dim">
+                            {citation.path}
+                            {citation.line !== null ? `:${citation.line}` : ''}
+                          </span>
+                        )}
+                        {citation.symbolName && (
+                          <span className="mt-0.5 block truncate font-mono text-[10px] text-ink-faint">
+                            {citation.symbolName}
+                          </span>
+                        )}
+                      </div>
+                      {graphUrl && (
+                        <Link
+                          to={graphUrl}
+                          className="shrink-0 rounded-md border border-border px-2 py-1 font-mono text-[9px] text-ink-faint transition-colors hover:border-accent hover:text-accent"
+                        >
+                          grafo
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </div>
+    </details>
   );
 }

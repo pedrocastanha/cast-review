@@ -51,9 +51,10 @@ def _symbol_item(repo_id: str, symbol: Symbol, *, with_body: bool = False) -> di
     return item
 
 
-def _symbol_citation(repo_id: str, symbol: Symbol) -> Citation:
+def _symbol_citation(repo_id: str, sha: str, symbol: Symbol) -> Citation:
     return Citation(
         repoId=repo_id,
+        sha=sha,
         path=symbol.path,
         line=symbol.line,
         symbolId=symbol.id,
@@ -177,7 +178,10 @@ class ToolExecutor:
         selected = scored[:limit]
         return ToolResult(
             items=[_symbol_item(workspace.repo_id, symbol) for _, _, workspace, symbol in selected],
-            citations=[_symbol_citation(workspace.repo_id, symbol) for _, _, workspace, symbol in selected],
+            citations=[
+                _symbol_citation(workspace.repo_id, workspace.sha, symbol)
+                for _, _, workspace, symbol in selected
+            ],
             note=None if selected else f"nenhum símbolo encontrado para '{query}'",
         )
 
@@ -190,7 +194,9 @@ class ToolExecutor:
             if symbol is not None:
                 return ToolResult(
                     items=[_symbol_item(workspace.repo_id, symbol, with_body=True)],
-                    citations=[_symbol_citation(workspace.repo_id, symbol)],
+                    citations=[
+                        _symbol_citation(workspace.repo_id, workspace.sha, symbol)
+                    ],
                 )
         return ToolResult(note=f"símbolo '{symbol_id}' não existe no índice")
 
@@ -205,7 +211,14 @@ class ToolExecutor:
             body, truncated = _truncate_body(content)
             return ToolResult(
                 items=[{"repoId": workspace.repo_id, "path": path, "content": body}],
-                citations=[Citation(repoId=workspace.repo_id, path=path, line=1)],
+                citations=[
+                    Citation(
+                        repoId=workspace.repo_id,
+                        sha=workspace.sha,
+                        path=path,
+                        line=1,
+                    )
+                ],
                 truncated=truncated,
             )
         return ToolResult(
@@ -234,7 +247,10 @@ class ToolExecutor:
             ]
             return ToolResult(
                 items=items,
-                citations=[_symbol_citation(workspace.repo_id, symbol) for symbol, _, _ in found],
+                citations=[
+                    _symbol_citation(workspace.repo_id, workspace.sha, symbol)
+                    for symbol, _, _ in found
+                ],
                 note=None if found else "nenhum vizinho encontrado",
             )
         return ToolResult(note=f"símbolo '{symbol_id}' não existe no índice")
@@ -298,6 +314,7 @@ class ToolExecutor:
                 citations.append(
                     Citation(
                         repoId=workspace.repo_id,
+                        sha=workspace.sha,
                         path=endpoint.path,
                         line=endpoint.line,
                         symbolId=endpoint.symbol_id,
@@ -353,6 +370,7 @@ class ToolExecutor:
                 citations.append(
                     Citation(
                         repoId=consumer_workspace.repo_id,
+                        sha=consumer_workspace.sha,
                         path=consumer.path,
                         line=consumer.line,
                         symbolId=consumer.symbol_id,

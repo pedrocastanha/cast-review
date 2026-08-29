@@ -8,9 +8,7 @@ interface ThreadListProps {
 }
 
 function scopeOf(thread: ChatThread): string {
-  if (thread.scope.mode === 'project') {
-    return thread.scope.projectName ?? 'projeto';
-  }
+  if (thread.scope.mode === 'global') return 'global';
   return thread.repoId?.split('/').pop() ?? '';
 }
 

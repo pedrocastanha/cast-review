@@ -20,9 +20,8 @@ import { useAuth } from '../context/AuthContext';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
 import { useRepoAnalyses } from '../hooks/useRepoAnalyses';
 import { hasReviewContent } from '../lib/assemble-report';
+import { DEFAULT_AI_MODEL } from '../lib/ai-models';
 import type { EligibleProject, PullRequest, SpecPayload } from '../types';
-
-const DEFAULT_MODEL = 'gpt-4o';
 
 const POLICY_LABEL_CLASS =
   'font-mono text-[10.5px] font-medium tracking-[0.12em] text-ink-faint uppercase';
@@ -142,8 +141,8 @@ export function AnalysisPage() {
 
   const [pull, setPull] = useState<PullRequest | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [testModel, setTestModel] = useState(DEFAULT_MODEL);
-  const [archModel, setArchModel] = useState(DEFAULT_MODEL);
+  const [testModel, setTestModel] = useState(DEFAULT_AI_MODEL);
+  const [archModel, setArchModel] = useState(DEFAULT_AI_MODEL);
   const [prdPolicy, setPrdPolicy] = useState<'manual' | 'auto'>('manual');
   const [specPolicy, setSpecPolicy] = useState<'manual' | 'auto'>('manual');
   const [publishPolicy, setPublishPolicy] = useState<'manual' | 'auto_safe' | 'auto'>('manual');

@@ -21,6 +21,7 @@ export interface ChatMention {
 
 export interface ChatCitation {
   repoId: string;
+  sha?: string | null;
   path: string;
   line: number | null;
   symbolId: string | null;

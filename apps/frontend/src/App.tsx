@@ -115,6 +115,18 @@ function App() {
             }
           />
           <Route
+            path="/repos/:owner/:repo/chat"
+            element={
+              <ProtectedRoute>
+                <Layout wide>
+                  <RepositoryLayout>
+                    <ChatPage />
+                  </RepositoryLayout>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/repos/:owner/:repo/pulls/:pullNumber"
             element={
               <ProtectedRoute>
