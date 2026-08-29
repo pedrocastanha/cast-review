@@ -19,13 +19,19 @@ describe('CreateChatThreadDto', () => {
     expect(value.scope).toEqual({ mode: 'repository', repoId: 'acme/back' });
   });
 
-  it('aceita escopo de projeto', async () => {
-    const value = await pipe.transform(
-      { scope: { mode: 'project', projectId: 'uuid-1' } },
-      metadata,
-    );
+  it('aceita escopo global', async () => {
+    const value = await pipe.transform({ scope: { mode: 'global' } }, metadata);
 
-    expect(value.scope).toEqual({ mode: 'project', projectId: 'uuid-1' });
+    expect(value.scope).toEqual({ mode: 'global' });
+  });
+
+  it('rejeita o modo de projeto removido', async () => {
+    await expect(
+      pipe.transform(
+        { scope: { mode: 'project', projectId: 'uuid-1' } },
+        metadata,
+      ),
+    ).rejects.toBeDefined();
   });
 
   it('rejeita corpo sem scope', async () => {
@@ -33,6 +39,8 @@ describe('CreateChatThreadDto', () => {
   });
 
   it('rejeita scope que não é objeto', async () => {
-    await expect(pipe.transform({ scope: 'repository' }, metadata)).rejects.toBeDefined();
+    await expect(
+      pipe.transform({ scope: 'repository' }, metadata),
+    ).rejects.toBeDefined();
   });
 });

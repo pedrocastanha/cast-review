@@ -20,6 +20,9 @@ export class ChatMessage extends DefaultEntity<ChatMessage> {
   @Column({ type: 'text' })
   content: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  model: string | null;
+
   @Column({ type: 'jsonb', default: () => "'[]'" })
   mentions: ChatMention[];
 

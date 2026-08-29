@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   Length,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 
@@ -30,5 +31,11 @@ export class SendChatMessageDto {
   mentions?: ChatMentionDto[];
 
   @IsString()
+  @Length(1, 120)
   model!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^[^/\s]+\/[^/\s]+$/)
+  repositoryHint?: string;
 }

@@ -18,13 +18,14 @@ function threadRepository(seed: any[] = []) {
       return entity;
     }),
     find: jest.fn(async () => [...rows]),
-    findOne: jest.fn(async ({ where }: any) =>
-      rows.find(
-        (row) =>
-          row.id === where.id &&
-          row.userId === where.userId &&
-          row.active !== false,
-      ) ?? null,
+    findOne: jest.fn(
+      async ({ where }: any) =>
+        rows.find(
+          (row) =>
+            row.id === where.id &&
+            row.userId === where.userId &&
+            row.active !== false,
+        ) ?? null,
     ),
     update: jest.fn(async (id: string, patch: any) => {
       const row = rows.find((candidate) => candidate.id === id);
@@ -59,17 +60,6 @@ function buildService(overrides: any = {}) {
     getFileContent: jest.fn(async () => 'conteudo do github'),
     ...overrides.repositoriesService,
   };
-  const projectsService = {
-    getById: jest.fn(async () => ({ id: 'project-1', name: 'Cast' })),
-    getIndexStatus: jest.fn(async () => ({
-      projectId: 'project-1',
-      repositories: [
-        { repository: 'acme/back', status: 'indexed', sha: 'sha-back', stale: false },
-        { repository: 'acme/front', status: 'not_indexed', sha: null, stale: false },
-      ],
-    })),
-    ...overrides.projectsService,
-  };
   const userService = {
     getOpenaiKey: jest.fn(async () => 'sk-do-banco'),
     ...overrides.userService,
@@ -90,14 +80,18 @@ function buildService(overrides: any = {}) {
     ...overrides.aiApiClient,
   };
   const logger = { error: jest.fn(), log: jest.fn(), warn: jest.fn() };
+  const catalogGrantService = {
+    issue: jest.fn(() => 'catalog-grant'),
+    ...overrides.catalogGrantService,
+  };
 
   const service = new ChatService(
     threads as any,
     messages as any,
     repositoriesService as any,
-    projectsService as any,
     userService as any,
     aiApiClient as any,
+    catalogGrantService as any,
     logger as any,
   );
 
@@ -106,9 +100,9 @@ function buildService(overrides: any = {}) {
     threads,
     messages,
     repositoriesService,
-    projectsService,
     userService,
     aiApiClient,
+    catalogGrantService,
   };
 }
 
@@ -126,7 +120,12 @@ function seedThread(overrides: any = {}) {
     scope: {
       mode: 'repository',
       repositories: [
-        { repoId: 'acme/back', sha: 'sha-abc', included: true, omissionReason: null },
+        {
+          repoId: 'acme/back',
+          sha: 'sha-abc',
+          included: true,
+          omissionReason: null,
+        },
       ],
     },
     ...overrides,
@@ -134,6 +133,20 @@ function seedThread(overrides: any = {}) {
 }
 
 describe('ChatService.create', () => {
+  it('cria uma thread global sem congelar o catálogo', async () => {
+    const { service, threads, repositoriesService } = buildService();
+
+    const thread = await service.create(
+      { scope: { mode: 'global' } },
+      currentUser,
+    );
+
+    expect(thread.scope).toEqual({ mode: 'global', repositories: [] });
+    expect(thread.repoId).toBeNull();
+    expect(threads.save).toHaveBeenCalled();
+    expect(repositoriesService.getRepositoryIndexStatus).not.toHaveBeenCalled();
+  });
+
   it('congela o sha indexado no escopo do repositório', async () => {
     const { service, threads } = buildService();
 
@@ -143,7 +156,12 @@ describe('ChatService.create', () => {
     );
 
     expect(thread.scope.repositories).toEqual([
-      { repoId: 'acme/back', sha: 'sha-abc', included: true, omissionReason: null },
+      {
+        repoId: 'acme/back',
+        sha: 'sha-abc',
+        included: true,
+        omissionReason: null,
+      },
     ]);
     expect(threads.save).toHaveBeenCalled();
   });
@@ -152,7 +170,10 @@ describe('ChatService.create', () => {
     const { service } = buildService();
 
     await expect(
-      service.create({ scope: { mode: 'repository', repoId: 'semBarra' } }, currentUser),
+      service.create(
+        { scope: { mode: 'repository', repoId: 'semBarra' } },
+        currentUser,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -168,23 +189,11 @@ describe('ChatService.create', () => {
     });
 
     await expect(
-      service.create({ scope: { mode: 'repository', repoId: 'acme/back' } }, currentUser),
+      service.create(
+        { scope: { mode: 'repository', repoId: 'acme/back' } },
+        currentUser,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('marca repositório não indexado do projeto como omitido, sem bloquear a thread', async () => {
-    const { service } = buildService();
-
-    const thread = await service.create(
-      { scope: { mode: 'project', projectId: 'project-1' } },
-      currentUser,
-    );
-
-    expect(thread.scope.projectName).toBe('Cast');
-    expect(thread.scope.repositories).toEqual([
-      { repoId: 'acme/back', sha: 'sha-back', included: true, omissionReason: null },
-      { repoId: 'acme/front', sha: null, included: false, omissionReason: 'not_indexed' },
-    ]);
   });
 
   it('rejeita modo desconhecido', async () => {
@@ -193,6 +202,29 @@ describe('ChatService.create', () => {
     await expect(
       service.create({ scope: { mode: 'galaxia' } } as any, currentUser),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('ChatService.list', () => {
+  it('omite threads históricas de projeto', async () => {
+    const threads = threadRepository([
+      seedThread(),
+      seedThread({ id: 'project-thread', scopeType: 'project' }),
+      seedThread({
+        id: 'global-thread',
+        scopeType: 'global',
+        repoId: null,
+        scope: { mode: 'global', repositories: [] },
+      }),
+    ]);
+    const { service } = buildService({ threads });
+
+    const result = await service.list(currentUser, {});
+
+    expect(result.map((thread) => thread.id)).toEqual([
+      'thread-1',
+      'global-thread',
+    ]);
   });
 });
 
@@ -284,7 +316,12 @@ describe('ChatService.sendMessage', () => {
               content: 'login está em src/a.ts:4',
               citations: [{ repoId: 'acme/back', path: 'src/a.ts', line: 4 }],
               toolCalls: [{ name: 'search_symbols' }],
-              usage: { promptTokens: 10, completionTokens: 4, cachedTokens: 0, costUsd: 0.01 },
+              usage: {
+                promptTokens: 10,
+                completionTokens: 4,
+                cachedTokens: 0,
+                costUsd: 0.01,
+              },
               truncated: false,
             },
           },
@@ -307,12 +344,85 @@ describe('ChatService.sendMessage', () => {
 
     expect(messages.rows[0].role).toBe('user');
     expect(messages.rows[0].content).toBe('quem faz login?');
+    expect(messages.rows[0].model).toBe('gpt-4o');
     expect(messages.rows[1].role).toBe('assistant');
+    expect(messages.rows[1].model).toBe('gpt-4o');
     expect(messages.rows[1].citations).toHaveLength(1);
     expect(messages.rows[1].usage.costUsd).toBe(0.01);
     expect(written).toHaveLength(2);
     expect(res.end).toHaveBeenCalled();
     expect(aiApiClient.runChat).toHaveBeenCalled();
+  });
+
+  it('envia uma thread global com grant e sem catálogo pré-carregado', async () => {
+    const threads = threadRepository([
+      seedThread({
+        scopeType: 'global',
+        repoId: null,
+        scope: { mode: 'global', repositories: [] },
+      }),
+    ]);
+    const { service, aiApiClient, catalogGrantService } = buildService({
+      threads,
+      aiApiClient: { runChat: events([]) },
+    });
+    const { req, res } = httpDoubles();
+
+    await service.sendMessage(
+      'thread-1',
+      { content: 'quais repositórios existem?', model: 'gpt-5.4-mini' },
+      currentUser,
+      req,
+      res,
+    );
+
+    const payload = (aiApiClient.runChat as jest.Mock).mock.calls[0][0];
+    expect(payload.mode).toBe('global');
+    expect(payload.repositories).toEqual([]);
+    expect(payload.catalog.grant).toBe('catalog-grant');
+    expect(payload.catalog.url).toContain('/internal/chat/catalog');
+    expect(catalogGrantService.issue).toHaveBeenCalledWith(
+      currentUser,
+      'thread-1',
+    );
+  });
+
+  it('valida a pista de repositório antes de enviá-la ao agente global', async () => {
+    const threads = threadRepository([
+      seedThread({
+        scopeType: 'global',
+        repoId: null,
+        scope: { mode: 'global', repositories: [] },
+      }),
+    ]);
+    const { service, aiApiClient, repositoriesService } = buildService({
+      threads,
+      aiApiClient: { runChat: events([]) },
+    });
+    const { req, res } = httpDoubles();
+
+    await service.sendMessage(
+      'thread-1',
+      {
+        content: 'como funciona?',
+        model: 'gpt-5.4-mini',
+        repositoryHint: 'acme/back',
+      },
+      currentUser,
+      req,
+      res,
+    );
+
+    expect(repositoriesService.getRepositoryIndexStatus).toHaveBeenCalledWith(
+      'back',
+      currentUser,
+      'acme',
+    );
+    const payload = (aiApiClient.runChat as jest.Mock).mock.calls[0][0];
+    expect(payload.repositoryHint).toEqual({
+      repoId: 'acme/back',
+      sha: 'sha-abc',
+    });
   });
 
   it('resolve menção pelo grafo antes de tentar o GitHub', async () => {
@@ -409,8 +519,20 @@ describe('ChatService.sendMessage', () => {
   it('manda o histórico anterior junto da pergunta', async () => {
     const threads = threadRepository([seedThread()]);
     const messages = messageRepository([
-      { id: 'm1', threadId: 'thread-1', role: 'user', content: 'antes', active: true },
-      { id: 'm2', threadId: 'thread-1', role: 'assistant', content: 'resposta', active: true },
+      {
+        id: 'm1',
+        threadId: 'thread-1',
+        role: 'user',
+        content: 'antes',
+        active: true,
+      },
+      {
+        id: 'm2',
+        threadId: 'thread-1',
+        role: 'assistant',
+        content: 'resposta',
+        active: true,
+      },
     ]);
     const { service, aiApiClient } = buildService({
       threads,
@@ -486,7 +608,12 @@ describe('ChatService.sendMessage', () => {
         scope: {
           mode: 'repository',
           repositories: [
-            { repoId: 'acme/back', sha: null, included: false, omissionReason: 'not_indexed' },
+            {
+              repoId: 'acme/back',
+              sha: null,
+              included: false,
+              omissionReason: 'not_indexed',
+            },
           ],
         },
       }),
@@ -505,7 +632,6 @@ describe('ChatService.sendMessage', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
-
 
 describe('ChatService e a chave da OpenAI', () => {
   function httpDoubles() {

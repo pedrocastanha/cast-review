@@ -236,13 +236,17 @@ export interface ChatRunHistoryMessage {
 
 export interface ChatRunRequest {
   threadId: string;
-  mode: 'repository' | 'project';
-  projectId?: string | null;
+  mode: 'global' | 'repository';
   repositories: ChatRunScopeRepository[];
   history: ChatRunHistoryMessage[];
   question: string;
   mentions: ChatRunMention[];
   model: string;
+  repositoryHint?: ChatRunScopeRepository | null;
+  catalog?: {
+    url: string;
+    grant: string;
+  } | null;
   apiKeys: {
     openai: string;
   };

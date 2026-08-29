@@ -14,19 +14,19 @@ import type {
   ChatRunScopeRepository,
 } from 'src/shared/types';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
-import type { ProjectsService } from '../projects/projects.service';
 import type { RepositoriesService } from '../repositories/repositories.service';
 import type { UserService } from '../users/user.service';
-import type { ChatMessage } from './chat-message.entity';
-import { ChatMessageRepository } from './chat-message.repository';
-import type { ChatThread } from './chat-thread.entity';
-import { ChatThreadRepository } from './chat-thread.repository';
 import type {
   ChatCitation,
   ChatScope,
   ChatToolCallRecord,
   ChatUsage,
 } from './chat.types';
+import { ChatCatalogGrantService } from './chat-catalog-grant.service';
+import type { ChatMessage } from './chat-message.entity';
+import { ChatMessageRepository } from './chat-message.repository';
+import type { ChatThread } from './chat-thread.entity';
+import { ChatThreadRepository } from './chat-thread.repository';
 import type { CreateChatThreadDto } from './dtos/create-chat-thread.dto';
 import type { SendChatMessageDto } from './dtos/send-chat-message.dto';
 
@@ -48,17 +48,19 @@ export class ChatService {
     private readonly messageRepository: ChatMessageRepository,
     @Inject('REPOSITORIES_SERVICE')
     private readonly repositoriesService: RepositoriesService,
-    @Inject('PROJECTS_SERVICE')
-    private readonly projectsService: ProjectsService,
     @Inject('USER_SERVICE')
     private readonly userService: UserService,
     private readonly aiApiClient: AiApiClient,
+    private readonly catalogGrants: ChatCatalogGrantService,
     private readonly logger: AppLogger,
   ) {}
 
   async create(dto: CreateChatThreadDto, currentUser: CurrentUserData) {
     const scope = await this.resolveScope(dto, currentUser);
-    if (!scope.repositories.some((repository) => repository.included)) {
+    if (
+      scope.mode === 'repository' &&
+      !scope.repositories.some((repository) => repository.included)
+    ) {
       throw new BadRequestException(
         'Nenhum repositório indexado neste escopo. Indexe antes de abrir o chat.',
       );
@@ -68,8 +70,9 @@ export class ChatService {
       this.threadRepository.create({
         userId: currentUser.id,
         scopeType: scope.mode,
-        repoId: scope.mode === 'repository' ? scope.repositories[0].repoId : null,
-        projectId: scope.projectId ?? null,
+        repoId:
+          scope.mode === 'repository' ? scope.repositories[0].repoId : null,
+        projectId: null,
         title: DEFAULT_TITLE,
         scope,
       }),
@@ -91,7 +94,9 @@ export class ChatService {
       },
       order: { updatedAt: 'DESC' },
     });
-    return threads.map((thread) => this.toThreadDto(thread, []));
+    return threads
+      .filter((thread) => thread.scopeType !== 'project')
+      .map((thread) => this.toThreadDto(thread, []));
   }
 
   async get(id: string, currentUser: CurrentUserData) {
@@ -149,10 +154,14 @@ export class ChatService {
     res: Response,
   ) {
     const thread = await this.requireThread(id, currentUser);
+    if (thread.scope.mode === 'project') {
+      throw new BadRequestException('Conversas de projeto não são suportadas');
+    }
+    const mode = thread.scope.mode;
     const included = thread.scope.repositories.filter(
       (repository) => repository.included && repository.sha,
     );
-    if (included.length === 0) {
+    if (thread.scope.mode === 'repository' && included.length === 0) {
       throw new BadRequestException(
         'Nenhum repositório indexado nesta conversa.',
       );
@@ -165,12 +174,18 @@ export class ChatService {
       dto.mentions ?? [],
       currentUser,
     );
+    const repositoryHint = await this.resolveRepositoryHint(
+      thread,
+      dto.repositoryHint,
+      currentUser,
+    );
 
     const userMessage = await this.messageRepository.save(
       this.messageRepository.create({
         threadId: thread.id,
         role: 'user',
         content: dto.content,
+        model: dto.model,
         mentions: (dto.mentions ?? []).map((mention) => ({
           repoId: mention.repoId,
           path: mention.path,
@@ -190,8 +205,7 @@ export class ChatService {
 
     const payload: ChatRunRequest = {
       threadId: thread.id,
-      mode: thread.scope.mode,
-      projectId: thread.scope.projectId ?? null,
+      mode,
       repositories: included.map<ChatRunScopeRepository>((repository) => ({
         repoId: repository.repoId,
         sha: repository.sha as string,
@@ -203,6 +217,14 @@ export class ChatService {
       question: dto.content,
       mentions,
       model: dto.model,
+      repositoryHint,
+      catalog:
+        mode === 'global'
+          ? {
+              url: this.catalogUrl(),
+              grant: this.catalogGrants.issue(currentUser, thread.id),
+            }
+          : null,
       apiKeys: { openai },
     };
 
@@ -225,7 +247,7 @@ export class ChatService {
       )) {
         res.write(`data: ${JSON.stringify(event)}\n\n`);
         if (event.type === 'message_done') {
-          await this.persistAnswer(thread.id, event);
+          await this.persistAnswer(thread.id, dto.model, event);
         }
       }
       res.end();
@@ -244,7 +266,11 @@ export class ChatService {
     }
   }
 
-  private async persistAnswer(threadId: string, event: ChatEvent) {
+  private async persistAnswer(
+    threadId: string,
+    model: string,
+    event: ChatEvent,
+  ) {
     const payload = event.payload as {
       content?: string;
       citations?: ChatCitation[];
@@ -258,6 +284,7 @@ export class ChatService {
         threadId,
         role: 'assistant',
         content: payload.content ?? '',
+        model,
         mentions: [],
         toolCalls: payload.toolCalls ?? [],
         citations: payload.citations ?? [],
@@ -320,6 +347,9 @@ export class ChatService {
     currentUser: CurrentUserData,
   ): Promise<ChatScope> {
     const scope = dto?.scope;
+    if (scope?.mode === 'global') {
+      return { mode: 'global', repositories: [] };
+    }
     if (scope?.mode === 'repository') {
       const { owner, name } = splitRepoId(scope.repoId);
       const status = await this.repositoriesService.getRepositoryIndexStatus(
@@ -341,32 +371,37 @@ export class ChatService {
       };
     }
 
-    if (scope?.mode === 'project') {
-      const project = await this.projectsService.getById(
-        scope.projectId,
-        currentUser,
-      );
-      const status = await this.projectsService.getIndexStatus(
-        project.id,
-        currentUser,
-      );
-      return {
-        mode: 'project',
-        projectId: project.id,
-        projectName: project.name,
-        repositories: status.repositories.map((repository) => ({
-          repoId: repository.repository,
-          sha: repository.sha ?? null,
-          included: repository.status === 'indexed' && Boolean(repository.sha),
-          omissionReason:
-            repository.status === 'indexed' && repository.sha
-              ? null
-              : repository.status,
-        })),
-      };
-    }
+    throw new BadRequestException('scope.mode deve ser global ou repository');
+  }
 
-    throw new BadRequestException('scope.mode deve ser repository ou project');
+  private async resolveRepositoryHint(
+    thread: ChatThread,
+    hint: string | undefined,
+    currentUser: CurrentUserData,
+  ): Promise<ChatRunScopeRepository | null> {
+    if (!hint) return null;
+    if (thread.scope.mode !== 'global') {
+      throw new BadRequestException(
+        'repositoryHint só pode ser usado no chat global',
+      );
+    }
+    const { owner, name } = splitRepoId(hint);
+    const status = await this.repositoriesService.getRepositoryIndexStatus(
+      name,
+      currentUser,
+      owner,
+    );
+    if (status.status !== 'indexed' || !status.sha) {
+      throw new BadRequestException('Repositório não está indexado');
+    }
+    return { repoId: `${owner}/${name}`, sha: status.sha };
+  }
+
+  private catalogUrl(): string {
+    const base =
+      process.env.BACKEND_INTERNAL_URL?.trim() ||
+      `http://127.0.0.1:${process.env.PORT ?? '3000'}`;
+    return `${base.replace(/\/$/, '')}/internal/chat/catalog`;
   }
 
   private async staleRepositories(
@@ -381,11 +416,12 @@ export class ChatService {
       included.map(async (repository) => {
         try {
           const { owner, name } = splitRepoId(repository.repoId);
-          const status = await this.repositoriesService.getRepositoryIndexStatus(
-            name,
-            currentUser,
-            owner,
-          );
+          const status =
+            await this.repositoriesService.getRepositoryIndexStatus(
+              name,
+              currentUser,
+              owner,
+            );
           return status.sha && status.sha !== repository.sha
             ? repository.repoId
             : null;
@@ -426,6 +462,7 @@ export class ChatService {
         id: message.id,
         role: message.role,
         content: message.content,
+        model: message.model,
         mentions: message.mentions,
         toolCalls: message.toolCalls,
         citations: message.citations,

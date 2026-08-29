@@ -1,4 +1,4 @@
-export type ChatScopeMode = 'repository' | 'project';
+export type ChatScopeMode = 'global' | 'repository' | 'project';
 
 export interface ChatScopeRepository {
   repoId: string;

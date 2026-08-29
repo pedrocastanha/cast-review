@@ -1,12 +1,11 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Queue } from 'bullmq';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import { BaseService } from 'src/shared/services/base.service';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { UserService } from '../users/user.service';
-import { GithubSessionProvider } from './use-cases/shared/github-session.provider';
 import {
   CODE_INDEX_QUEUE,
   IndexJobData,
@@ -28,6 +27,7 @@ import { ListPullFilesUseCase } from './use-cases/list-pull-files/list-pull-file
 import { ListPullReviewCommentsUseCase } from './use-cases/list-pull-review-comments/list-pull-review-comments.use-case';
 import { ListPullsUseCase } from './use-cases/list-pulls/list-pulls.use-case';
 import { ListReposUseCase } from './use-cases/list-repos/list-repos.use-case';
+import { GithubSessionProvider } from './use-cases/shared/github-session.provider';
 
 @Injectable()
 export class RepositoriesService extends BaseService {
@@ -115,6 +115,93 @@ export class RepositoriesService extends BaseService {
     return repositories.filter((repository) =>
       indexed.has(repository.fullName.toLowerCase()),
     );
+  }
+
+  async listIndexedCatalog(
+    currentUser: CurrentUserData,
+    query: string | undefined,
+    limit: number,
+    cursor?: string,
+  ) {
+    const repositories = await this.listReposUseCase.execute({ currentUser });
+    const accessible = new Set(
+      repositories.map((repository) => repository.fullName.toLowerCase()),
+    );
+    const selected: Array<{ repoId: string; sha: string; stale: boolean }> = [];
+    let nextCursor = cursor;
+
+    while (selected.length < limit) {
+      const page = await this.aiApiClient.listIndexRepositories(
+        query,
+        limit,
+        nextCursor,
+      );
+      const candidates = page.repositories.filter((repository) =>
+        accessible.has(repository.repoId.toLowerCase()),
+      );
+      const checked = await Promise.all(
+        candidates.map(async (repository) => {
+          const [owner, name] = repository.repoId.split('/');
+          if (!owner || !name) return null;
+          try {
+            const status = await this.getRepositoryIndexStatus(
+              name,
+              currentUser,
+              owner,
+            );
+            if (status.status !== 'indexed' || !status.sha) return null;
+            return {
+              repoId: repository.repoId,
+              sha: status.sha,
+              stale: status.stale,
+            };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      selected.push(
+        ...checked.filter(
+          (entry): entry is { repoId: string; sha: string; stale: boolean } =>
+            entry !== null,
+        ),
+      );
+      nextCursor = page.nextCursor ?? undefined;
+      if (!nextCursor) break;
+    }
+
+    return {
+      repositories: selected.slice(0, limit),
+      nextCursor: nextCursor ?? null,
+    };
+  }
+
+  async resolveIndexedCatalogEntry(
+    currentUser: CurrentUserData,
+    owner: string,
+    repo: string,
+  ) {
+    const repositories = await this.listReposUseCase.execute({ currentUser });
+    const repoId = `${owner}/${repo}`;
+    if (
+      !repositories.some(
+        (repository) =>
+          repository.fullName.toLowerCase() === repoId.toLowerCase(),
+      )
+    ) {
+      throw new NotFoundException('Repositório indexado não encontrado');
+    }
+
+    const status = await this.getRepositoryIndexStatus(
+      repo,
+      currentUser,
+      owner,
+    );
+    if (status.status !== 'indexed' || !status.sha) {
+      throw new NotFoundException('Repositório indexado não encontrado');
+    }
+
+    return { repoId, sha: status.sha, stale: status.stale };
   }
 
   async listPulls(
