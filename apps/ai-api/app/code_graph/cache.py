@@ -160,13 +160,13 @@ class IndexCache:
             result = await session.run(
                 """
                 MATCH (r:RepoIndex)
-                WHERE $query IS NULL OR toLower(r.repoId) CONTAINS $query
+                WHERE $searchQuery IS NULL OR toLower(r.repoId) CONTAINS $searchQuery
                 RETURN r.repoId AS repoId, r.sha AS sha
                 ORDER BY r.repoId
                 SKIP $offset
                 LIMIT $fetchLimit
                 """,
-                query=normalized_query,
+                searchQuery=normalized_query,
                 offset=offset,
                 fetchLimit=limit + 1,
             )

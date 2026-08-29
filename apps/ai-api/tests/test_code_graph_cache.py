@@ -123,6 +123,19 @@ async def test_get_latest_sha_returns_indexed_sha(driver, redis_client, repo_id)
     await _cleanup(driver, repo_id)
 
 
+async def test_list_repositories_queries_neo4j_without_parameter_collision(
+    driver, redis_client, repo_id
+):
+    cache = IndexCache(driver, redis_client)
+    await cache.build_and_store(repo_id, "sha1", _sample_graph())
+
+    repositories, next_cursor = await cache.list_repositories(repo_id, 20, None)
+
+    assert repositories == [{"repoId": repo_id, "sha": "sha1"}]
+    assert next_cursor is None
+    await _cleanup(driver, repo_id)
+
+
 async def test_reindex_new_sha_updates_latest_and_drops_old_nodes(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
     await cache.build_and_store(repo_id, "sha1", _sample_graph())
