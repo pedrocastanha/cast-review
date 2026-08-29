@@ -9,8 +9,8 @@ from app.chat.models import Citation, ToolResult
 from app.code_graph.file_view import distinct_paths, render_file
 from app.code_graph.models import Graph, Symbol
 
-MAX_RESULT_CHARS = 6000
-MAX_BODY_CHARS = 4000
+MAX_RESULT_CHARS = 4000
+MAX_BODY_CHARS = 3200
 MAX_DEPTH = 2
 PROJECT_ONLY_TOOLS = {"cross_repo_links"}
 
@@ -426,9 +426,20 @@ class GlobalToolExecutor:
         repo_id = str(args.get("repoId") or "").strip()
         if not repo_id:
             raise ToolError(f"{name} exige 'repoId' no chat global")
-        workspace = await self._workspace(repo_id)
+        workspace, evicted_repo_id = await self._workspace(repo_id)
         executor = ToolExecutor([workspace])
-        return executor.execute(name, args)
+        result = executor.execute(name, args)
+        if evicted_repo_id:
+            eviction_note = (
+                f"workspace '{evicted_repo_id}' removido do contexto por limite de memória"
+            )
+            result.truncated = True
+            result.note = (
+                f"{result.note} | {eviction_note}"
+                if result.note
+                else eviction_note
+            )
+        return result
 
     async def _list_repositories(self, args: dict[str, Any]) -> ToolResult:
         try:
@@ -461,11 +472,13 @@ class GlobalToolExecutor:
             note=f"próximo cursor: {next_cursor}" if next_cursor else None,
         )
 
-    async def _workspace(self, repo_id: str) -> RepoWorkspace:
+    async def _workspace(
+        self, repo_id: str
+    ) -> tuple[RepoWorkspace, str | None]:
         cached = self._workspaces.pop(repo_id, None)
         if cached is not None:
             self._workspaces[repo_id] = cached
-            return cached
+            return cached, None
 
         try:
             entry = await self._catalog.resolve(repo_id)
@@ -481,9 +494,10 @@ class GlobalToolExecutor:
 
         workspace = RepoWorkspace(canonical_repo_id, sha, graph)
         self._workspaces[repo_id] = workspace
+        evicted_repo_id = None
         while len(self._workspaces) > self._max_workspaces:
-            self._workspaces.popitem(last=False)
-        return workspace
+            evicted_repo_id, _ = self._workspaces.popitem(last=False)
+        return workspace, evicted_repo_id
 
 
 def _function(name: str, description: str, properties: dict, required: list[str]) -> dict[str, Any]:

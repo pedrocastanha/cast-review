@@ -1,7 +1,13 @@
 import pytest
 
-from app.chat.agent import MAX_ITERATIONS, run_chat
-from app.chat.models import ChatRunRequest
+from app.chat.agent import (
+    MAX_ITERATIONS,
+    MAX_TOOL_CONTEXT_CHARS,
+    _validate_citations,
+    run_chat,
+)
+from app.chat.models import ChatRunRequest, Citation
+from app.chat.tools import RepoWorkspace, ToolExecutor
 from app.code_graph.models import Graph, HttpEndpoint, Symbol
 from app.infrastructure.llm.client import LlmError, LlmToolResult, ToolCall
 from app.infrastructure.llm.tokens import TokenUsage
@@ -251,6 +257,7 @@ async def test_global_scope_exposes_dynamic_catalog_without_loading_graph(monkey
     assert "cross_repo_links" not in names
     assert "acme/back" in captured[0]["messages"][0]["content"]
     assert "sha1" not in captured[0]["messages"][0]["content"]
+    assert "histórico não substitui evidência" in captured[0]["system"].lower()
     assert cache.calls == []
 
 
@@ -377,3 +384,110 @@ async def test_citations_are_capped_and_deduplicated(monkeypatch):
     assert len(citations) == MAX_CITATIONS
     keys = [(item["repoId"], item["path"], item["line"]) for item in citations]
     assert len(set(keys)) == len(keys)
+
+
+def test_citation_cap_balances_multiple_repositories():
+    back = Graph(
+        nodes={
+            f"b{index}": Symbol(
+                id=f"b{index}",
+                kind="function",
+                path=f"src/back-{index}.ts",
+                name=f"back{index}",
+                line=index + 1,
+                end_line=8,
+                signature=f"function back{index}()",
+                body="function back() {}",
+            )
+            for index in range(20)
+        }
+    )
+    front = Graph(
+        nodes={
+            f"f{index}": Symbol(
+                id=f"f{index}",
+                kind="function",
+                path=f"src/front-{index}.ts",
+                name=f"front{index}",
+                line=index + 1,
+                end_line=8,
+                signature=f"function front{index}()",
+                body="function front() {}",
+            )
+            for index in range(20)
+        }
+    )
+    executor = ToolExecutor(
+        [
+            RepoWorkspace("acme/back", "sha-back", back),
+            RepoWorkspace("acme/front", "sha-front", front),
+        ],
+        mode="project",
+    )
+    citations = [
+        *[
+            Citation(
+                repoId="acme/back",
+                path=f"src/back-{index}.ts",
+                line=index + 1,
+                symbolId=f"b{index}",
+            )
+            for index in range(20)
+        ],
+        *[
+            Citation(
+                repoId="acme/front",
+                path=f"src/front-{index}.ts",
+                line=index + 1,
+                symbolId=f"f{index}",
+            )
+            for index in range(20)
+        ],
+    ]
+
+    validated = _validate_citations(citations, executor)
+
+    assert {citation.repoId for citation in validated} == {"acme/back", "acme/front"}
+
+
+@pytest.mark.asyncio
+async def test_tool_payload_budget_stops_large_investigations(monkeypatch):
+    graph = Graph(
+        nodes={
+            f"s{index}": Symbol(
+                id=f"s{index}",
+                kind="function",
+                path=f"src/f{index}.ts",
+                name=f"handler{index}",
+                line=1,
+                end_line=200,
+                signature=f"function handler{index}()",
+                body="x" * 5000,
+            )
+            for index in range(7)
+        }
+    )
+    _patch_llm(
+        monkeypatch,
+        [
+            _calls(
+                *[
+                    ToolCall(
+                        id=f"c{index}",
+                        name="read_symbol",
+                        arguments={"symbolId": f"s{index}"},
+                    )
+                    for index in range(7)
+                ]
+            ),
+            _answer("resposta limitada"),
+        ],
+    )
+
+    events = await _collect(FakeCache(graph), _request())
+
+    done = events[-1].payload
+    notes = [record["note"] or "" for record in done["toolCalls"]]
+    assert MAX_TOOL_CONTEXT_CHARS > 0
+    assert done["truncated"] is True
+    assert any("orçamento de contexto" in note for note in notes)

@@ -20,10 +20,11 @@ from app.infrastructure.logging.setup import get_logger
 
 log = get_logger(__name__)
 
-MAX_ITERATIONS = 8
+MAX_ITERATIONS = 6
 MAX_HISTORY_MESSAGES = 20
 MAX_REPEATED_CALLS = 2
 MAX_CITATIONS = 12
+MAX_TOOL_CONTEXT_CHARS = 18_000
 _DONE = object()
 
 
@@ -46,7 +47,7 @@ def _validate_citations(
     }
 
     seen: set[tuple] = set()
-    valid: list[Citation] = []
+    by_repository: dict[str, list[Citation]] = {}
     for citation in citations:
         if (citation.repoId, citation.path) not in known_paths:
             continue
@@ -56,8 +57,19 @@ def _validate_citations(
         if key in seen:
             continue
         seen.add(key)
-        valid.append(citation)
-        if len(valid) >= MAX_CITATIONS:
+        by_repository.setdefault(citation.repoId, []).append(citation)
+
+    valid: list[Citation] = []
+    while len(valid) < MAX_CITATIONS:
+        added = False
+        for repository_citations in by_repository.values():
+            if not repository_citations:
+                continue
+            valid.append(repository_citations.pop(0))
+            added = True
+            if len(valid) >= MAX_CITATIONS:
+                break
+        if not added:
             break
     return valid
 
@@ -149,6 +161,7 @@ async def _converse(
     records: list[ChatToolCallRecord] = []
     usage = ChatUsage()
     call_counts: dict[str, int] = {}
+    tool_context_chars = 0
     truncated = False
 
     async def emit_token(delta: str) -> None:
@@ -217,7 +230,13 @@ async def _converse(
             repeated = call_counts[signature] > 1
 
             started = time.monotonic()
-            if repeated:
+            if stop_after:
+                payload = {
+                    "note": "orçamento de contexto das ferramentas atingido",
+                    "items": [],
+                }
+                item_count, was_truncated, note = 0, True, payload["note"]
+            elif repeated:
                 payload = {
                     "note": "chamada idêntica já executada nesta mensagem; use o resultado anterior",
                     "items": [],
@@ -228,11 +247,28 @@ async def _converse(
             else:
                 try:
                     tool_result = await executor.execute_async(call.name, call.arguments)
-                    citations.extend(tool_result.citations)
-                    payload = tool_result.model_dump(exclude_none=True)
-                    item_count = len(tool_result.items)
-                    was_truncated = tool_result.truncated
-                    note = tool_result.note
+                    candidate_payload = tool_result.model_dump(exclude_none=True)
+                    candidate_size = len(
+                        json.dumps(candidate_payload, ensure_ascii=False)
+                    )
+                    if tool_context_chars + candidate_size > MAX_TOOL_CONTEXT_CHARS:
+                        payload = {
+                            "note": "orçamento de contexto das ferramentas atingido",
+                            "items": [],
+                        }
+                        item_count, was_truncated, note = (
+                            0,
+                            True,
+                            payload["note"],
+                        )
+                        stop_after = True
+                    else:
+                        payload = candidate_payload
+                        tool_context_chars += candidate_size
+                        citations.extend(tool_result.citations)
+                        item_count = len(tool_result.items)
+                        was_truncated = tool_result.truncated
+                        note = tool_result.note
                 except ToolError as exc:
                     payload = {"error": str(exc), "items": []}
                     item_count, was_truncated, note = 0, False, str(exc)

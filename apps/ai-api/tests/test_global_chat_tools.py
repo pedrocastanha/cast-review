@@ -102,8 +102,9 @@ async def test_workspace_cache_is_bounded_by_least_recently_used_order():
     cache = FakeCache()
     executor = GlobalToolExecutor(cache, FakeCatalog(), max_workspaces=2)
 
+    result = None
     for repo_id in ["acme/one", "acme/two", "acme/three"]:
-        await executor.execute_async(
+        result = await executor.execute_async(
             "list_files", {"repoId": repo_id, "pathPrefix": "src"}
         )
 
@@ -111,6 +112,9 @@ async def test_workspace_cache_is_bounded_by_least_recently_used_order():
         "acme/two",
         "acme/three",
     ]
+    assert result is not None
+    assert result.truncated is True
+    assert "acme/one" in result.note
 
 
 def test_global_definitions_require_repo_id_for_graph_tools():
