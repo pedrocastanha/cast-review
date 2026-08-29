@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Headers,
+  Inject,
   Param,
   Query,
   UnauthorizedException,
@@ -15,6 +16,7 @@ import { ChatCatalogGrantService } from './chat-catalog-grant.service';
 export class ChatCatalogController {
   constructor(
     private readonly grants: ChatCatalogGrantService,
+    @Inject('REPOSITORIES_SERVICE')
     private readonly repositoriesService: RepositoriesService,
   ) {}
 
