@@ -39,7 +39,13 @@ function fakeQueue(job: any = null) {
 }
 
 function fakeAiApiClient(status = { indexed: false, sha: null as string | null }) {
-  return { getIndexStatus: jest.fn().mockResolvedValue(status) } as any;
+  return {
+    getIndexStatus: jest.fn().mockResolvedValue(status),
+    listIndexRepositories: jest.fn().mockResolvedValue({
+      repositories: [],
+      nextCursor: null,
+    }),
+  } as any;
 }
 
 function fakeLogger() {
@@ -311,6 +317,55 @@ describe('RepositoriesService pull/file delegation', () => {
 
     expect(result).toEqual([
       expect.objectContaining({ id: 1, fullName: 'octocat/hello-world' }),
+    ]);
+  });
+
+  it('listRepos filters the GitHub list through the paginated index catalog', async () => {
+    octokitInstance.paginate.mockResolvedValue([
+      {
+        id: 1,
+        name: 'indexed',
+        full_name: 'octocat/indexed',
+        owner: { login: 'octocat' },
+        private: false,
+        description: null,
+        html_url: 'https://github.com/octocat/indexed',
+        updated_at: '2024-01-01T00:00:00Z',
+        default_branch: 'main',
+      },
+      {
+        id: 2,
+        name: 'plain',
+        full_name: 'octocat/plain',
+        owner: { login: 'octocat' },
+        private: false,
+        description: null,
+        html_url: 'https://github.com/octocat/plain',
+        updated_at: '2024-01-01T00:00:00Z',
+        default_branch: 'main',
+      },
+    ]);
+    const aiApiClient = fakeAiApiClient();
+    aiApiClient.listIndexRepositories.mockResolvedValue({
+      repositories: [{ repoId: 'octocat/indexed', sha: 'sha-indexed' }],
+      nextCursor: null,
+    });
+    const service = new RepositoriesService(
+      fakeUserService(),
+      fakeQueue(null),
+      aiApiClient,
+      fakeLogger(),
+    );
+
+    const result = await service.listRepos(currentUser, true);
+
+    expect(aiApiClient.listIndexRepositories).toHaveBeenCalledWith(
+      undefined,
+      200,
+      undefined,
+    );
+    expect(result).toEqual([
+      expect.objectContaining({ id: 1, fullName: 'octocat/indexed' }),
     ]);
   });
 

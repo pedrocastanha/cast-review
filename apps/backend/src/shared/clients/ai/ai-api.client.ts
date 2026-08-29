@@ -10,6 +10,7 @@ import type {
   IndexBuildResult,
   IndexFileResult,
   IndexFilesResult,
+  IndexRepositoriesResult,
   IndexStatusResult,
   ProjectGraphRequest,
   ProjectGraphResult,
@@ -141,6 +142,30 @@ export class AiApiClient {
     }
 
     return (await response.json()) as IndexStatusResult;
+  }
+
+  async listIndexRepositories(
+    query?: string,
+    limit?: number,
+    cursor?: string,
+  ): Promise<IndexRepositoriesResult> {
+    const params = new URLSearchParams();
+    if (query) params.set('query', query);
+    if (limit !== undefined) params.set('limit', String(limit));
+    if (cursor) params.set('cursor', cursor);
+    const suffix = params.size > 0 ? `?${params.toString()}` : '';
+    const response = await fetch(
+      `${resolveAiApiUrl()}/index/repositories${suffix}`,
+    );
+
+    if (!response.ok) {
+      this.logger.error('ai-api respondeu com falha ao listar índices', {
+        status: response.status,
+      });
+      throw new Error(`ai-api indisponível (status ${response.status})`);
+    }
+
+    return (await response.json()) as IndexRepositoriesResult;
   }
 
   async getGraph(

@@ -34,8 +34,17 @@ describe('RepositoriesController', () => {
 
     const result = await controller.listUserRepositories(currentUser);
 
-    expect(service.listRepos).toHaveBeenCalledWith(currentUser);
+    expect(service.listRepos).toHaveBeenCalledWith(currentUser, false);
     expect(result).toEqual(['repo']);
+  });
+
+  it('listUserRepositories enables the index filter only for indexed=true', async () => {
+    const service = fakeRepositoriesService();
+    const controller = new RepositoriesController(service);
+
+    await controller.listUserRepositories(currentUser, 'true');
+
+    expect(service.listRepos).toHaveBeenCalledWith(currentUser, true);
   });
 
   it('listPulls forwards the repo, current user and owner query param', async () => {

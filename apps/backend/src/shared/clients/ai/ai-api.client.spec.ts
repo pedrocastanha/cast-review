@@ -204,3 +204,29 @@ describe('AiApiClient.getProjectGraph', () => {
     expect(result).toEqual(responseBody);
   });
 });
+
+describe('AiApiClient.listIndexRepositories', () => {
+  const fetchMock = jest.fn();
+  const logger = { error: jest.fn() } as unknown as AppLogger;
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  it('forwards bounded catalog filters to the AI API', async () => {
+    const responseBody = {
+      repositories: [{ repoId: 'cast/backend', sha: 'sha-back' }],
+      nextCursor: '20',
+    };
+    fetchMock.mockResolvedValue(jsonResponse(responseBody));
+    const client = new AiApiClient(logger);
+
+    const result = await client.listIndexRepositories('cast', 20, '0');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8000/index/repositories?query=cast&limit=20&cursor=0',
+    );
+    expect(result).toEqual(responseBody);
+  });
+});

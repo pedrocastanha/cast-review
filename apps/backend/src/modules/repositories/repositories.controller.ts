@@ -16,8 +16,11 @@ export class RepositoriesController {
   constructor(private readonly repositoriesService: RepositoriesService) {}
 
   @Get()
-  async listUserRepositories(@CurrentUser() currentUser: CurrentUserData) {
-    return this.repositoriesService.listRepos(currentUser);
+  async listUserRepositories(
+    @CurrentUser() currentUser: CurrentUserData,
+    @Query('indexed') indexed?: string,
+  ) {
+    return this.repositoriesService.listRepos(currentUser, indexed === 'true');
   }
 
   @Get(':repo/pulls')

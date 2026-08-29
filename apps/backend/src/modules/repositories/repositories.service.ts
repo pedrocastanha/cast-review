@@ -94,8 +94,27 @@ export class RepositoriesService extends BaseService {
     );
   }
 
-  async listRepos(currentUser: CurrentUserData) {
-    return this.listReposUseCase.execute({ currentUser });
+  async listRepos(currentUser: CurrentUserData, indexedOnly = false) {
+    const repositories = await this.listReposUseCase.execute({ currentUser });
+    if (!indexedOnly) return repositories;
+
+    const indexed = new Set<string>();
+    let cursor: string | undefined;
+    do {
+      const page = await this.aiApiClient.listIndexRepositories(
+        undefined,
+        200,
+        cursor,
+      );
+      for (const repository of page.repositories) {
+        indexed.add(repository.repoId.toLowerCase());
+      }
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+
+    return repositories.filter((repository) =>
+      indexed.has(repository.fullName.toLowerCase()),
+    );
   }
 
   async listPulls(

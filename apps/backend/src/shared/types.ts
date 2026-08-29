@@ -121,6 +121,16 @@ export interface IndexStatusResult {
   sha: string | null;
 }
 
+export interface IndexRepositoryCatalogEntry {
+  repoId: string;
+  sha: string;
+}
+
+export interface IndexRepositoriesResult {
+  repositories: IndexRepositoryCatalogEntry[];
+  nextCursor: string | null;
+}
+
 export interface VizNode {
   id: string;
   label: string;
