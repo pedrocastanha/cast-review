@@ -20,11 +20,12 @@ from app.infrastructure.logging.setup import get_logger
 
 log = get_logger(__name__)
 
-MAX_ITERATIONS = 6
+MAX_ITERATIONS = 8
 MAX_HISTORY_MESSAGES = 20
 MAX_REPEATED_CALLS = 2
 MAX_CITATIONS = 12
-MAX_TOOL_CONTEXT_CHARS = 18_000
+STOP_BUDGET_RATIO = 0.85
+MAX_TOOL_CONTEXT_CHARS = 48_000
 _DONE = object()
 
 
@@ -168,11 +169,10 @@ async def _converse(
         await queue.put(ChatEvent(type="token", payload={"delta": delta}))
 
     for iteration in range(1, MAX_ITERATIONS + 1):
-        last_turn = iteration == MAX_ITERATIONS
         result = await complete_with_tools(
             system=SYSTEM_PROMPT,
             messages=messages,
-            tools=[] if last_turn else definitions,
+            tools=definitions,
             model=request.model,
             api_key=request.apiKeys.openai,
             on_delta=emit_token,
@@ -195,7 +195,7 @@ async def _converse(
 
         if not result.tool_calls:
             await _finish(
-                queue, result.content, citations, records, usage, executor, truncated or last_turn
+                queue, result.content, citations, records, usage, executor, truncated
             )
             return
 
@@ -253,7 +253,7 @@ async def _converse(
                     )
                     if tool_context_chars + candidate_size > MAX_TOOL_CONTEXT_CHARS:
                         payload = {
-                            "note": "orçamento de contexto das ferramentas atingido",
+                            "note": "resultado omitido: orçamento de contexto das ferramentas atingido",
                             "items": [],
                         }
                         item_count, was_truncated, note = (
@@ -261,7 +261,9 @@ async def _converse(
                             True,
                             payload["note"],
                         )
-                        stop_after = True
+                        stop_after = (
+                            tool_context_chars >= MAX_TOOL_CONTEXT_CHARS * STOP_BUDGET_RATIO
+                        )
                     else:
                         payload = candidate_payload
                         tool_context_chars += candidate_size
@@ -321,7 +323,11 @@ async def _converse(
             *messages,
             {
                 "role": "user",
-                "content": "Limite de investigação atingido. Responda agora com o que você já reuniu e diga o que ficou sem confirmar.",
+                "content": (
+                    "O orçamento de ferramentas desta mensagem acabou. "
+                    "Responda agora com o que já reuniu. Se algo essencial ficou sem "
+                    "confirmar, diga isso em uma única frase no final, sem lista de ressalvas."
+                ),
             },
         ],
         tools=[],
