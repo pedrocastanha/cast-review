@@ -329,7 +329,7 @@ export function ChatPage() {
 
         {empty ? (
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-10">
-            <div className="w-full max-w-[46rem]">
+            <div className="w-full max-w-[52rem]">
               <div className="mx-auto mb-5 grid size-10 place-items-center rounded-xl border border-border-strong bg-surface-1 font-mono text-sm text-accent shadow-card">
                 {repoId ? '&gt;_' : '/_'}
               </div>
@@ -376,9 +376,9 @@ export function ChatPage() {
             <div
               ref={scrollRef}
               onScroll={onScroll}
-              className="min-h-0 flex-1 overflow-y-auto px-4 py-6"
+              className="min-h-0 flex-1 overflow-y-auto px-6 py-8"
             >
-              <div className="mx-auto flex w-full max-w-[46rem] flex-col gap-7">
+              <div className="mx-auto flex w-full max-w-[58rem] flex-col gap-8">
                 {thread.messages.map((message) => (
                   <MessageTurn
                     key={message.id}
@@ -388,7 +388,7 @@ export function ChatPage() {
                 ))}
 
                 {live.running && (
-                  <article className="text-[15px] leading-7 text-ink">
+                  <article className="rounded-xl border border-border bg-surface-sunk px-5 py-5 text-[15.5px] leading-[1.75] text-ink">
                     {live.answer ? (
                       <span className="whitespace-pre-wrap">{live.answer}</span>
                     ) : (
@@ -406,8 +406,8 @@ export function ChatPage() {
               </div>
             </div>
 
-            <div className="shrink-0 border-t border-border bg-surface/95 px-4 py-3">
-              <div className="mx-auto w-full max-w-[46rem]">
+            <div className="shrink-0 border-t border-border bg-surface/95 px-6 py-4">
+              <div className="mx-auto w-full max-w-[58rem]">
                 <Composer
                   threadId={thread.id}
                   scopeMode={scopeMode}

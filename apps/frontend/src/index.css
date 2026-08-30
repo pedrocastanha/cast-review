@@ -14,6 +14,7 @@
   --color-surface-1: #ffffff;
   --color-surface-2: #f4f5f8;
   --color-surface-3: #edeef2;
+  --color-surface-sunk: #dcdfe6;
   --color-border: #d8dce2;
   --color-border-strong: #c2c8d1;
 
@@ -74,6 +75,7 @@
   --color-surface-1: oklch(16% 0.008 350);
   --color-surface-2: oklch(19.5% 0.009 350);
   --color-surface-3: oklch(23% 0.01 350);
+  --color-surface-sunk: oklch(16.5% 0.008 350);
   --color-border: oklch(28% 0.011 350);
   --color-border-strong: oklch(36% 0.013 350);
 
