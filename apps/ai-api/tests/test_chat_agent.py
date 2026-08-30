@@ -7,7 +7,7 @@ from app.chat.agent import (
     run_chat,
 )
 from app.chat.models import ChatRunRequest, Citation
-from app.chat.tools import RepoWorkspace, ToolExecutor
+from app.chat.tools import MAX_BODY_CHARS, RepoWorkspace, ToolExecutor
 from app.code_graph.models import Graph, HttpEndpoint, Symbol
 from app.infrastructure.llm.client import LlmError, LlmToolResult, ToolCall
 from app.infrastructure.llm.tokens import TokenUsage
@@ -172,7 +172,7 @@ async def test_three_identical_calls_stop_the_investigation(monkeypatch):
 async def test_iteration_ceiling_forces_final_answer(monkeypatch):
     responses = [
         _calls(ToolCall(id=f"c{index}", name="search_symbols", arguments={"query": f"q{index}"}))
-        for index in range(MAX_ITERATIONS - 1)
+        for index in range(MAX_ITERATIONS)
     ]
     responses.append(_answer("respondendo com o que achei"))
     captured: list = []
@@ -452,6 +452,7 @@ def test_citation_cap_balances_multiple_repositories():
 
 @pytest.mark.asyncio
 async def test_tool_payload_budget_stops_large_investigations(monkeypatch):
+    reads = (MAX_TOOL_CONTEXT_CHARS // MAX_BODY_CHARS) + 4
     graph = Graph(
         nodes={
             f"s{index}": Symbol(
@@ -462,9 +463,9 @@ async def test_tool_payload_budget_stops_large_investigations(monkeypatch):
                 line=1,
                 end_line=200,
                 signature=f"function handler{index}()",
-                body="x" * 5000,
+                body="x" * (MAX_BODY_CHARS * 2),
             )
-            for index in range(7)
+            for index in range(reads)
         }
     )
     _patch_llm(
@@ -477,7 +478,7 @@ async def test_tool_payload_budget_stops_large_investigations(monkeypatch):
                         name="read_symbol",
                         arguments={"symbolId": f"s{index}"},
                     )
-                    for index in range(7)
+                    for index in range(reads)
                 ]
             ),
             _answer("resposta limitada"),
