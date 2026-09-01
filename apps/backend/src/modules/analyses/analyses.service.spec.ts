@@ -94,7 +94,14 @@ function buildService() {
     update: jest.fn().mockResolvedValue(undefined),
     findOne: jest.fn(),
   };
-  const repositoriesService = {};
+  const repositoriesService = {
+    listPullFiles: jest.fn(),
+    getPullHeadSha: jest.fn(),
+    loginFor: jest.fn(),
+    listPullReviewComments: jest.fn(),
+    deletePullReviewComment: jest.fn(),
+    createPullReview: jest.fn(),
+  };
   const aiApiClient = { resumeAgent: jest.fn() };
   const logger = { error: jest.fn(), log: jest.fn(), warn: jest.fn() };
   const contextSnapshotRepository = {
@@ -103,24 +110,50 @@ function buildService() {
     findOne: jest.fn(),
   };
   const projectsService = { resolveAnalysisScope: jest.fn() };
+  const findingLifecycleService = {
+    reconcile: jest.fn().mockResolvedValue({
+      summary: {
+        status: 'available',
+        baselineAnalysisId: null,
+        modelChanged: false,
+        newCount: 0,
+        recurringCount: 0,
+        reopenedCount: 0,
+        notObservedCount: 0,
+        acknowledgedCount: 0,
+        suppressedFromGithubCount: 0,
+      },
+      metadataByCommentIndex: new Map(),
+    }),
+    currentDispositions: jest.fn().mockResolvedValue(new Map()),
+  };
 
   const userService = { getOpenaiKey: jest.fn(async () => 'sk-do-banco') };
+  const findingCaseRepository = {};
+  const findingOccurrenceRepository = {};
+  const findingCaseEventRepository = {};
   const service = new AnalysesService(
     repositoriesService as any,
     aiApiClient as any,
     analysisRepository as any,
     contextSnapshotRepository as any,
+    findingCaseRepository as any,
+    findingOccurrenceRepository as any,
+    findingCaseEventRepository as any,
     projectsService as any,
     userService as any,
     logger as any,
   );
+  (service as any).findingLifecycleUseCase = findingLifecycleService;
 
   return {
     service,
+    repositoriesService,
     userService,
     analysisRepository,
     aiApiClient,
     contextSnapshotRepository,
+    findingLifecycleService,
     logger,
   };
 }
@@ -268,11 +301,12 @@ describe('AnalysesService#streamLeg', () => {
 
     const emitted = eventsOf(writes);
     expect(emitted[0].type).toBe('report_ready');
-    expect(emitted[1]).toEqual({
+    expect(emitted[1].type).toBe('finding_lifecycle_done');
+    expect(emitted[2]).toEqual({
       type: 'awaiting_approval',
       payload: { stage: 'publish' },
     });
-    expect(emitted).toHaveLength(2);
+    expect(emitted).toHaveLength(3);
   });
 
   it('auto_safe publish policy fails closed (no guardrail signal wired yet) and behaves like manual', async () => {
@@ -299,6 +333,7 @@ describe('AnalysesService#streamLeg', () => {
     );
     expect(eventsOf(writes).map((event) => event.type)).toEqual([
       'report_ready',
+      'finding_lifecycle_done',
       'awaiting_approval',
     ]);
   });
@@ -333,11 +368,132 @@ describe('AnalysesService#streamLeg', () => {
 
     const emitted = eventsOf(writes);
     expect(emitted[0].type).toBe('report_ready');
-    expect(emitted[1]).toEqual({
+    expect(emitted[1].type).toBe('finding_lifecycle_done');
+    expect(emitted[2]).toEqual({
       type: 'github_comments_done',
       payload: githubResult,
     });
-    expect(emitted).toHaveLength(2);
+    expect(emitted).toHaveLength(3);
+  });
+
+  it('reconcilia report_ready, decora comments e persiste antes da aprovação', async () => {
+    const { service, findingLifecycleService, analysisRepository } =
+      buildService();
+    const analysis = fakeAnalysis({ publishPolicy: publishPolicy('manual') });
+    const { res, writes } = fakeResponse();
+    findingLifecycleService.reconcile.mockResolvedValue({
+      summary: {
+        status: 'available',
+        baselineAnalysisId: 'analysis-0',
+        modelChanged: false,
+        newCount: 1,
+        recurringCount: 0,
+        reopenedCount: 0,
+        notObservedCount: 0,
+        acknowledgedCount: 0,
+        suppressedFromGithubCount: 0,
+      },
+      metadataByCommentIndex: new Map([
+        [
+          0,
+          {
+            caseId: 'case-1',
+            classification: 'new',
+            state: 'active',
+            disposition: 'unreviewed',
+            matchBasis: 'stable_anchor',
+            firstSeenAnalysisId: 'analysis-1',
+            previousOccurrenceAnalysisId: null,
+          },
+        ],
+      ]),
+    });
+
+    await (service as any).streamLeg(
+      analysis,
+      scripted([
+        {
+          type: 'report_ready',
+          payload: {
+            results: [
+              {
+                name: 'test_reviewer',
+                score: 70,
+                findings: [
+                  {
+                    status: 'fail',
+                    title: 'sem teste',
+                    detail: 'x',
+                    path: 'src/a.ts',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ]),
+      res,
+    );
+
+    expect(findingLifecycleService.reconcile).toHaveBeenCalledWith(
+      expect.objectContaining({ analysis, owner: 'octo-org' }),
+    );
+    expect(analysisRepository.update).toHaveBeenLastCalledWith(
+      analysis.id,
+      expect.objectContaining({
+        report: expect.objectContaining({
+          findingLifecycle: expect.objectContaining({ newCount: 1 }),
+          comments: [
+            expect.objectContaining({
+              lifecycle: expect.objectContaining({ caseId: 'case-1' }),
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(eventsOf(writes).map((item) => item.type)).toEqual([
+      'report_ready',
+      'finding_lifecycle_done',
+      'awaiting_approval',
+    ]);
+  });
+
+  it('mantém o fluxo fail-open quando a reconciliação falha', async () => {
+    const { service, findingLifecycleService, analysisRepository, logger } =
+      buildService();
+    const analysis = fakeAnalysis({ publishPolicy: publishPolicy('manual') });
+    const { res, writes } = fakeResponse();
+    findingLifecycleService.reconcile.mockRejectedValue(new Error('db down'));
+
+    await (service as any).streamLeg(
+      analysis,
+      scripted([
+        { type: 'report_ready', payload: { results: [], markdown: 'ok' } },
+      ]),
+      res,
+    );
+
+    expect(analysisRepository.update).toHaveBeenLastCalledWith(
+      analysis.id,
+      expect.objectContaining({
+        status: 'awaiting_approval',
+        report: expect.objectContaining({
+          findingLifecycle: expect.objectContaining({
+            status: 'unavailable',
+            errorCode: 'reconciliation_failed',
+          }),
+        }),
+      }),
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      'Falha ao reconciliar lifecycle de findings',
+      expect.objectContaining({ analysisId: analysis.id }),
+    );
+    expect(eventsOf(writes).map((item) => item.type)).toEqual([
+      'report_ready',
+      'finding_lifecycle_done',
+      'awaiting_approval',
+    ]);
   });
 
   it('error event: persists error status and passes the event through unchanged (regression)', async () => {
@@ -383,6 +539,51 @@ describe('AnalysesService#streamLeg', () => {
       { type: 'error', payload: { message: 'Falha ao rodar a análise' } },
     ]);
     expect(res.end).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AnalysesService#publishGithubComments', () => {
+  it('não publica case reconhecido segundo a disposição atual do banco', async () => {
+    const { service, findingLifecycleService, repositoriesService } =
+      buildService();
+    findingLifecycleService.currentDispositions.mockResolvedValue(
+      new Map([['case-1', 'accepted_risk']]),
+    );
+
+    const result = await (service as any).publishGithubComments({
+      analysisId: 'analysis-1',
+      review: {
+        results: [],
+        comments: [
+          {
+            reviewer: 'test_reviewer',
+            status: 'fail',
+            title: 'sem teste',
+            detail: 'x',
+            lifecycle: {
+              caseId: 'case-1',
+              classification: 'recurring',
+              state: 'active',
+              disposition: 'unreviewed',
+              matchBasis: 'stable_anchor',
+              firstSeenAnalysisId: 'analysis-0',
+              previousOccurrenceAnalysisId: 'analysis-0',
+            },
+          },
+        ],
+      },
+      repo: 'octo-repo',
+      pullNumber: 7,
+      currentUser: { id: 'user-1', username: null, email: '' },
+      owner: 'octo-org',
+    });
+
+    expect(findingLifecycleService.currentDispositions).toHaveBeenCalledWith(
+      ['case-1'],
+      'user-1',
+    );
+    expect(result.status).toBe('empty');
+    expect(repositoriesService.listPullFiles).not.toHaveBeenCalled();
   });
 });
 
