@@ -26,6 +26,9 @@ export function hasReviewContent(report: ReportPayload | null | undefined): bool
 
 export function assembleReport(events: AgentEvent[]): ReportPayload | undefined {
   const ready = latest(events, 'report_ready')?.payload as ReportPayload | undefined;
+  const findingLifecycle = latest(events, 'finding_lifecycle_done')?.payload as
+    | ReportPayload['findingLifecycle']
+    | undefined;
   const changeAnalysis = latest(events, 'change_analysis_done')?.payload as ReportPayload['changeAnalysis'];
   const prd = (latest(events, 'prd_generated')?.payload as ReportPayload['prd']) ?? ready?.prd;
   const spec = (latest(events, 'spec_generated')?.payload as ReportPayload['spec']) ?? ready?.spec;
@@ -47,9 +50,11 @@ export function assembleReport(events: AgentEvent[]): ReportPayload | undefined 
     prd: prd ?? null,
     spec: spec ?? null,
     results,
-    comments: results.flatMap((result) =>
-      result.findings.map((finding) => ({ reviewer: result.name, ...finding })),
-    ),
+    comments:
+      ready?.comments ??
+      results.flatMap((result) =>
+        result.findings.map((finding) => ({ reviewer: result.name, ...finding })),
+      ),
     markdown: ready?.markdown ?? '',
     verdict: ready?.verdict,
     overallScore: ready?.overallScore,
@@ -61,5 +66,6 @@ export function assembleReport(events: AgentEvent[]): ReportPayload | undefined 
     githubComments:
       (latest(events, 'github_comments_done')?.payload as ReportPayload['githubComments']) ??
       ready?.githubComments,
+    findingLifecycle: findingLifecycle ?? ready?.findingLifecycle,
   };
 }

@@ -3,6 +3,9 @@ import type {
   AnalysisContextSnapshot,
   Annotation,
   AnalysisRecord,
+  FindingDisposition,
+  FindingLifecycleListResponse,
+  FindingLifecycleView,
   RunAnalysisPayload,
 } from '../types';
 import { authorizedFetch, request } from './http';
@@ -46,6 +49,35 @@ export const analysesApi = {
     request<AnalysisContextSnapshot>(
       `/analyses/${encodeURIComponent(id)}/context-snapshot`,
     ),
+
+  getFindingLifecycle: (
+    analysisId: string,
+    query: { view?: FindingLifecycleView; limit?: number; cursor?: string } = {},
+  ) => {
+    const params = new URLSearchParams();
+    if (query.view) params.set('view', query.view);
+    if (query.limit !== undefined) params.set('limit', String(query.limit));
+    if (query.cursor) params.set('cursor', query.cursor);
+    const suffix = params.size > 0 ? `?${params.toString()}` : '';
+    return request<FindingLifecycleListResponse>(
+      `/analyses/${encodeURIComponent(analysisId)}/finding-lifecycle${suffix}`,
+    );
+  },
+
+  updateFindingDisposition: (
+    caseId: string,
+    payload: { disposition: FindingDisposition; note?: string | null },
+  ) =>
+    request<{
+      id: string;
+      state: 'active' | 'resolved';
+      disposition: FindingDisposition;
+      dispositionNote: string | null;
+      updatedAt: string;
+    }>(`/finding-cases/${encodeURIComponent(caseId)}/disposition`, {
+      method: 'PUT',
+      body: payload,
+    }),
 
   async *run(
     repo: string,

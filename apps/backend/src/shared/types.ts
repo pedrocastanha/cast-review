@@ -49,6 +49,7 @@ export type AgentEventType =
   | 'test_reviewer_done'
   | 'architecture_reviewer_done'
   | 'report_ready'
+  | 'finding_lifecycle_done'
   | 'awaiting_approval'
   | 'github_comments_done'
   | 'thought'
