@@ -16,6 +16,31 @@ def _symbol(symbol_id: str, path: str, name: str, body: str) -> Symbol:
     )
 
 
+def test_snapshot_records_only_tested_candidates_as_their_own_relation():
+    prod = _symbol("prod", "src/foo.ts", "foo", "return 1")
+    graph = Graph(nodes={prod.id: prod}, edges=[])
+    related = RelatedContext(
+        onlyTestedCandidates=[
+            SymbolRef(path=prod.path, name=prod.name, signature=prod.signature, body=None)
+        ],
+        stats=IndexStats(indexed=True),
+    )
+
+    snapshot = build_context_snapshot(
+        analysis_id=None,
+        repo_id="cast/review",
+        sha="sha-123",
+        graph=graph,
+        related=related,
+        diff="",
+        changed_files=[{"path": "src/other.ts", "diff": ""}],
+        conventions="",
+    )
+
+    assert [node.name for node in snapshot.selected.onlyTestedCandidates] == ["foo"]
+    assert snapshot.selected.onlyTestedCandidates[0].relation == "only_tested"
+
+
 def test_snapshot_hash_is_stable_and_captures_selected_subgraph():
     changed = _symbol("changed", "src/changed.ts", "changed", "return dependency()")
     caller = _symbol("caller", "src/caller.ts", "caller", "return changed()")

@@ -3,7 +3,8 @@ from neo4j import AsyncDriver
 from app.code_graph.budget import DEFAULT_TOKEN_BUDGET
 from app.code_graph.budget import select as budget_select
 from app.code_graph.cache import IndexCache
-from app.code_graph.deadcode import find_dead_candidates
+from app.code_graph.deadcode import filter_pr_relevant, find_dead_candidates
+from app.code_graph.hunks import changed_symbol_ids, removed_identifiers
 from app.code_graph.models import Graph, IndexStats, RelatedContext, ScoredNode, Symbol, SymbolRef
 from app.code_graph.ranker import rank as rank_callers
 
@@ -49,6 +50,7 @@ async def assemble_related_context(
     sha: str,
     changed_paths: list[str],
     token_budget: int = DEFAULT_TOKEN_BUDGET,
+    changed_files: list[dict] | None = None,
 ) -> RelatedContext:
     """Single facade shared by the standalone `/index/context` route (P5) and
     `change_analyzer` (P2, in-process) — same selection logic either way, per CGC-16's
@@ -57,20 +59,31 @@ async def assemble_related_context(
     if graph is None:
         return RelatedContext(stats=IndexStats(indexed=False))
 
-    changed_ids = {s.id for s in graph.nodes.values() if s.path in changed_paths}
+    if changed_files:
+        changed_ids = changed_symbol_ids(graph, changed_files)
+        source_symbol_ids = sorted(changed_ids)
+    else:
+        changed_ids = {s.id for s in graph.nodes.values() if s.path in changed_paths}
+        source_symbol_ids = None
     changed_symbols = [graph.nodes[sid] for sid in changed_ids]
 
     callee_ids = set(_direct_targets(graph, changed_ids, "references")[:MAX_CALLEES])
     test_ids = set(_direct_sources(graph, changed_ids, "tests")[:MAX_TEST_REFS])
 
-    ranked_callers = await rank_callers(driver, repo_id, sha, changed_paths)
+    ranked_callers = await rank_callers(
+        driver, repo_id, sha, changed_paths, source_symbol_ids=source_symbol_ids
+    )
 
     combined_ranked = list(ranked_callers) + [
         ScoredNode(symbol_id=callee_id, score=0.0) for callee_id in callee_ids
     ]
 
     selection = budget_select(changed_symbols, combined_ranked, graph.nodes, token_budget)
-    dead = find_dead_candidates(graph)
+
+    removed_names: set[str] = set()
+    for item in changed_files or []:
+        removed_names |= removed_identifiers(str(item.get("diff") or ""))
+    dead = filter_pr_relevant(find_dead_candidates(graph), set(changed_paths), removed_names)
 
     callers: list[SymbolRef] = []
     callees: list[SymbolRef] = []
@@ -93,7 +106,8 @@ async def assemble_related_context(
         callers=callers,
         callees=callees,
         tests=tests,
-        deadCodeCandidates=[_to_ref(s, False) for s in dead.dead if s.id in changed_ids],
+        deadCodeCandidates=[_to_ref(s, False) for s in dead.dead],
+        onlyTestedCandidates=[_to_ref(s, False) for s in dead.only_tested],
         repoMap=repo_map,
         stats=IndexStats(
             indexed=True,

@@ -61,8 +61,16 @@ def _related_context_block(related_context: dict | None, budget: int) -> str:
 
     dead = related_context.get("deadCodeCandidates") or []
     if dead:
-        dead_text = "\n".join(f"- {d['path']}::{d['name']} — sem caller conhecido no repo" for d in dead)
+        dead_text = "\n".join(f"- {d['path']}::{d['name']} — sem caller conhecido após esta PR" for d in dead)
         sections.append(f"## Possível código morto\n{dead_text}")
+
+    only_tested = related_context.get("onlyTestedCandidates") or []
+    if only_tested:
+        only_tested_text = "\n".join(
+            f"- {o['path']}::{o['name']} — só é chamado por teste, nenhum caller de produção"
+            for o in only_tested
+        )
+        sections.append(f"## Coberto apenas por teste\n{only_tested_text}")
 
     repo_map = related_context.get("repoMap") or ""
     if repo_map:

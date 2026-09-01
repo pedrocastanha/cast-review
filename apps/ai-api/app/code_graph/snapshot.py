@@ -5,6 +5,7 @@ from collections import deque
 from datetime import UTC, datetime
 
 from app.code_graph.budget import DEFAULT_TOKEN_BUDGET
+from app.code_graph.hunks import changed_symbol_ids
 from app.code_graph.models import (
     AnalysisContextSnapshot,
     Graph,
@@ -69,6 +70,7 @@ def _snapshot_node(
         "callee": "é chamado diretamente por um símbolo alterado",
         "test": "teste relacionado ao símbolo alterado",
         "dead_code": "não possui caller conhecido no índice",
+        "only_tested": "só é chamado por teste, sem caller de produção no índice",
     }
     return GraphSnapshotNode(
         id=symbol.id,
@@ -118,9 +120,8 @@ def build_context_snapshot(
     conventions: str,
     token_budget: int = DEFAULT_TOKEN_BUDGET,
 ) -> AnalysisContextSnapshot:
-    changed_paths = {str(item.get("path") or "") for item in changed_files}
-    changed_symbols = [symbol for symbol in graph.nodes.values() if symbol.path in changed_paths]
-    changed_ids = {symbol.id for symbol in changed_symbols}
+    changed_ids = changed_symbol_ids(graph, changed_files)
+    changed_symbols = [graph.nodes[symbol_id] for symbol_id in sorted(changed_ids)]
     caller_distances = _distances(graph, changed_ids, reverse=True)
     callee_distances = _distances(graph, changed_ids, reverse=False)
 
@@ -131,6 +132,7 @@ def build_context_snapshot(
         "callee": [],
         "test": [],
         "dead_code": [],
+        "only_tested": [],
     }
 
     def add(symbol: Symbol, relation: str, distance: int | None, full_body: bool) -> None:
@@ -148,6 +150,7 @@ def build_context_snapshot(
         (related.callees, "callee", callee_distances),
         (related.tests, "test", {}),
         (related.deadCodeCandidates, "dead_code", {}),
+        (related.onlyTestedCandidates, "only_tested", {}),
     )
     for relation_refs, relation, distances in refs:
         for ref in relation_refs:
@@ -182,6 +185,7 @@ def build_context_snapshot(
         callees=groups["callee"],
         tests=groups["test"],
         deadCodeCandidates=groups["dead_code"],
+        onlyTestedCandidates=groups["only_tested"],
         repoMap=related.repoMap,
     )
     snapshot = AnalysisContextSnapshot(
@@ -249,7 +253,7 @@ def build_cross_repo_snapshot(
             "stale": False,
             "indexerVersion": "code-graph-v1",
             "graphSchemaVersion": "1",
-            "queryVersion": "related-context-v1",
+            "queryVersion": "related-context-v2",
         },
         "input": {"diffHash": "", "diff": "", "changedFiles": [], "conventions": ""},
         "selected": {
@@ -259,6 +263,7 @@ def build_cross_repo_snapshot(
             "callees": [],
             "tests": [],
             "deadCodeCandidates": [],
+            "onlyTestedCandidates": [],
             "repoMap": "",
         },
         "edges": [],
