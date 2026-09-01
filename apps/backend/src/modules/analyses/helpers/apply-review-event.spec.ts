@@ -235,3 +235,44 @@ describe('applyReviewEvent github comments', () => {
     });
   });
 });
+
+describe('applyReviewEvent finding lifecycle', () => {
+  it('anexa o resumo sem remover metadata dos comments', () => {
+    const current = emptyReview();
+    current.comments = [
+      {
+        reviewer: 'test_reviewer',
+        status: 'fail',
+        title: 'sem teste',
+        detail: 'x',
+        lifecycle: {
+          caseId: 'case-1',
+          classification: 'new',
+          state: 'active',
+          disposition: 'unreviewed',
+          matchBasis: 'stable_anchor',
+          firstSeenAnalysisId: 'analysis-1',
+          previousOccurrenceAnalysisId: null,
+        },
+      },
+    ];
+
+    const next = applyReviewEvent(current, 'finding_lifecycle_done', {
+      status: 'available',
+      baselineAnalysisId: null,
+      modelChanged: false,
+      newCount: 1,
+      recurringCount: 0,
+      reopenedCount: 0,
+      notObservedCount: 0,
+      acknowledgedCount: 0,
+      suppressedFromGithubCount: 0,
+    });
+
+    expect(next.findingLifecycle).toMatchObject({
+      status: 'available',
+      newCount: 1,
+    });
+    expect(next.comments[0].lifecycle?.caseId).toBe('case-1');
+  });
+});

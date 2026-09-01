@@ -3,6 +3,7 @@ import {
   buildReviewBody,
   CAST_REVIEW_MARKER,
   collectActionable,
+  collectPublishable,
   isCastReviewComment,
   planInlineComments,
 } from './github-review.helper';
@@ -52,6 +53,73 @@ describe('collectActionable', () => {
       }),
     );
     expect(items.map((item) => item.status)).toEqual(['fail', 'warning']);
+  });
+});
+
+describe('collectPublishable', () => {
+  it('suprime findings reconhecidos usando a disposição atual, não a decorada', () => {
+    const items = collectPublishable(
+      review({
+        comments: [
+          {
+            reviewer: 'test_reviewer',
+            status: 'fail',
+            title: 'risco aceito',
+            detail: 'x',
+            lifecycle: {
+              caseId: 'case-1',
+              classification: 'recurring',
+              state: 'active',
+              disposition: 'unreviewed',
+              matchBasis: 'stable_anchor',
+              firstSeenAnalysisId: 'analysis-0',
+              previousOccurrenceAnalysisId: 'analysis-0',
+            },
+          },
+          {
+            reviewer: 'architecture_reviewer',
+            status: 'warning',
+            title: 'sem metadata',
+            detail: 'y',
+          },
+        ],
+      }),
+      new Map([['case-1', 'accepted_risk']]),
+    );
+
+    expect(items.map((item) => item.title)).toEqual(['sem metadata']);
+  });
+
+  it('publica finding quando o case não foi encontrado no mapa atual', () => {
+    const input = review({
+      comments: [
+        {
+          reviewer: 'test_reviewer',
+          status: 'fail',
+          title: 'fallback fail-open',
+          detail: 'x',
+          lifecycle: {
+            caseId: 'case-missing',
+            classification: 'new',
+            state: 'active',
+            disposition: 'false_positive',
+            matchBasis: 'title_fallback',
+            firstSeenAnalysisId: 'analysis-1',
+            previousOccurrenceAnalysisId: null,
+          },
+        },
+      ],
+    });
+
+    expect(collectPublishable(input, new Map())).toHaveLength(1);
+  });
+});
+
+describe('buildReviewBody lifecycle', () => {
+  it('informa quantos findings reconhecidos não foram republicados', () => {
+    expect(buildReviewBody('an-1', review(), 1, 2)).toContain(
+      '2 finding(s) reconhecido(s) não republicado(s).',
+    );
   });
 });
 

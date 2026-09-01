@@ -76,6 +76,21 @@ export class AnalysesController {
     return this.analysesService.getContextSnapshotForUser(id, currentUser);
   }
 
+  @Get('analyses/:id/finding-lifecycle')
+  getFindingLifecycle(
+    @Param('id') id: string,
+    @Query('view') view: string | undefined,
+    @Query('limit') limit: string | undefined,
+    @Query('cursor') cursor: string | undefined,
+    @CurrentUser() currentUser: CurrentUserData,
+  ) {
+    return this.analysesService.listFindingLifecycle(id, currentUser, {
+      view,
+      limit,
+      cursor,
+    });
+  }
+
   @Post('analyses/:id/resume')
   resume(
     @Param('id') id: string,

@@ -1,7 +1,8 @@
 import type {
   AnalysisReview,
+  FindingDisposition,
   GithubCommentsResult,
-  ReviewFinding,
+  ReviewComment,
 } from '../analyses.types';
 import {
   fallbackAnchor,
@@ -13,7 +14,7 @@ import {
 export const CAST_REVIEW_MARKER = '<!-- cast-review:';
 const MAX_INLINE_COMMENTS = 20;
 
-export type ReviewerComment = ReviewFinding & { reviewer: string };
+export type ReviewerComment = ReviewComment;
 
 export type GithubInlineComment = {
   path: string;
@@ -48,10 +49,26 @@ export function collectActionable(review: AnalysisReview): ReviewerComment[] {
   );
 }
 
+export function collectPublishable(
+  review: AnalysisReview,
+  currentDispositionByCaseId: ReadonlyMap<string, FindingDisposition>,
+): ReviewerComment[] {
+  return collectActionable(review).filter((item) => {
+    const currentDisposition = item.lifecycle?.caseId
+      ? currentDispositionByCaseId.get(item.lifecycle.caseId)
+      : undefined;
+    return (
+      currentDisposition !== 'accepted_risk' &&
+      currentDisposition !== 'false_positive'
+    );
+  });
+}
+
 export function buildReviewBody(
   analysisId: string,
   review: AnalysisReview,
   posted: number,
+  suppressed = 0,
 ): string {
   const verdict = review.verdict ? VERDICT_LABEL[review.verdict] : 'Review';
   const score =
@@ -61,7 +78,7 @@ export function buildReviewBody(
     (item) => item.status === 'warning',
   ).length;
 
-  return [
+  const lines = [
     markerFor(analysisId),
     `Cast Review · **${verdict}**${score}`,
     '',
@@ -69,7 +86,15 @@ export function buildReviewBody(
       ? `${posted} comentário(s) no diff (${fails} fail, ${warnings} warning).`
       : 'Nenhum trecho do diff pôde ser ancorado; o parecer completo está no Cast Review.',
     `Análise: ${analysisId}`,
-  ].join('\n');
+  ];
+  if (suppressed > 0) {
+    lines.splice(
+      lines.length - 1,
+      0,
+      `${suppressed} finding(s) reconhecido(s) não republicado(s).`,
+    );
+  }
+  return lines.join('\n');
 }
 
 export function buildInlineBody(

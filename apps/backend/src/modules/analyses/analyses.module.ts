@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import { FindingCasesModule } from '../finding-cases/finding-cases.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { UsersModule } from '../users/user.module';
@@ -10,7 +11,12 @@ import { AnalysisRepository } from './analysis.repository';
 import { AnalysisContextSnapshotRepository } from './analysis-context-snapshot.repository';
 
 @Module({
-  imports: [RepositoriesModule, ProjectsModule, UsersModule],
+  imports: [
+    RepositoriesModule,
+    ProjectsModule,
+    UsersModule,
+    FindingCasesModule,
+  ],
   controllers: [AnalysesController],
   providers: [
     AnalysesService,
