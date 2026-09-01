@@ -27,7 +27,7 @@ async def run_test_reviewer(
         payload["usage"] = skipped_step("test_reviewer")
         return payload
 
-    if not analysis["hasTests"]:
+    if not analysis["hasTests"] and not (related_context or {}).get("tests"):
         path = _anchor_path(analysis, changed_files)
         payload = review_payload([_missing_test(rule, path) for rule in business_rules])
         payload["usage"] = skipped_step("test_reviewer")

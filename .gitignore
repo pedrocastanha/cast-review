@@ -79,3 +79,6 @@ docs/feature-system-wiki/PRD.md
 docs/product-system-intelligence/DELIVERY-PLAN.md
 docs/product-system-intelligence/PRD.md
 .superpowers/
+
+# --- Neo4j GDS plugin (jar 61MB, baixado por dev) ---
+.neo4j-plugins/

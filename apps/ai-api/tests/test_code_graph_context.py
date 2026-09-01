@@ -73,6 +73,44 @@ async def test_assembles_callers_callees_and_tests_for_changed_file(driver, redi
     await _cleanup(driver, repo_id)
 
 
+async def test_hunk_scoped_context_ignores_untouched_siblings_in_a_changed_file(
+    driver, redis_client, repo_id
+):
+    z = parse_file(
+        "src/z.ts",
+        "import { helperOne } from './h1';\n"
+        "import { helperTwo } from './h2';\n"
+        "function zOne() { return helperOne(); }\n"
+        "function zTwo() { return helperTwo(); }\n",
+    )
+    h1 = parse_file("src/h1.ts", "function helperOne() { return 1; }\n")
+    h2 = parse_file("src/h2.ts", "function helperTwo() { return 2; }\n")
+
+    cache = IndexCache(driver, redis_client)
+    await cache.build_and_store(repo_id, "sha1", build_graph([z, h1, h2]))
+
+    context = await assemble_related_context(
+        cache,
+        driver,
+        repo_id,
+        "sha1",
+        ["src/z.ts"],
+        changed_files=[
+            {
+                "path": "src/z.ts",
+                "diff": "@@ -4,1 +4,1 @@\n-function zTwo() { return helperTwo(); }\n"
+                "+function zTwo() { return helperTwo() + 1; }\n",
+            }
+        ],
+    )
+    callee_names = {ref.name for ref in context.callees}
+
+    assert "helperTwo" in callee_names
+    assert "helperOne" not in callee_names
+
+    await _cleanup(driver, repo_id)
+
+
 async def test_dead_code_candidate_surfaced_only_when_in_changed_files(driver, redis_client, repo_id):
     orphan_in_changed = parse_file("src/z.ts", "function orphanZ() { return 1; }\n")
     orphan_elsewhere = parse_file("src/other.ts", "function orphanOther() { return 1; }\n")
@@ -86,6 +124,63 @@ async def test_dead_code_candidate_surfaced_only_when_in_changed_files(driver, r
 
     assert "orphanZ" in dead_names
     assert "orphanOther" not in dead_names
+
+    await _cleanup(driver, repo_id)
+
+
+async def test_symbol_left_dead_by_the_diff_surfaces_even_from_an_unchanged_file(
+    driver, redis_client, repo_id
+):
+    orphan = parse_file("src/orphan.ts", "function orphan() { return 1; }\n")
+    caller = parse_file("src/caller.ts", "function caller() {\n  return 1;\n}\n")
+
+    cache = IndexCache(driver, redis_client)
+    await cache.build_and_store(repo_id, "sha1", build_graph([orphan, caller]))
+
+    context = await assemble_related_context(
+        cache,
+        driver,
+        repo_id,
+        "sha1",
+        ["src/caller.ts"],
+        changed_files=[
+            {
+                "path": "src/caller.ts",
+                "diff": "@@ -2,1 +2,1 @@\n-  return orphan();\n+  return 1;\n",
+            }
+        ],
+    )
+
+    assert "orphan" in {ref.name for ref in context.deadCodeCandidates}
+
+    await _cleanup(driver, repo_id)
+
+
+async def test_changed_symbol_exercised_only_by_tests_lands_in_its_own_bucket(
+    driver, redis_client, repo_id
+):
+    prod = parse_file("src/foo.ts", "function foo() { return 1; }\n")
+    test = parse_file("src/foo.test.ts", "import { foo } from './foo';\nfoo();\n")
+
+    cache = IndexCache(driver, redis_client)
+    await cache.build_and_store(repo_id, "sha1", detect_test_edges(build_graph([prod, test])))
+
+    context = await assemble_related_context(
+        cache,
+        driver,
+        repo_id,
+        "sha1",
+        ["src/foo.ts"],
+        changed_files=[
+            {
+                "path": "src/foo.ts",
+                "diff": "@@ -1,1 +1,1 @@\n-function foo() { return 1; }\n+function foo() { return 2; }\n",
+            }
+        ],
+    )
+
+    assert "foo" in {ref.name for ref in context.onlyTestedCandidates}
+    assert "foo" not in {ref.name for ref in context.deadCodeCandidates}
 
     await _cleanup(driver, repo_id)
 

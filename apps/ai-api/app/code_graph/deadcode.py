@@ -46,6 +46,20 @@ def find_dead_candidates(
     return DeadCodeResult(dead=dead, only_tested=only_tested)
 
 
+def filter_pr_relevant(
+    result: DeadCodeResult,
+    changed_paths: set[str],
+    removed_names: set[str],
+) -> DeadCodeResult:
+    def keep(symbol: Symbol) -> bool:
+        return symbol.path in changed_paths or symbol.name in removed_names
+
+    return DeadCodeResult(
+        dead=[symbol for symbol in result.dead if keep(symbol)],
+        only_tested=[symbol for symbol in result.only_tested if keep(symbol)],
+    )
+
+
 def _is_entrypoint(symbol: Symbol, decorator_patterns: list[str]) -> bool:
     if symbol.name in ENTRYPOINT_NAMES:
         return True

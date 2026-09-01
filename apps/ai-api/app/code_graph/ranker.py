@@ -13,6 +13,7 @@ async def rank(
     repo_id: str,
     sha: str,
     changed_paths: list[str],
+    source_symbol_ids: list[str] | None = None,
 ) -> list[ScoredNode]:
     """Personalized PageRank over the `REFERENCES` subgraph only — `IMPORTS` never
     participates in ranking. That's not an oversight: mixing relationship types in one
@@ -55,16 +56,28 @@ async def rank(
                 graphName=graph_name,
             )
 
-            source_result = await session.run(
-                """
-                MATCH (s:Symbol {repoId: $repoId, sha: $sha})
-                WHERE s.path IN $changedPaths
-                RETURN collect(id(s)) AS sourceIds
-                """,
-                repoId=repo_id,
-                sha=sha,
-                changedPaths=changed_paths,
-            )
+            if source_symbol_ids:
+                source_result = await session.run(
+                    """
+                    MATCH (s:Symbol {repoId: $repoId, sha: $sha})
+                    WHERE s.id IN $symbolIds
+                    RETURN collect(id(s)) AS sourceIds
+                    """,
+                    repoId=repo_id,
+                    sha=sha,
+                    symbolIds=source_symbol_ids,
+                )
+            else:
+                source_result = await session.run(
+                    """
+                    MATCH (s:Symbol {repoId: $repoId, sha: $sha})
+                    WHERE s.path IN $changedPaths
+                    RETURN collect(id(s)) AS sourceIds
+                    """,
+                    repoId=repo_id,
+                    sha=sha,
+                    changedPaths=changed_paths,
+                )
             source_record = await source_result.single()
             source_ids = source_record["sourceIds"] if source_record else []
             if not source_ids:

@@ -99,6 +99,7 @@ export interface AnalysisContextSnapshot {
     callees: GraphSnapshotNode[];
     tests: GraphSnapshotNode[];
     deadCodeCandidates: GraphSnapshotNode[];
+    onlyTestedCandidates?: GraphSnapshotNode[];
     repoMap: string;
   };
   edges: GraphSnapshotEdge[];

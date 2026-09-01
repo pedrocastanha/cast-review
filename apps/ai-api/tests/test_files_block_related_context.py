@@ -40,6 +40,23 @@ def test_files_block_renders_callees_and_tests_and_repo_map():
     assert "function e(): void" in result
 
 
+def test_files_block_renders_only_tested_candidates_as_their_own_section():
+    related = {
+        "callers": [],
+        "callees": [],
+        "tests": [],
+        "deadCodeCandidates": [],
+        "onlyTestedCandidates": [
+            {"path": "src/foo.ts", "name": "foo", "signature": "function foo()", "body": None}
+        ],
+        "repoMap": "",
+    }
+    result = files_block([{"path": "src/foo.ts", "diff": "", "fullContent": "x"}], related)
+
+    assert "## Coberto apenas por teste" in result
+    assert "src/foo.ts::foo" in result
+
+
 def test_files_block_skips_related_context_block_when_all_sections_empty():
     related = {"callers": [], "callees": [], "tests": [], "deadCodeCandidates": [], "repoMap": ""}
     result = files_block([{"path": "a.ts", "diff": "", "fullContent": "x"}], related)

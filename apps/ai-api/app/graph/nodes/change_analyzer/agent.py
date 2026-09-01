@@ -121,7 +121,14 @@ async def _local_graph_context(state: GraphState) -> tuple[dict | None, dict | N
 
         driver, cache = _get_index_cache()
         changed_paths = [item["path"] for item in state["changed_files"] if item.get("path")]
-        related = await assemble_related_context(cache, driver, repo_id, sha, changed_paths)
+        related = await assemble_related_context(
+            cache,
+            driver,
+            repo_id,
+            sha,
+            changed_paths,
+            changed_files=state["changed_files"],
+        )
         graph = await cache.lookup(repo_id, sha) or Graph()
         snapshot = build_context_snapshot(
             analysis_id=state.get("run_id"),

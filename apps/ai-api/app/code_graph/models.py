@@ -102,6 +102,7 @@ class RelatedContext(BaseModel):
     callees: list[SymbolRef] = Field(default_factory=list)
     tests: list[SymbolRef] = Field(default_factory=list)
     deadCodeCandidates: list[SymbolRef] = Field(default_factory=list)
+    onlyTestedCandidates: list[SymbolRef] = Field(default_factory=list)
     repoMap: str = ""
     stats: IndexStats
 
@@ -192,7 +193,7 @@ class ProjectGraph(BaseModel):
     stats: ProjectGraphStats
 
 
-GraphRelation = Literal["changed", "caller", "callee", "test", "dead_code"]
+GraphRelation = Literal["changed", "caller", "callee", "test", "dead_code", "only_tested"]
 GraphConfidence = Literal["confirmed", "inferred", "unresolved", "stale"]
 
 
@@ -235,7 +236,7 @@ class SnapshotGraphMetadata(BaseModel):
     stale: bool = False
     indexerVersion: str = "code-graph-v1"
     graphSchemaVersion: str = "1"
-    queryVersion: str = "related-context-v1"
+    queryVersion: str = "related-context-v2"
 
 
 class SnapshotInput(BaseModel):
@@ -252,6 +253,7 @@ class SnapshotSelection(BaseModel):
     callees: list[GraphSnapshotNode] = Field(default_factory=list)
     tests: list[GraphSnapshotNode] = Field(default_factory=list)
     deadCodeCandidates: list[GraphSnapshotNode] = Field(default_factory=list)
+    onlyTestedCandidates: list[GraphSnapshotNode] = Field(default_factory=list)
     repoMap: str = ""
 
 
