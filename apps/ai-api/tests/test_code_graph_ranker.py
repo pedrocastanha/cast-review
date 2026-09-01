@@ -54,6 +54,28 @@ async def test_rank_ranks_direct_caller_above_transitive_caller(driver, redis_cl
     await _cleanup(driver, repo_id)
 
 
+async def test_rank_scoped_to_changed_symbols_ignores_callers_of_untouched_siblings(
+    driver, redis_client, repo_id
+):
+    z = parse_file("src/z.ts", "function zOne() { return 1; }\nfunction zTwo() { return 2; }\n")
+    x = parse_file("src/x.ts", "import { zOne } from './z';\nfunction x() { return zOne(); }\n")
+    w = parse_file("src/w.ts", "import { zTwo } from './z';\nfunction w() { return zTwo(); }\n")
+    graph = build_graph([z, x, w])
+
+    cache = IndexCache(driver, redis_client)
+    await cache.build_and_store(repo_id, "sha1", graph)
+
+    z_two_id = next(s.id for s in graph.nodes.values() if s.name == "zTwo")
+    scored = await rank(driver, repo_id, "sha1", ["src/z.ts"], source_symbol_ids=[z_two_id])
+    scores = {s.symbol_id: s.score for s in scored}
+
+    fn_w_id = next(sid for sid in scores if "src/w.ts::w" in sid)
+    fn_x_id = next(sid for sid in scores if "src/x.ts::x" in sid)
+    assert scores[fn_w_id] > scores[fn_x_id]
+
+    await _cleanup(driver, repo_id)
+
+
 async def test_rank_returns_empty_when_changed_path_has_no_symbols(driver, redis_client, repo_id):
     a = parse_file("src/a.ts", "function a() {}\n")
     graph = build_graph([a])

@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
     environment:
       NEO4J_AUTH: "neo4j/portfolio123"
-      NEO4J_PLUGINS: '["graph-data-science"]'
+      NEO4J_dbms_security_procedures_unrestricted: "gds.*"
       NEO4J_server_memory_heap_initial__size: "128m"
       NEO4J_server_memory_heap_max__size: "512m"
       NEO4J_server_memory_pagecache_size: "256m"
@@ -48,6 +48,7 @@ services:
       - "7687:7687"
     volumes:
       - neo4j_data:/data
+      - ./.neo4j-plugins:/var/lib/neo4j/plugins
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
       interval: 5s
