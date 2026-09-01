@@ -16,6 +16,10 @@ import type {
   FrozenImpactScope,
 } from 'src/shared/types';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
+import { FindingCaseRepository } from '../finding-cases/finding-case.repository';
+import { FindingCaseEventRepository } from '../finding-cases/finding-case-event.repository';
+import { FindingOccurrenceRepository } from '../finding-cases/finding-occurrence.repository';
+import { FindingLifecycleUseCase } from '../finding-cases/use-cases/finding-lifecycle/finding-lifecycle.use-case';
 import { ProjectsService } from '../projects/projects.service';
 import { RepositoriesService } from '../repositories/repositories.service';
 import type { UserService } from '../users/user.service';
@@ -23,6 +27,7 @@ import type {
   AnalysisContextSnapshot,
   AnalysisRecord,
   AnalysisReview,
+  FindingLifecycleSummary,
   GithubCommentsResult,
   Iteration,
   PublishPolicy,
@@ -41,6 +46,7 @@ import { buildAgentRunRequest } from './helpers/context-builder.helper';
 import {
   buildReviewBody,
   collectActionable,
+  collectPublishable,
   emptyGithubComments,
   isCastReviewComment,
   planInlineComments,
@@ -63,17 +69,40 @@ type RunInput = {
 
 @Injectable()
 export class AnalysesService extends BaseService {
+  private readonly findingLifecycleUseCase: FindingLifecycleUseCase;
+
   constructor(
     private readonly repositoriesService: RepositoriesService,
     private readonly aiApiClient: AiApiClient,
     private readonly analysisRepository: AnalysisRepository,
     private readonly contextSnapshotRepository: AnalysisContextSnapshotRepository,
+    findingCaseRepository: FindingCaseRepository,
+    findingOccurrenceRepository: FindingOccurrenceRepository,
+    findingCaseEventRepository: FindingCaseEventRepository,
     private readonly projectsService: ProjectsService,
     @Inject('USER_SERVICE')
     private readonly userService: UserService,
     logger: AppLogger,
   ) {
     super(logger);
+    this.findingLifecycleUseCase = new FindingLifecycleUseCase(
+      findingCaseRepository,
+      findingOccurrenceRepository,
+      findingCaseEventRepository,
+      analysisRepository,
+    );
+  }
+
+  listFindingLifecycle(
+    analysisId: string,
+    currentUser: CurrentUserData,
+    query: { view?: string; limit?: string; cursor?: string },
+  ) {
+    return this.findingLifecycleUseCase.listForAnalysis(
+      analysisId,
+      currentUser.id,
+      query,
+    );
   }
 
   async run({
@@ -505,12 +534,22 @@ export class AnalysesService extends BaseService {
           }
           review = applyReviewEvent(review, event.type, event.payload);
           if (event.type === 'report_ready') {
+            const lifecycleSummary = await this.reconcileFindingLifecycle(
+              analysis,
+              review,
+              publishingUser,
+            );
+            review = lifecycleSummary.review;
             if (analysis.publishPolicy?.publish === 'auto') {
               await persistReview({
                 status: 'completed',
                 finishedAt: new Date(),
               });
               writeEvent(event);
+              writeEvent({
+                type: 'finding_lifecycle_done',
+                payload: { ...lifecycleSummary.summary },
+              });
 
               const github = await this.publishGithubComments({
                 analysisId: analysis.id,
@@ -540,6 +579,10 @@ export class AnalysesService extends BaseService {
               finishedAt: new Date(),
             });
             writeEvent(event);
+            writeEvent({
+              type: 'finding_lifecycle_done',
+              payload: { ...lifecycleSummary.summary },
+            });
             writeEvent({
               type: 'awaiting_approval',
               payload: { stage: 'publish' },
@@ -729,9 +772,30 @@ export class AnalysesService extends BaseService {
     owner?: string;
   }): Promise<GithubCommentsResult> {
     try {
-      if (collectActionable(input.review).length === 0) {
+      const actionable = collectActionable(input.review);
+      if (actionable.length === 0) {
         return emptyGithubComments();
       }
+
+      let currentDispositions = new Map();
+      try {
+        currentDispositions =
+          await this.findingLifecycleUseCase.currentDispositions(
+            actionable.flatMap((item) =>
+              item.lifecycle?.caseId ? [item.lifecycle.caseId] : [],
+            ),
+            input.currentUser.id,
+          );
+      } catch (err) {
+        this.logger.warn('Falha ao carregar disposições atuais dos findings', {
+          exception: err,
+          analysisId: input.analysisId,
+        });
+      }
+      const publishable = collectPublishable(input.review, currentDispositions);
+      if (publishable.length === 0) return emptyGithubComments();
+      const suppressed = actionable.length - publishable.length;
+      const publishableReview = { ...input.review, comments: publishable };
 
       const [files, headSha, login] = await Promise.all([
         this.repositoriesService.listPullFiles(
@@ -751,7 +815,7 @@ export class AnalysesService extends BaseService {
 
       const { comments, skipped } = planInlineComments(
         input.analysisId,
-        input.review,
+        publishableReview,
         files,
       );
 
@@ -779,8 +843,9 @@ export class AnalysesService extends BaseService {
           commitId: headSha,
           body: buildReviewBody(
             input.analysisId,
-            input.review,
+            publishableReview,
             comments.length,
+            suppressed,
           ),
           comments: comments.map((comment) => ({
             path: comment.path,
@@ -820,6 +885,56 @@ export class AnalysesService extends BaseService {
         htmlUrl: null,
         errorMessage:
           err instanceof Error ? err.message : 'Falha ao comentar na PR',
+      };
+    }
+  }
+
+  private async reconcileFindingLifecycle(
+    analysis: Analysis,
+    review: AnalysisReview,
+    currentUser: CurrentUserData,
+  ): Promise<{ review: AnalysisReview; summary: FindingLifecycleSummary }> {
+    try {
+      const owner =
+        analysis.owner.trim() ||
+        (await this.repositoriesService.loginFor(currentUser));
+      const result = await this.findingLifecycleUseCase.reconcile({
+        analysis,
+        review,
+        owner,
+      });
+      const comments = review.comments.map((comment, index) => {
+        const lifecycle = result.metadataByCommentIndex.get(index);
+        return lifecycle ? { ...comment, lifecycle } : comment;
+      });
+      const decorated = applyReviewEvent(
+        { ...review, comments },
+        'finding_lifecycle_done',
+        { ...result.summary },
+      );
+      return { review: decorated, summary: result.summary };
+    } catch (err) {
+      const summary: FindingLifecycleSummary = {
+        status: 'unavailable',
+        baselineAnalysisId: null,
+        modelChanged: false,
+        newCount: 0,
+        recurringCount: 0,
+        reopenedCount: 0,
+        notObservedCount: 0,
+        acknowledgedCount: 0,
+        suppressedFromGithubCount: 0,
+        errorCode: 'reconciliation_failed',
+      };
+      this.logger.error('Falha ao reconciliar lifecycle de findings', {
+        exception: err,
+        analysisId: analysis.id,
+      });
+      return {
+        review: applyReviewEvent(review, 'finding_lifecycle_done', {
+          ...summary,
+        }),
+        summary,
       };
     }
   }

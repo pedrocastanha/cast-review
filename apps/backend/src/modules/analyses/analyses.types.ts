@@ -1,3 +1,5 @@
+import type { FindingDisposition as FindingCaseDisposition } from '../finding-cases/finding-cases.types';
+
 export type AnalysisStatus =
   | 'running'
   | 'completed'
@@ -152,8 +154,34 @@ export interface ReviewResult {
   findings: ReviewFinding[];
 }
 
+export type FindingDisposition = FindingCaseDisposition;
+
+export interface FindingLifecycleMeta {
+  caseId: string;
+  classification: 'new' | 'recurring' | 'reopened';
+  state: 'active';
+  disposition: FindingDisposition;
+  matchBasis: 'stable_anchor' | 'title_fallback';
+  firstSeenAnalysisId: string;
+  previousOccurrenceAnalysisId: string | null;
+}
+
+export interface FindingLifecycleSummary {
+  status: 'available' | 'unavailable';
+  baselineAnalysisId: string | null;
+  modelChanged: boolean;
+  newCount: number;
+  recurringCount: number;
+  reopenedCount: number;
+  notObservedCount: number;
+  acknowledgedCount: number;
+  suppressedFromGithubCount: number;
+  errorCode?: 'reconciliation_failed';
+}
+
 export interface ReviewComment extends ReviewFinding {
   reviewer: string;
+  lifecycle?: FindingLifecycleMeta;
 }
 
 export type ReviewVerdict = 'approve' | 'comment' | 'request_changes';
@@ -219,6 +247,7 @@ export interface AnalysisReview {
   conventionsSource?: 'repo' | 'default';
   usage?: AnalysisUsage;
   githubComments?: GithubCommentsResult;
+  findingLifecycle?: FindingLifecycleSummary;
 }
 
 export interface Annotation {

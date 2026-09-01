@@ -2,6 +2,8 @@ import type {
   AnalysisReview,
   AnalysisUsage,
   ChangeAnalysis,
+  FindingLifecycleMeta,
+  FindingLifecycleSummary,
   GithubCommentsResult,
   ReviewComment,
   ReviewFinding,
@@ -102,11 +104,20 @@ export function applyReviewEvent(
     case 'github_comments_done':
       next.githubComments = normalizeGithubComments(payload);
       break;
+    case 'finding_lifecycle_done':
+      next.findingLifecycle = normalizeFindingLifecycleSummary(payload);
+      break;
     default:
       return current;
   }
 
-  next.comments = flattenComments(next.results);
+  if (
+    type === 'test_reviewer_done' ||
+    type === 'architecture_reviewer_done' ||
+    type === 'report_ready'
+  ) {
+    next.comments = flattenComments(next.results);
+  }
   return next;
 }
 
@@ -155,6 +166,7 @@ export function hydrateReview(
         : undefined,
     usage: isAnalysisUsage(raw.usage) ? raw.usage : undefined,
     githubComments: normalizeGithubComments(raw.githubComments),
+    findingLifecycle: normalizeFindingLifecycleSummary(raw.findingLifecycle),
   };
 }
 
@@ -242,7 +254,73 @@ function normalizeComment(value: unknown): ReviewComment | null {
   const finding = normalizeFinding(value);
   if (!finding || !isRecord(value) || !isNonEmptyString(value.reviewer))
     return null;
-  return { reviewer: value.reviewer, ...finding };
+  return {
+    reviewer: value.reviewer,
+    ...finding,
+    lifecycle: normalizeFindingLifecycleMeta(value.lifecycle),
+  };
+}
+
+function normalizeFindingLifecycleMeta(
+  value: unknown,
+): FindingLifecycleMeta | undefined {
+  if (!isRecord(value)) return undefined;
+  const classification = value.classification;
+  const disposition = value.disposition;
+  const matchBasis = value.matchBasis;
+  if (
+    !isNonEmptyString(value.caseId) ||
+    (classification !== 'new' &&
+      classification !== 'recurring' &&
+      classification !== 'reopened') ||
+    value.state !== 'active' ||
+    (disposition !== 'unreviewed' &&
+      disposition !== 'accepted_risk' &&
+      disposition !== 'false_positive') ||
+    (matchBasis !== 'stable_anchor' && matchBasis !== 'title_fallback') ||
+    !isNonEmptyString(value.firstSeenAnalysisId)
+  ) {
+    return undefined;
+  }
+  return {
+    caseId: value.caseId,
+    classification,
+    state: 'active',
+    disposition,
+    matchBasis,
+    firstSeenAnalysisId: value.firstSeenAnalysisId,
+    previousOccurrenceAnalysisId: isNonEmptyString(
+      value.previousOccurrenceAnalysisId,
+    )
+      ? value.previousOccurrenceAnalysisId
+      : null,
+  };
+}
+
+function normalizeFindingLifecycleSummary(
+  value: unknown,
+): FindingLifecycleSummary | undefined {
+  if (!isRecord(value)) return undefined;
+  if (value.status !== 'available' && value.status !== 'unavailable') {
+    return undefined;
+  }
+  return {
+    status: value.status,
+    baselineAnalysisId: isNonEmptyString(value.baselineAnalysisId)
+      ? value.baselineAnalysisId
+      : null,
+    modelChanged: Boolean(value.modelChanged),
+    newCount: asCount(value.newCount),
+    recurringCount: asCount(value.recurringCount),
+    reopenedCount: asCount(value.reopenedCount),
+    notObservedCount: asCount(value.notObservedCount),
+    acknowledgedCount: asCount(value.acknowledgedCount),
+    suppressedFromGithubCount: asCount(value.suppressedFromGithubCount),
+    errorCode:
+      value.errorCode === 'reconciliation_failed'
+        ? 'reconciliation_failed'
+        : undefined,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

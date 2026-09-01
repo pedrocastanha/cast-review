@@ -208,6 +208,7 @@ export type AgentEventType =
   | 'test_reviewer_done'
   | 'architecture_reviewer_done'
   | 'report_ready'
+  | 'finding_lifecycle_done'
   | 'awaiting_approval'
   | 'github_comments_done'
   | 'thought'
@@ -276,8 +277,71 @@ export interface ReviewResult {
   findings: Finding[];
 }
 
+export type FindingDisposition = 'unreviewed' | 'accepted_risk' | 'false_positive';
+export type FindingClassification = 'new' | 'recurring' | 'reopened' | 'not_observed';
+
+export interface FindingLifecycleMeta {
+  caseId: string;
+  classification: Exclude<FindingClassification, 'not_observed'>;
+  state: 'active';
+  disposition: FindingDisposition;
+  matchBasis: 'stable_anchor' | 'title_fallback';
+  firstSeenAnalysisId: string;
+  previousOccurrenceAnalysisId: string | null;
+}
+
+export interface FindingLifecycleSummary {
+  status: 'available' | 'unavailable';
+  baselineAnalysisId: string | null;
+  modelChanged: boolean;
+  newCount: number;
+  recurringCount: number;
+  reopenedCount: number;
+  notObservedCount: number;
+  acknowledgedCount: number;
+  suppressedFromGithubCount: number;
+  errorCode?: 'reconciliation_failed';
+}
+
+export interface FindingLifecycleOccurrence {
+  severity: 'fail' | 'warning';
+  reviewer: string;
+  title: string;
+  detail: string;
+  path: string | null;
+  line: number | null;
+  endLine: number | null;
+  businessRule: string | null;
+  conventionRef: string | null;
+  evidenceId: string | null;
+}
+
+export interface FindingLifecycleItem {
+  caseId: string;
+  classification: FindingClassification;
+  state: 'active' | 'resolved';
+  disposition: FindingDisposition;
+  dispositionNote: string | null;
+  matchBasis: 'stable_anchor' | 'title_fallback';
+  firstSeenAnalysisId: string | null;
+  previousOccurrenceAnalysisId: string | null;
+  currentOccurrence: FindingLifecycleOccurrence | null;
+  lastOccurrence?: FindingLifecycleOccurrence | null;
+  transitionedAt: string;
+}
+
+export type FindingLifecycleView = 'attention' | 'acknowledged' | 'not_observed' | 'all';
+
+export interface FindingLifecycleListResponse {
+  data: FindingLifecycleItem[];
+  summary: FindingLifecycleSummary;
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
 export interface ReviewComment extends Finding {
   reviewer: string;
+  lifecycle?: FindingLifecycleMeta;
 }
 
 export interface ChangeAnalysisFile {
@@ -560,6 +624,7 @@ export interface ReportPayload {
   conventionsSource?: 'repo' | 'default';
   usage?: AnalysisUsage;
   githubComments?: GithubCommentsResult;
+  findingLifecycle?: FindingLifecycleSummary;
 }
 
 export type GithubCommentsStatus = 'posted' | 'empty' | 'error';
