@@ -5,22 +5,32 @@ import type {
   RelatedFile,
 } from 'src/shared/types';
 import type { CurrentUserData } from '../../auth/utils/current-user-decorator';
-import type { RepositoriesService } from '../../repositories/repositories.service';
+import type { GithubPullGateway } from '../../repositories/types/github-pull-gateway.type';
 import type { RunAnalysisDto } from '../dtos/run-analysis.dto';
-
-export type RunAnalysisInput = RunAnalysisDto & {
-  apiKeys: { openai: string };
-};
 import {
   candidatePathsFor,
   extractRelativeImportPaths,
 } from './import-resolver.helper';
 
+export type RunAnalysisInput = RunAnalysisDto & {
+  apiKeys: { openai: string };
+};
+
+export type PullContextSource = Pick<
+  GithubPullGateway,
+  | 'getPullByNumber'
+  | 'getPullDiff'
+  | 'listPullFiles'
+  | 'getFileContent'
+  | 'getConventions'
+  | 'loginFor'
+>;
+
 const MAX_RELATED_FILES_PER_CHANGE = 3;
 const MAX_RELATED_FILE_CHARS = 4000;
 
 export async function buildAgentRunRequest(
-  repositoriesService: RepositoriesService,
+  repositoriesService: PullContextSource,
   repo: string,
   pullNumber: number,
   currentUser: CurrentUserData,
@@ -77,7 +87,7 @@ export async function buildAgentRunRequest(
 }
 
 async function buildChangedFile(
-  repositoriesService: RepositoriesService,
+  repositoriesService: PullContextSource,
   repo: string,
   file: { filename: string; patch?: string },
   headRef: string,
@@ -122,7 +132,7 @@ async function buildChangedFile(
 }
 
 async function resolveRelatedFiles(
-  repositoriesService: RepositoriesService,
+  repositoriesService: PullContextSource,
   repo: string,
   changedFilePath: string,
   content: string,
@@ -152,7 +162,7 @@ async function resolveRelatedFiles(
 }
 
 async function fetchWithExtensionFallback(
-  repositoriesService: RepositoriesService,
+  repositoriesService: PullContextSource,
   repo: string,
   path: string,
   ref: string,

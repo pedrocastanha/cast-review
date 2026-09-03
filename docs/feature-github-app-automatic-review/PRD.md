@@ -1,6 +1,6 @@
 # PRD: Revisão automática via GitHub App
 
-**Status:** Proposto
+**Status:** Implementado (P1)
 
 **Data:** 2026-09-01
 
@@ -247,13 +247,17 @@ O administrador pode:
 
 ## Rastreabilidade
 
-| História | Requisitos | Status |
-| --- | --- | --- |
-| APP-01 | GA-01, GA-02, GA-14 | Pendente |
-| APP-02 | GA-03, GA-04, GA-15 | Pendente |
-| APP-03 | GA-05 a GA-09, GA-12 | Pendente |
-| APP-04 | GA-10, GA-11, GA-16 | Pendente |
-| APP-05 | GA-04, GA-13, GA-15 | Pendente |
-| APP-06 | GA-05, GA-06, GA-08 | Pendente |
-| APP-07 | GA-11, GA-12 | Pendente |
-| APP-08 | GA-09, GA-16 | Pendente |
+| História | Requisitos | Status | Onde |
+| --- | --- | --- | --- |
+| APP-01 | GA-01, GA-02, GA-14 | Implementado | `installations.service.ts`, `installation-token.service.ts` |
+| APP-02 | GA-03, GA-04, GA-15 | Implementado | `installations.service.ts`, `IntegrationsPage.tsx` |
+| APP-03 | GA-05 a GA-09, GA-12 | Implementado | `webhooks.service.ts`, `review.processor.ts` |
+| APP-04 | GA-10, GA-11, GA-16 | Implementado | `check-run.service.ts`, `check-run-output.helper.ts` |
+| APP-05 | GA-04, GA-13, GA-15 | Implementado | `budget.service.ts`, `installations.service.ts` |
+| APP-06 | GA-05, GA-06, GA-08 | Implementado | `webhooks.service.ts`, `github-app.service.ts` |
+| APP-07 | GA-11, GA-12 | Implementado | `review.processor.ts` (`beforePublish`, supersede) |
+| APP-08 | GA-09, GA-16 | Implementado | `analyses.origin`/`head_sha`, `ReviewRunList.tsx` |
+
+Detalhes de implementação: [SPEC.md](./SPEC.md). Operação: [DEPLOY.md](./DEPLOY.md).
+
+**Não implementado do P1:** `staleIndexBehavior` é persistido e configurável, mas a checagem de índice stale antes da análise não altera o fluxo — o valor fica gravado para o P2.

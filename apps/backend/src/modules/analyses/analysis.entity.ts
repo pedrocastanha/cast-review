@@ -2,6 +2,7 @@ import { DefaultEntity } from 'src/shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
 import type {
   AnalysisImpactScopeSummary,
+  AnalysisOrigin,
   AnalysisReview,
   AnalysisStatus,
   Iteration,
@@ -23,6 +24,12 @@ export class Analysis extends DefaultEntity<Analysis> {
 
   @Column({ name: 'pull_number', type: 'int' })
   pullNumber: number;
+
+  @Column({ type: 'varchar', default: 'manual' })
+  origin: AnalysisOrigin;
+
+  @Column({ name: 'head_sha', type: 'varchar', nullable: true })
+  headSha: string | null;
 
   @Column({ type: 'varchar' })
   status: AnalysisStatus;

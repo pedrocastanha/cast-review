@@ -9,6 +9,10 @@ import { ChatThread } from 'src/modules/chat/chat-thread.entity';
 import { FindingCase } from 'src/modules/finding-cases/finding-case.entity';
 import { FindingCaseEvent } from 'src/modules/finding-cases/finding-case-event.entity';
 import { FindingOccurrence } from 'src/modules/finding-cases/finding-occurrence.entity';
+import { GithubAppRepository } from 'src/modules/github-app/entities/github-app-repository.entity';
+import { GithubInstallation } from 'src/modules/github-app/entities/github-installation.entity';
+import { GithubReviewRun } from 'src/modules/github-app/entities/github-review-run.entity';
+import { GithubWebhookDelivery } from 'src/modules/github-app/entities/github-webhook-delivery.entity';
 import { Project } from 'src/modules/projects/project.entity';
 import { ProjectRepositoryMember } from 'src/modules/projects/project-repository-member.entity';
 import { User } from 'src/modules/users/user.entity';
@@ -32,6 +36,10 @@ export default new DataSource({
     BenchmarkRun,
     ChatThread,
     ChatMessage,
+    GithubInstallation,
+    GithubAppRepository,
+    GithubWebhookDelivery,
+    GithubReviewRun,
     Project,
     ProjectRepositoryMember,
   ],

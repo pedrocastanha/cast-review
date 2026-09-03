@@ -24,6 +24,11 @@ const NAV_ITEMS = [
     icon: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
   },
   {
+    to: '/integrations',
+    label: 'Integrações',
+    icon: <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7L12.5 19.5" />,
+  },
+  {
     to: '/settings',
     label: 'Configurações',
     icon: (

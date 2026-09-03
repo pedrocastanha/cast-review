@@ -1,9 +1,9 @@
-import { GithubSessionProvider } from '../shared/github-session.provider';
+import type { GithubSessionSource } from '../shared/github-session.provider';
 import { toPullSummary } from '../shared/pull-summary.helper';
 import { GetPullByNumberDto } from './get-pull-by-number.dto';
 
 export class GetPullByNumberUseCase {
-  constructor(private readonly githubSession: GithubSessionProvider) {}
+  constructor(private readonly githubSession: GithubSessionSource) {}
 
   async execute({
     repo,

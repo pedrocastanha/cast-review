@@ -756,3 +756,104 @@ export interface SendChatMessagePayload {
   model: string;
   repositoryHint?: string;
 }
+
+export type GithubInstallationStatus = 'pending' | 'active' | 'suspended' | 'deleted';
+
+export type GithubAppPublishPolicy = 'check_only' | 'comments';
+
+export type RepositoryConfigStatus = 'ready' | 'configuration_required';
+
+export interface GithubAppRepositoryConfig {
+  events: { opened: boolean; reopened: boolean; synchronize: boolean };
+  includeDrafts: boolean;
+  baseBranches: string[];
+  models: { testReviewer: string; architectureReviewer: string } | null;
+  impactScope: { mode: 'repository' } | { mode: 'project'; projectId: string };
+  publishPolicy: GithubAppPublishPolicy;
+  budgetMonthlyUsd: number | null;
+  budgetPerRunUsd: number | null;
+  staleIndexBehavior: 'proceed' | 'skip';
+}
+
+export interface GithubAppBudgetUsage {
+  month: string;
+  consumedUsd: number;
+  reservedUsd: number;
+  limitUsd: number | null;
+  remainingUsd: number | null;
+}
+
+export interface GithubAppRepositorySummary {
+  id: string;
+  installationId: string;
+  owner: string;
+  repo: string;
+  fullName: string;
+  isPrivate: boolean;
+  defaultBranch: string | null;
+  enabled: boolean;
+  paused: boolean;
+  configStatus: RepositoryConfigStatus;
+  configReason: string | null;
+  config: GithubAppRepositoryConfig;
+  budget?: GithubAppBudgetUsage;
+}
+
+export interface GithubInstallationSummary {
+  id: string;
+  installationId: string;
+  accountLogin: string;
+  accountType: string;
+  status: GithubInstallationStatus;
+  paused: boolean;
+  repositorySelection: string | null;
+  permissions: Record<string, string>;
+  linkedAt: string | null;
+  lastEventAt: string | null;
+  repositories: GithubAppRepositorySummary[];
+}
+
+export type GithubReviewRunStatus =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'skipped'
+  | 'superseded'
+  | 'cancelled';
+
+export interface GithubReviewRunSummary {
+  id: string;
+  pullNumber: number;
+  headSha: string;
+  status: GithubReviewRunStatus;
+  skipReason: string | null;
+  errorMessage: string | null;
+  analysisId: string | null;
+  trigger: 'webhook' | 'manual' | 'retry';
+  eventAction: string | null;
+  checkRun: {
+    id: number | null;
+    status: string | null;
+    conclusion: string | null;
+    htmlUrl: string | null;
+  } | null;
+  consumedUsd: number | null;
+  queuedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface UpdateRepositoryConfigPayload {
+  enabled?: boolean;
+  events?: { opened: boolean; reopened: boolean; synchronize: boolean };
+  includeDrafts?: boolean;
+  baseBranches?: string[];
+  models?: { testReviewer: string; architectureReviewer: string };
+  impactScope?: { mode: 'repository' | 'project'; projectId?: string };
+  publishPolicy?: GithubAppPublishPolicy;
+  budgetMonthlyUsd?: number | null;
+  budgetPerRunUsd?: number | null;
+  staleIndexBehavior?: 'proceed' | 'skip';
+  paused?: boolean;
+}

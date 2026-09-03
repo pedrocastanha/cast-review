@@ -1,8 +1,8 @@
-import { GithubSessionProvider } from '../shared/github-session.provider';
+import type { GithubSessionSource } from '../shared/github-session.provider';
 import { GetPullDiffDto } from './get-pull-diff.dto';
 
 export class GetPullDiffUseCase {
-  constructor(private readonly githubSession: GithubSessionProvider) {}
+  constructor(private readonly githubSession: GithubSessionSource) {}
 
   async execute({
     repo,

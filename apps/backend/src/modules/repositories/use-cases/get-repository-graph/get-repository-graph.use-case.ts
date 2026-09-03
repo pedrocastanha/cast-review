@@ -1,10 +1,10 @@
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import { GithubSessionProvider } from '../shared/github-session.provider';
+import type { GithubSessionSource } from '../shared/github-session.provider';
 import { GetRepositoryGraphDto } from './get-repository-graph.dto';
 
 export class GetRepositoryGraphUseCase {
   constructor(
-    private readonly githubSession: GithubSessionProvider,
+    private readonly githubSession: GithubSessionSource,
     private readonly aiApiClient: AiApiClient,
   ) {}
 

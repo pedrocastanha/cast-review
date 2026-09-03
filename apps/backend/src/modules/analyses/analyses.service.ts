@@ -22,9 +22,11 @@ import { FindingOccurrenceRepository } from '../finding-cases/finding-occurrence
 import { FindingLifecycleUseCase } from '../finding-cases/use-cases/finding-lifecycle/finding-lifecycle.use-case';
 import { ProjectsService } from '../projects/projects.service';
 import { RepositoriesService } from '../repositories/repositories.service';
+import type { GithubPullGateway } from '../repositories/types/github-pull-gateway.type';
 import type { UserService } from '../users/user.service';
 import type {
   AnalysisContextSnapshot,
+  AnalysisOrigin,
   AnalysisRecord,
   AnalysisReview,
   FindingLifecycleSummary,
@@ -66,6 +68,40 @@ type RunInput = {
   req: Request;
   res: Response;
 };
+
+export interface AnalysisEventSink {
+  write(chunk: string): unknown;
+  end(): unknown;
+}
+
+export interface AnalysisPipelineContext {
+  github: GithubPullGateway;
+  publishingUser: CurrentUserData;
+  beforePublish?: () => Promise<{ allowed: boolean; reason?: string }>;
+  onEvent?: (event: AgentEvent) => void | Promise<void>;
+}
+
+export interface HeadlessRunInput {
+  requestedBy: string;
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  headSha: string;
+  origin: AnalysisOrigin;
+  models: { testReviewer: string; architectureReviewer: string };
+  impactScope: FrozenImpactScope;
+  publishPolicy: PublishPolicy;
+  openaiKey: string;
+  github: GithubPullGateway;
+  signal: AbortSignal;
+  beforePublish?: AnalysisPipelineContext['beforePublish'];
+  onEvent?: AnalysisPipelineContext['onEvent'];
+}
+
+export interface HeadlessRunResult {
+  analysis: Analysis;
+  review: AnalysisReview;
+}
 
 @Injectable()
 export class AnalysesService extends BaseService {
@@ -160,6 +196,8 @@ export class AnalysesService extends BaseService {
         owner: owner?.trim() || '',
         repo,
         pullNumber,
+        origin: 'manual',
+        headSha: null,
         status: 'running',
         report: emptyReview(),
         thoughts: {},
@@ -339,6 +377,7 @@ export class AnalysesService extends BaseService {
       pullNumber: analysis.pullNumber,
       currentUser,
       owner: analysis.owner,
+      github: this.repositoriesService,
     });
     const updatedReview = applyReviewEvent(review, 'github_comments_done', {
       ...github,
@@ -453,21 +492,127 @@ export class AnalysesService extends BaseService {
     }
   }
 
+  async runHeadless(input: HeadlessRunInput): Promise<HeadlessRunResult> {
+    const analysis = await this.analysisRepository.save(
+      this.analysisRepository.create({
+        id: randomUUID(),
+        requestedBy: input.requestedBy,
+        owner: input.owner,
+        repo: input.repo,
+        pullNumber: input.pullNumber,
+        origin: input.origin,
+        headSha: input.headSha,
+        status: 'running',
+        report: emptyReview(),
+        thoughts: {},
+        errorMessage: null,
+        models: input.models,
+        impactScope: {
+          requestedMode: input.impactScope.requestedMode,
+          effectiveMode: input.impactScope.effectiveMode,
+          status: input.impactScope.status,
+          projectId: input.impactScope.projectId,
+          projectName: input.impactScope.projectName,
+          fallbackReason: input.impactScope.fallbackReason,
+        },
+        finishedAt: null,
+        publishPolicy: input.publishPolicy,
+      }),
+    );
+
+    this.logger.log('Análise headless iniciada', {
+      analysisId: analysis.id,
+      origin: input.origin,
+      repo: input.repo,
+      pullNumber: input.pullNumber,
+      headSha: input.headSha,
+    });
+
+    const publishingUser: CurrentUserData = {
+      id: input.requestedBy,
+      username: null,
+      email: '',
+    };
+    const sink: AnalysisEventSink = {
+      write: () => undefined,
+      end: () => undefined,
+    };
+
+    try {
+      const payload = await buildAgentRunRequest(
+        input.github,
+        input.repo,
+        input.pullNumber,
+        publishingUser,
+        {
+          models: input.models,
+          policies: { prd: 'auto', spec: 'auto' },
+          impactScope:
+            input.impactScope.requestedMode === 'project' &&
+            input.impactScope.projectId
+              ? { mode: 'project', projectId: input.impactScope.projectId }
+              : { mode: 'repository' },
+          apiKeys: { openai: input.openaiKey },
+        },
+        analysis.id,
+        input.owner,
+        input.impactScope,
+      );
+
+      await this.streamLeg(
+        analysis,
+        this.aiApiClient.runAgent(payload, input.signal),
+        sink,
+        {
+          github: input.github,
+          publishingUser,
+          beforePublish: input.beforePublish,
+          onEvent: input.onEvent,
+        },
+      );
+    } catch (err) {
+      await this.analysisRepository.update(analysis.id, {
+        status: 'error',
+        errorMessage:
+          err instanceof Error ? err.message : 'Falha inesperada na análise',
+        finishedAt: new Date(),
+      });
+      this.logger.error('Falha ao rodar análise headless', {
+        exception: err,
+        analysisId: analysis.id,
+      });
+    }
+
+    const final = await this.analysisRepository.findOne({
+      where: { id: analysis.id },
+    });
+    const finalAnalysis = final ?? analysis;
+    return {
+      analysis: finalAnalysis,
+      review: hydrateReview(finalAnalysis.report) ?? emptyReview(),
+    };
+  }
+
   private async streamLeg(
     analysis: Analysis,
     events: AsyncGenerator<AgentEvent>,
-    res: Response,
+    res: AnalysisEventSink,
+    context?: AnalysisPipelineContext,
   ): Promise<void> {
     const thoughts: Record<string, string> = { ...(analysis.thoughts ?? {}) };
     let review: AnalysisReview =
       hydrateReview(analysis.report) ?? emptyReview();
     let lastThoughtPersist = 0;
+    const github = context?.github ?? this.repositoriesService;
 
     const writeEvent = (event: {
       type: string;
       payload: Record<string, unknown>;
     }) => {
       res.write(`data: ${JSON.stringify(event)}\n\n`);
+      if (context?.onEvent) {
+        void context.onEvent(event as AgentEvent);
+      }
     };
 
     const persistThoughts = async (force = false) => {
@@ -495,11 +640,16 @@ export class AnalysesService extends BaseService {
       });
     };
 
-    const publishingUser: CurrentUserData = {
+    const publishingUser: CurrentUserData = context?.publishingUser ?? {
       id: analysis.requestedBy,
       username: null,
       email: '',
     };
+
+    const resolveScopeOwner = () =>
+      context
+        ? Promise.resolve(analysis.owner)
+        : this.repositoriesService.loginFor(publishingUser);
 
     try {
       for await (const event of events) {
@@ -538,8 +688,22 @@ export class AnalysesService extends BaseService {
               analysis,
               review,
               publishingUser,
+              resolveScopeOwner,
             );
             review = lifecycleSummary.review;
+            if (analysis.publishPolicy?.publish === 'none') {
+              await persistReview({
+                status: 'completed',
+                finishedAt: new Date(),
+              });
+              writeEvent(event);
+              writeEvent({
+                type: 'finding_lifecycle_done',
+                payload: { ...lifecycleSummary.summary },
+              });
+              continue;
+            }
+
             if (analysis.publishPolicy?.publish === 'auto') {
               await persistReview({
                 status: 'completed',
@@ -551,15 +715,31 @@ export class AnalysesService extends BaseService {
                 payload: { ...lifecycleSummary.summary },
               });
 
-              const github = await this.publishGithubComments({
-                analysisId: analysis.id,
-                review,
-                repo: analysis.repo,
-                pullNumber: analysis.pullNumber,
-                currentUser: publishingUser,
-                owner: analysis.owner,
-              });
-              const githubPayload = { ...github } as Record<string, unknown>;
+              const gate = context?.beforePublish
+                ? await context.beforePublish()
+                : { allowed: true };
+              const githubResult: GithubCommentsResult = gate.allowed
+                ? await this.publishGithubComments({
+                    analysisId: analysis.id,
+                    review,
+                    repo: analysis.repo,
+                    pullNumber: analysis.pullNumber,
+                    currentUser: publishingUser,
+                    owner: analysis.owner,
+                    github,
+                  })
+                : {
+                    status: 'skipped',
+                    posted: 0,
+                    skipped: 0,
+                    reviewId: null,
+                    htmlUrl: null,
+                    errorMessage: gate.reason ?? 'Publicação não permitida',
+                  };
+              const githubPayload = { ...githubResult } as Record<
+                string,
+                unknown
+              >;
               review = applyReviewEvent(
                 review,
                 'github_comments_done',
@@ -770,7 +950,9 @@ export class AnalysesService extends BaseService {
     pullNumber: number;
     currentUser: CurrentUserData;
     owner?: string;
+    github: GithubPullGateway;
   }): Promise<GithubCommentsResult> {
+    const github = input.github;
     try {
       const actionable = collectActionable(input.review);
       if (actionable.length === 0) {
@@ -798,19 +980,19 @@ export class AnalysesService extends BaseService {
       const publishableReview = { ...input.review, comments: publishable };
 
       const [files, headSha, login] = await Promise.all([
-        this.repositoriesService.listPullFiles(
+        github.listPullFiles(
           input.repo,
           input.pullNumber,
           input.currentUser,
           input.owner,
         ),
-        this.repositoriesService.getPullHeadSha(
+        github.getPullHeadSha(
           input.repo,
           input.pullNumber,
           input.currentUser,
           input.owner,
         ),
-        this.repositoriesService.loginFor(input.currentUser),
+        github.loginFor(input.currentUser),
       ]);
 
       const { comments, skipped } = planInlineComments(
@@ -819,7 +1001,7 @@ export class AnalysesService extends BaseService {
         files,
       );
 
-      const existing = await this.repositoriesService.listPullReviewComments(
+      const existing = await github.listPullReviewComments(
         input.repo,
         input.pullNumber,
         input.currentUser,
@@ -827,7 +1009,7 @@ export class AnalysesService extends BaseService {
       );
       for (const comment of existing) {
         if (comment.user === login && isCastReviewComment(comment.body)) {
-          await this.repositoriesService.deletePullReviewComment(
+          await github.deletePullReviewComment(
             input.repo,
             comment.id,
             input.currentUser,
@@ -836,7 +1018,7 @@ export class AnalysesService extends BaseService {
         }
       }
 
-      const created = await this.repositoriesService.createPullReview(
+      const created = await github.createPullReview(
         input.repo,
         input.pullNumber,
         {
@@ -893,11 +1075,10 @@ export class AnalysesService extends BaseService {
     analysis: Analysis,
     review: AnalysisReview,
     currentUser: CurrentUserData,
+    resolveOwner: () => Promise<string>,
   ): Promise<{ review: AnalysisReview; summary: FindingLifecycleSummary }> {
     try {
-      const owner =
-        analysis.owner.trim() ||
-        (await this.repositoriesService.loginFor(currentUser));
+      const owner = analysis.owner.trim() || (await resolveOwner());
       const result = await this.findingLifecycleUseCase.reconcile({
         analysis,
         review,
@@ -952,6 +1133,8 @@ export class AnalysesService extends BaseService {
       errorMessage: row.errorMessage,
       models: row.models,
       impactScope: row.impactScope,
+      origin: row.origin ?? 'manual',
+      headSha: row.headSha ?? null,
       createdAt: row.createdAt.toISOString(),
       finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
       approvalStage: row.approvalStage,
