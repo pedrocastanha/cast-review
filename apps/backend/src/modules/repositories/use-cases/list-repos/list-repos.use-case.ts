@@ -1,10 +1,10 @@
-import { GithubSessionProvider } from '../shared/github-session.provider';
+import type { GithubSessionSource } from '../shared/github-session.provider';
 import { ListReposDto } from './list-repos.dto';
 
 const REPO_AFFILIATION = 'owner,collaborator,organization_member';
 
 export class ListReposUseCase {
-  constructor(private readonly githubSession: GithubSessionProvider) {}
+  constructor(private readonly githubSession: GithubSessionSource) {}
 
   async execute({ currentUser }: ListReposDto) {
     const { octokit } = await this.githubSession.getSession(currentUser);

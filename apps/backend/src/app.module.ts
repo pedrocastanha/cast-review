@@ -9,6 +9,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtAccessGuard } from './modules/auth/guards/jwt-access.guard';
 import { BenchmarksModule } from './modules/benchmarks/benchmarks.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { GithubAppModule } from './modules/github-app/github-app.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { RepositoriesModule } from './modules/repositories/repositories.module';
 import { UsersModule } from './modules/users/user.module';
@@ -35,6 +36,7 @@ import { resolveRedisConnection } from './shared/queue/redis-connection';
     BenchmarksModule,
     ProjectsModule,
     ChatModule,
+    GithubAppModule,
   ],
   controllers: [AppController],
   providers: [

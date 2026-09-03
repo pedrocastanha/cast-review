@@ -1,9 +1,9 @@
-import { GithubSessionProvider } from '../shared/github-session.provider';
 import { GithubPullFile } from '../../types/github-pull.type';
+import type { GithubSessionSource } from '../shared/github-session.provider';
 import { ListPullFilesDto } from './list-pull-files.dto';
 
 export class ListPullFilesUseCase {
-  constructor(private readonly githubSession: GithubSessionProvider) {}
+  constructor(private readonly githubSession: GithubSessionSource) {}
 
   async execute({
     repo,

@@ -1,8 +1,8 @@
-import { GithubSessionProvider } from '../shared/github-session.provider';
+import type { GithubSessionSource } from '../shared/github-session.provider';
 import { CreatePullReviewDto } from './create-pull-review.dto';
 
 export class CreatePullReviewUseCase {
-  constructor(private readonly githubSession: GithubSessionProvider) {}
+  constructor(private readonly githubSession: GithubSessionSource) {}
 
   async execute({
     repo,

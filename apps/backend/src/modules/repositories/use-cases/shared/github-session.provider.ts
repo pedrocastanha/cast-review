@@ -10,7 +10,37 @@ import type { CurrentUserData } from '../../../auth/utils/current-user-decorator
 import { UserService } from '../../../users/user.service';
 import { GithubSession } from '../../types/github-session.type';
 
-export class GithubSessionProvider {
+export function throwGithubError(err: unknown, logger: AppLogger): never {
+  logger.error('Falha na chamada à API do Github', { exception: err });
+
+  const status = (err as { status?: number }).status;
+
+  if (status === 401) {
+    throw new UnauthorizedException('Token do Github expirado ou inválido.');
+  }
+
+  if (status === 403 || status === 429) {
+    throw new ForbiddenException(
+      'Acesso negado pelo Github: permissão insuficiente ou limite de requisições atingido.',
+    );
+  }
+
+  if (status === 404) {
+    throw new NotFoundException('Recurso não encontrado no Github');
+  }
+
+  throw new InternalServerErrorException(
+    'Erro inesperado ao consultar a API do Github',
+  );
+}
+
+export interface GithubSessionSource {
+  getSession(currentUser: CurrentUserData): Promise<GithubSession>;
+  resolveOwner(session: GithubSession, ownerOverride?: string): string;
+  handleGithubError(err: unknown): never;
+}
+
+export class GithubSessionProvider implements GithubSessionSource {
   constructor(
     private readonly userService: UserService,
     private readonly logger: AppLogger,
@@ -46,27 +76,7 @@ export class GithubSessionProvider {
   }
 
   handleGithubError(err: unknown): never {
-    this.logger.error('Falha na chamada à API do Github', { exception: err });
-
-    const status = (err as { status?: number }).status;
-
-    if (status === 401) {
-      throw new UnauthorizedException('Token do Github expirado ou inválido.');
-    }
-
-    if (status === 403 || status === 429) {
-      throw new ForbiddenException(
-        'Acesso negado pelo Github: permissão insuficiente ou limite de requisições atingido.',
-      );
-    }
-
-    if (status === 404) {
-      throw new NotFoundException('Recurso não encontrado no Github');
-    }
-
-    throw new InternalServerErrorException(
-      'Erro inesperado ao consultar a API do Github',
-    );
+    return throwGithubError(err, this.logger);
   }
 
   private async backfillLogin(

@@ -25,6 +25,10 @@ import { AnalysisContextSnapshotRepository } from './analysis-context-snapshot.r
     AnalysisContextSnapshotRepository,
     { provide: 'USER_SERVICE', useExisting: UserService },
   ],
-  exports: [AnalysisRepository, AnalysisContextSnapshotRepository],
+  exports: [
+    AnalysesService,
+    AnalysisRepository,
+    AnalysisContextSnapshotRepository,
+  ],
 })
 export class AnalysesModule {}

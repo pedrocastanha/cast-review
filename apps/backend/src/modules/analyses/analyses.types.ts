@@ -6,6 +6,8 @@ export type AnalysisStatus =
   | 'error'
   | 'awaiting_approval';
 
+export type AnalysisOrigin = 'manual' | 'github_app';
+
 export type FindingStatus = 'fail' | 'warning' | 'pass';
 
 export interface AnalysisImpactScopeSummary {
@@ -209,7 +211,7 @@ export interface StepUsage {
   source: UsageSource;
 }
 
-export type GithubCommentsStatus = 'posted' | 'empty' | 'error';
+export type GithubCommentsStatus = 'posted' | 'empty' | 'error' | 'skipped';
 
 export interface GithubCommentsResult {
   status: GithubCommentsStatus;
@@ -258,7 +260,7 @@ export interface Annotation {
 export interface PublishPolicy {
   prd: 'manual' | 'auto';
   spec: 'manual' | 'auto';
-  publish: 'manual' | 'auto_safe' | 'auto';
+  publish: 'manual' | 'auto_safe' | 'auto' | 'none';
 }
 
 export interface Iteration {
@@ -273,6 +275,8 @@ export interface AnalysisRecord {
   owner: string;
   repo: string;
   pullNumber: number;
+  origin: AnalysisOrigin;
+  headSha: string | null;
   status: AnalysisStatus;
   report: AnalysisReview | null;
   thoughts: Record<string, string> | null;
