@@ -16,6 +16,7 @@ import { ReposPage } from './pages/ReposPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { BenchmarksPage } from './pages/BenchmarksPage';
 import { ChatPage } from './pages/ChatPage';
+import { IntegrationsPage } from './pages/IntegrationsPage';
 import { ProjectFormPage } from './pages/ProjectFormPage';
 import { ProjectGraphPage } from './pages/ProjectGraphPage';
 import { ProjectsPage } from './pages/ProjectsPage';
@@ -76,6 +77,16 @@ function App() {
               <ProtectedRoute>
                 <Layout wide>
                   <BenchmarksPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/integrations"
+            element={
+              <ProtectedRoute>
+                <Layout wide>
+                  <IntegrationsPage />
                 </Layout>
               </ProtectedRoute>
             }
