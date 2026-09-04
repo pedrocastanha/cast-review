@@ -277,3 +277,119 @@ export interface IndexFilesResult {
   sha: string;
   paths: string[];
 }
+
+export interface ArchitectureRepositoryRef {
+  repoId: string;
+  sha: string | null;
+}
+
+export interface ArchitectureComponentEvidence {
+  kind: 'symbol' | 'edge' | 'endpoint';
+  repoId: string;
+  sha: string | null;
+  path: string;
+  line: number | null;
+  symbolId: string | null;
+  symbolName: string | null;
+}
+
+export interface ArchitectureCandidate {
+  candidateKey: string;
+  repoId: string;
+  pathPrefix: string;
+  label: string;
+  kind: 'repository' | 'directory';
+  sha: string | null;
+  indexed: boolean;
+  fileCount: number;
+  symbolCount: number;
+  internalEdges: number;
+  inboundEdges: number;
+  outboundEdges: number;
+  providedEndpoints: number;
+  consumedEndpoints: number;
+  evidence: ArchitectureComponentEvidence[];
+}
+
+export interface ArchitectureAnalysisStats {
+  repositories: number;
+  indexedRepositories: number;
+  symbols: number;
+  candidates: number;
+  omittedRepositories: string[];
+}
+
+export interface ArchitectureCandidatesResult {
+  candidates: ArchitectureCandidate[];
+  stats: ArchitectureAnalysisStats;
+}
+
+export interface ArchitectureComponentRef {
+  componentId: string;
+  repoId: string;
+  pathPrefix: string;
+}
+
+export interface ArchitectureDependencyEvidence {
+  kind: 'references' | 'imports' | 'tests' | 'http';
+  fromRepoId: string;
+  fromPath: string;
+  fromLine: number | null;
+  fromSymbolId: string | null;
+  fromSymbolName: string | null;
+  toRepoId: string;
+  toPath: string;
+  toLine: number | null;
+  toSymbolId: string | null;
+  toSymbolName: string | null;
+  fromSha: string | null;
+  toSha: string | null;
+  method: string | null;
+  route: string | null;
+}
+
+export interface ArchitectureComponentDependency {
+  fromComponentId: string;
+  toComponentId: string;
+  kind: 'references' | 'imports' | 'tests' | 'http';
+  count: number;
+  confidence: 'confirmed';
+  evidence: ArchitectureDependencyEvidence[];
+}
+
+export interface ArchitectureDependenciesResult {
+  dependencies: ArchitectureComponentDependency[];
+  stats: ArchitectureAnalysisStats;
+}
+
+export interface ArchitectureChangedFile {
+  repoId: string;
+  path: string;
+}
+
+export interface ArchitectureTouchedComponent {
+  componentId: string;
+  changedFiles: string[];
+  changedSymbols: ArchitectureComponentEvidence[];
+}
+
+export interface ArchitectureReachedComponent {
+  componentId: string;
+  viaComponentId: string;
+  direction: 'provides' | 'consumes';
+  kinds: Array<'references' | 'imports' | 'tests' | 'http'>;
+  count: number;
+}
+
+export interface ArchitectureImpactResult {
+  touched: ArchitectureTouchedComponent[];
+  reached: ArchitectureReachedComponent[];
+  unmapped: ArchitectureChangedFile[];
+  stats: {
+    changedFiles: number;
+    mappedFiles: number;
+    unmappedFiles: number;
+    coverage: number;
+    staleRepositories: string[];
+  };
+}
