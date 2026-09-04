@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AnalysesModule } from './modules/analyses/analyses.module';
+import { ArchitectureMapsModule } from './modules/architecture-maps/architecture-maps.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAccessGuard } from './modules/auth/guards/jwt-access.guard';
 import { BenchmarksModule } from './modules/benchmarks/benchmarks.module';
@@ -37,6 +38,7 @@ import { resolveRedisConnection } from './shared/queue/redis-connection';
     ProjectsModule,
     ChatModule,
     GithubAppModule,
+    ArchitectureMapsModule,
   ],
   controllers: [AppController],
   providers: [
