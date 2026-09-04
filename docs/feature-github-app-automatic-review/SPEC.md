@@ -160,7 +160,7 @@ Toda rota, exceto o webhook, exige JWT e filtra por `owner_user_id`. Um usuário
 | Checks | Read & write | Criar e concluir o Check Run |
 | Metadata | Read | Obrigatório pelo GitHub |
 
-Eventos assinados: `pull_request`, `installation`, `installation_repositories`. Nada além disso.
+Evento assinado: `pull_request`. Nada além disso. Os eventos `installation` e `installation_repositories` chegam automaticamente a toda GitHub App e não são assináveis — o manifesto é rejeitado se você tentar declará-los.
 
 ## 8. Orçamento
 

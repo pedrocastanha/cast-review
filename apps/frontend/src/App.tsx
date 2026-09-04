@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { AnalysisPage } from './pages/AnalysisPage';
 import { AnalysisRecordPage } from './pages/AnalysisRecordPage';
+import { ArchitectureMapPage } from './pages/ArchitectureMapPage';
 import { LoginPage } from './pages/LoginPage';
 import { PullRequestsPage } from './pages/PullRequestsPage';
 import { PullRequestReviewPage } from './pages/PullRequestReviewPage';
@@ -60,6 +61,10 @@ function App() {
           <Route
             path="/projects/:id"
             element={<ProtectedRoute><Layout wide><ProjectGraphPage /></Layout></ProtectedRoute>}
+          />
+          <Route
+            path="/projects/:id/architecture"
+            element={<ProtectedRoute><Layout wide><ArchitectureMapPage /></Layout></ProtectedRoute>}
           />
           <Route
             path="/repos"
@@ -160,6 +165,18 @@ function App() {
           <Route
             path="/chat"
             element={<ProtectedRoute><Layout fill><ChatPage /></Layout></ProtectedRoute>}
+          />
+          <Route
+            path="/repos/:owner/:repo/architecture"
+            element={
+              <ProtectedRoute>
+                <Layout wide>
+                  <RepositoryLayout>
+                    <ArchitectureMapPage />
+                  </RepositoryLayout>
+                </Layout>
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/repos/:owner/:repo/graph"

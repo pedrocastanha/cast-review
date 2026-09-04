@@ -46,6 +46,7 @@ export function RepositoryLayout({ children }: { children: ReactNode }) {
   const tabs = [
     { to: `${path}/pulls`, label: 'Pull requests' },
     { to: `${path}/graph`, label: 'Grafo' },
+    { to: `${path}/architecture`, label: 'Arquitetura' },
     { to: `${path}/runs`, label: 'Execuções' },
     { to: `${path}/chat`, label: 'Chat' },
   ];

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import { ArchitectureMapsModule } from '../architecture-maps/architecture-maps.module';
 import { FindingCasesModule } from '../finding-cases/finding-cases.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
@@ -16,6 +17,7 @@ import { AnalysisContextSnapshotRepository } from './analysis-context-snapshot.r
     ProjectsModule,
     UsersModule,
     FindingCasesModule,
+    ArchitectureMapsModule,
   ],
   controllers: [AnalysesController],
   providers: [

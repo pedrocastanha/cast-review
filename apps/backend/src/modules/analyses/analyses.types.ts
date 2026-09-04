@@ -1,3 +1,4 @@
+import type { ArchitectureImpact } from '../architecture-maps/domain/architecture-maps.types';
 import type { FindingDisposition as FindingCaseDisposition } from '../finding-cases/finding-cases.types';
 
 export type AnalysisStatus =
@@ -283,6 +284,7 @@ export interface AnalysisRecord {
   errorMessage: string | null;
   models: { testReviewer: string; architectureReviewer: string } | null;
   impactScope: AnalysisImpactScopeSummary | null;
+  architectureImpact: ArchitectureImpact | null;
   createdAt: string;
   finishedAt: string | null;
   approvalStage: 'prd' | 'spec' | 'publish' | null;

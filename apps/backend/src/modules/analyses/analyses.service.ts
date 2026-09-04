@@ -13,8 +13,10 @@ import { BaseService } from 'src/shared/services/base.service';
 import type {
   AgentEvent,
   AgentResumeRequest,
+  AgentRunRequest,
   FrozenImpactScope,
 } from 'src/shared/types';
+import { ArchitectureMapsService } from '../architecture-maps/architecture-maps.service';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { FindingCaseRepository } from '../finding-cases/finding-case.repository';
 import { FindingCaseEventRepository } from '../finding-cases/finding-case-event.repository';
@@ -116,6 +118,7 @@ export class AnalysesService extends BaseService {
     findingOccurrenceRepository: FindingOccurrenceRepository,
     findingCaseEventRepository: FindingCaseEventRepository,
     private readonly projectsService: ProjectsService,
+    private readonly architectureMapsService: ArchitectureMapsService,
     @Inject('USER_SERVICE')
     private readonly userService: UserService,
     logger: AppLogger,
@@ -244,6 +247,13 @@ export class AnalysesService extends BaseService {
         analysis.id,
         sourceOwner || undefined,
         impactScope,
+      );
+
+      await this.freezeArchitectureImpact(
+        analysis,
+        payload,
+        impactScope,
+        currentUser,
       );
 
       await this.streamLeg(
@@ -557,6 +567,13 @@ export class AnalysesService extends BaseService {
         analysis.id,
         input.owner,
         input.impactScope,
+      );
+
+      await this.freezeArchitectureImpact(
+        analysis,
+        payload,
+        input.impactScope,
+        publishingUser,
       );
 
       await this.streamLeg(
@@ -1120,6 +1137,39 @@ export class AnalysesService extends BaseService {
     }
   }
 
+  private async freezeArchitectureImpact(
+    analysis: Analysis,
+    payload: AgentRunRequest,
+    impactScope: FrozenImpactScope,
+    currentUser: CurrentUserData,
+  ): Promise<void> {
+    const repoId = payload.repoId;
+    if (!repoId) return;
+
+    const isProject =
+      impactScope.effectiveMode === 'project' && Boolean(impactScope.projectId);
+    const architectureImpact =
+      await this.architectureMapsService.resolveImpactForAnalysis(
+        isProject ? 'project' : 'repository',
+        isProject ? (impactScope.projectId as string) : repoId,
+        payload.changedFiles.map((file) => ({ repoId, path: file.path })),
+        currentUser,
+      );
+    if (!architectureImpact) return;
+
+    try {
+      await this.analysisRepository.update(analysis.id, {
+        architectureImpact,
+      });
+      analysis.architectureImpact = architectureImpact;
+    } catch (err) {
+      this.logger.warn('Falha ao congelar o impacto arquitetural', {
+        exception: err,
+        analysisId: analysis.id,
+      });
+    }
+  }
+
   private toRecord(row: Analysis): AnalysisRecord {
     return {
       id: row.id,
@@ -1133,6 +1183,7 @@ export class AnalysesService extends BaseService {
       errorMessage: row.errorMessage,
       models: row.models,
       impactScope: row.impactScope,
+      architectureImpact: row.architectureImpact ?? null,
       origin: row.origin ?? 'manual',
       headSha: row.headSha ?? null,
       createdAt: row.createdAt.toISOString(),

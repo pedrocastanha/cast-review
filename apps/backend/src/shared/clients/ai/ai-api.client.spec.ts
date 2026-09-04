@@ -229,4 +229,54 @@ describe('AiApiClient.listIndexRepositories', () => {
     );
     expect(result).toEqual(responseBody);
   });
+  describe('endpoints de arquitetura', () => {
+    it('envia repositórios do escopo ao pedir candidatos de componente', async () => {
+      process.env.AI_API_URL = 'http://localhost:8000';
+      fetchMock.mockResolvedValue(
+        jsonResponse({ candidates: [], stats: { repositories: 1 } }),
+      );
+      const client = new AiApiClient(logger);
+
+      await client.getArchitectureCandidates([
+        { repoId: 'acme/api', sha: 'sha1' },
+      ]);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:8000/architecture/candidates',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            repositories: [{ repoId: 'acme/api', sha: 'sha1' }],
+          }),
+        }),
+      );
+    });
+
+    it('envia componentes junto do escopo ao resolver dependências', async () => {
+      process.env.AI_API_URL = 'http://localhost:8000';
+      fetchMock.mockResolvedValue(jsonResponse({ dependencies: [], stats: {} }));
+      const client = new AiApiClient(logger);
+
+      await client.getArchitectureDependencies(
+        [{ repoId: 'acme/api', sha: 'sha1' }],
+        [{ componentId: 'c1', repoId: 'acme/api', pathPrefix: 'src/auth' }],
+      );
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(JSON.parse(init.body).components).toEqual([
+        { componentId: 'c1', repoId: 'acme/api', pathPrefix: 'src/auth' },
+      ]);
+    });
+
+    it('propaga falha do ai-api ao resolver impacto arquitetural', async () => {
+      process.env.AI_API_URL = 'http://localhost:8000';
+      fetchMock.mockResolvedValue(notOkResponse(503));
+      const client = new AiApiClient(logger);
+
+      await expect(
+        client.getArchitectureImpact([], [], []),
+      ).rejects.toThrow('ai-api indisponível (status 503)');
+      expect(logger.error).toHaveBeenCalled();
+    });
+  });
 });

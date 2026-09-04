@@ -2,6 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import type {
   AgentEvent,
+  ArchitectureCandidatesResult,
+  ArchitectureChangedFile,
+  ArchitectureComponentRef,
+  ArchitectureDependenciesResult,
+  ArchitectureImpactResult,
+  ArchitectureRepositoryRef,
   AgentResumeRequest,
   AgentRunRequest,
   ChatEvent,
@@ -262,6 +268,60 @@ export class AiApiClient {
     }
 
     return (await response.json()) as IndexFilesResult;
+  }
+
+  async getArchitectureCandidates(
+    repositories: ArchitectureRepositoryRef[],
+  ): Promise<ArchitectureCandidatesResult> {
+    return this.postJson<ArchitectureCandidatesResult>(
+      '/architecture/candidates',
+      { repositories },
+      'buscar candidatos de componente',
+    );
+  }
+
+  async getArchitectureDependencies(
+    repositories: ArchitectureRepositoryRef[],
+    components: ArchitectureComponentRef[],
+  ): Promise<ArchitectureDependenciesResult> {
+    return this.postJson<ArchitectureDependenciesResult>(
+      '/architecture/dependencies',
+      { repositories, components },
+      'resolver dependências entre componentes',
+    );
+  }
+
+  async getArchitectureImpact(
+    repositories: ArchitectureRepositoryRef[],
+    components: ArchitectureComponentRef[],
+    changedFiles: ArchitectureChangedFile[],
+  ): Promise<ArchitectureImpactResult> {
+    return this.postJson<ArchitectureImpactResult>(
+      '/architecture/impact',
+      { repositories, components, changedFiles },
+      'resolver impacto arquitetural',
+    );
+  }
+
+  private async postJson<T>(
+    path: string,
+    payload: unknown,
+    action: string,
+  ): Promise<T> {
+    const response = await fetch(`${resolveAiApiUrl()}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      this.logger.error(`ai-api respondeu com falha ao ${action}`, {
+        status: response.status,
+      });
+      throw new Error(`ai-api indisponível (status ${response.status})`);
+    }
+
+    return (await response.json()) as T;
   }
 
   private parseEvent(rawEvent: string): AgentEvent | null {

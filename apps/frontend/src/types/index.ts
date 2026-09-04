@@ -652,6 +652,7 @@ export interface AnalysisRecord {
   errorMessage: string | null;
   models: { testReviewer: string; architectureReviewer: string } | null;
   impactScope: AnalysisImpactScopeSummary | null;
+  architectureImpact: ArchitectureImpact | null;
   createdAt: string;
   finishedAt: string | null;
   approvalStage: 'prd' | 'spec' | 'publish' | null;
@@ -856,4 +857,211 @@ export interface UpdateRepositoryConfigPayload {
   budgetPerRunUsd?: number | null;
   staleIndexBehavior?: 'proceed' | 'skip';
   paused?: boolean;
+}
+
+export type ArchitectureScopeType = 'repository' | 'project';
+
+export type CapabilityCriticality = 'low' | 'medium' | 'high' | 'critical';
+
+export type ComponentSource = 'manual' | 'rule' | 'llm';
+
+export type ComponentConfidence = 'confirmed' | 'inferred';
+
+export type ComponentStatus = 'unmapped' | 'assigned' | 'rejected';
+
+export type BoundaryKind = 'allow' | 'deny' | 'review';
+
+export type ArchitectureDependencyKind = 'references' | 'imports' | 'tests' | 'http';
+
+export interface ArchitectureMapSummary {
+  id: string;
+  name: string;
+  scopeType: ArchitectureScopeType;
+  scopeRef: string;
+  publishedVersion: number | null;
+  publishedHash: string | null;
+  publishedAt: string | null;
+}
+
+export interface ComponentEvidence {
+  kind: 'symbol' | 'edge' | 'endpoint';
+  repoId: string;
+  sha: string | null;
+  path: string;
+  line: number | null;
+  symbolId: string | null;
+  symbolName: string | null;
+}
+
+export interface ArchitectureDependencyEvidence {
+  kind: ArchitectureDependencyKind;
+  fromRepoId: string;
+  fromPath: string;
+  fromLine: number | null;
+  fromSymbolName: string | null;
+  toRepoId: string;
+  toPath: string;
+  toLine: number | null;
+  toSymbolName: string | null;
+  fromSha: string | null;
+  toSha: string | null;
+  method: string | null;
+  route: string | null;
+}
+
+export interface ArchitectureComponent {
+  id: string;
+  mapId: string;
+  capabilityId: string | null;
+  candidateKey: string;
+  repoId: string;
+  pathPrefix: string;
+  label: string;
+  kind: string;
+  source: ComponentSource;
+  confidence: ComponentConfidence;
+  status: ComponentStatus;
+  indexedSha: string | null;
+  metrics: {
+    fileCount: number;
+    symbolCount: number;
+    internalEdges: number;
+    inboundEdges: number;
+    outboundEdges: number;
+    providedEndpoints: number;
+    consumedEndpoints: number;
+  };
+  evidence: ComponentEvidence[];
+}
+
+export interface CapabilityView {
+  id: string;
+  name: string;
+  description: string | null;
+  criticality: CapabilityCriticality;
+  componentCount: number;
+  confirmedComponentCount: number;
+  repositories: string[];
+  symbolCount: number;
+  providedEndpoints: number;
+  consumedEndpoints: number;
+}
+
+export interface CapabilityDependency {
+  fromCapabilityId: string;
+  toCapabilityId: string;
+  kinds: ArchitectureDependencyKind[];
+  count: number;
+  confidence: ComponentConfidence;
+  components: Array<{ fromComponentId: string; toComponentId: string }>;
+  evidence: ArchitectureDependencyEvidence[];
+}
+
+export interface CapabilityBoundary {
+  id: string;
+  mapId: string;
+  fromCapabilityId: string;
+  toCapabilityId: string;
+  kind: BoundaryKind;
+  note: string | null;
+}
+
+export interface BoundaryViolation {
+  boundaryId: string;
+  fromCapabilityId: string;
+  toCapabilityId: string;
+  boundaryKind: 'deny' | 'review';
+  severity: 'violation' | 'warning';
+  confidence: ComponentConfidence;
+  count: number;
+  evidence: ArchitectureDependencyEvidence[];
+}
+
+export interface ArchitectureCoverage {
+  structural: number;
+  totalComponents: number;
+  assignedComponents: number;
+  unmappedComponents: number;
+  rejectedComponents: number;
+  confirmedComponents: number;
+}
+
+export interface ArchitectureScopeRepository {
+  repoId: string;
+  sha: string | null;
+  status: string;
+  stale: boolean;
+  indexed: boolean;
+}
+
+export interface ArchitectureView {
+  map: ArchitectureMapSummary;
+  capabilities: CapabilityView[];
+  components: ArchitectureComponent[];
+  dependencies: CapabilityDependency[];
+  boundaries: CapabilityBoundary[];
+  violations: BoundaryViolation[];
+  coverage: ArchitectureCoverage;
+  scope: {
+    scopeType: ArchitectureScopeType;
+    scopeRef: string;
+    repositories: ArchitectureScopeRepository[];
+  };
+  dependenciesAvailable: boolean;
+}
+
+export interface SuggestComponentsResult {
+  created: number;
+  refreshed: number;
+  skipped: number;
+  omittedRepositories: string[];
+}
+
+export interface ArchitectureMapVersionSummary {
+  version: number;
+  hash: string;
+  publishedAt: string;
+}
+
+export interface ArchitectureImpactCapability {
+  capabilityId: string;
+  name: string;
+  criticality: CapabilityCriticality;
+  confidence: ComponentConfidence;
+  components: string[];
+  files: string[];
+  symbols: ComponentEvidence[];
+}
+
+export interface ArchitectureImpactReachedCapability {
+  capabilityId: string;
+  name: string;
+  criticality: CapabilityCriticality;
+  viaCapabilityId: string;
+  direction: 'provides' | 'consumes';
+  kinds: ArchitectureDependencyKind[];
+  confidence: ComponentConfidence;
+  count: number;
+}
+
+export interface ArchitectureImpact {
+  mapId: string;
+  mapName: string;
+  version: number | null;
+  hash: string | null;
+  usedDraft: boolean;
+  status: 'exact' | 'degraded' | 'unavailable';
+  changed: ArchitectureImpactCapability[];
+  reached: ArchitectureImpactReachedCapability[];
+  boundariesCrossed: Array<{
+    boundaryId: string;
+    fromCapabilityId: string;
+    toCapabilityId: string;
+    kind: BoundaryKind;
+  }>;
+  violations: BoundaryViolation[];
+  unmappedFiles: string[];
+  staleRepositories: string[];
+  coverage: number;
+  degradedReason: string | null;
 }

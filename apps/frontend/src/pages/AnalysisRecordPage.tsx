@@ -10,6 +10,7 @@ import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { PageHead } from '../components/ui/Card';
 import { Spinner } from '../components/ui/Spinner';
 import { GithubCommentsStatus } from '../components/analysis/GithubCommentsStatus';
+import { ArchitectureImpactPanel } from '../components/analysis/ArchitectureImpactPanel';
 import { GraphContextPanel } from '../components/analysis/GraphContextPanel';
 import { SaveBenchmarkButton } from '../components/analysis/SaveBenchmarkButton';
 import { formatUsageHeadline } from '../lib/format-usage';
@@ -161,6 +162,10 @@ export function AnalysisRecordPage() {
               </h2>
               <ThoughtLog thoughts={thoughts} running={record.status === 'running'} />
             </section>
+          )}
+
+          {record.architectureImpact && (
+            <ArchitectureImpactPanel impact={record.architectureImpact} />
           )}
 
           <GraphContextPanel analysisId={record.id} />

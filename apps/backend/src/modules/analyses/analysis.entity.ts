@@ -1,5 +1,6 @@
 import { DefaultEntity } from 'src/shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
+import type { ArchitectureImpact } from '../architecture-maps/domain/architecture-maps.types';
 import type {
   AnalysisImpactScopeSummary,
   AnalysisOrigin,
@@ -48,6 +49,9 @@ export class Analysis extends DefaultEntity<Analysis> {
 
   @Column({ name: 'impact_scope', type: 'jsonb', nullable: true })
   impactScope: AnalysisImpactScopeSummary | null;
+
+  @Column({ name: 'architecture_impact', type: 'jsonb', nullable: true })
+  architectureImpact: ArchitectureImpact | null;
 
   @Column({ name: 'finished_at', type: 'timestamptz', nullable: true })
   finishedAt: Date | null;

@@ -1,8 +1,10 @@
 # PRD: Mapa arquitetural semântico
 
-**Status:** Proposto
+**Status:** P1 implementado
 
-**Data:** 2026-09-01
+**Versão:** 0.3 — P1 implementado
+
+**Data:** 2026-09-01 (revisão em 2026-09-03, implementação do P1 em 2026-09-04)
 
 **Prioridade:** P2 — evolução do Code Graph e da inteligência de sistema
 **Dependências:** indexação do Code Graph, projetos multi-repo, evidência versionada, chat e Cross-Repo Impact Review
@@ -14,6 +16,27 @@ O Cast já representa símbolos, arquivos, chamadas, imports, testes e relaçõe
 O Mapa Arquitetural Semântico adiciona uma camada de significado acima do grafo técnico. Ele organiza o sistema em **capacidades**, **componentes** e **fronteiras**, mostra dependências entre essas unidades e conecta cada afirmação às evidências de código e aos SHAs que a sustentam.
 
 O mapa não pretende descobrir sozinho a “arquitetura verdadeira”. O MVP combina sugestões automáticas com confirmação humana e distingue claramente `confirmado`, `inferido` e `não mapeado`. Uma inferência jamais será apresentada como regra arquitetural aprovada.
+
+## Estado atual do código
+
+O mapa semântico não parte do zero. A camada técnica que ele consome já está implementada e em uso:
+
+| Capacidade existente | Onde | Papel no mapa semântico |
+| --- | --- | --- |
+| Indexação por tree-sitter | `apps/ai-api/app/code_graph/indexer.py` | Fonte dos símbolos, arquivos e relações que viram componentes candidatos |
+| Grafo persistido em Neo4j | `apps/ai-api/app/code_graph/graph.py` | Substrato das arestas técnicas que sustentam dependências entre capacidades |
+| Serialização para visualização | `apps/ai-api/app/code_graph/viz.py` | Agregação por diretório e expansão de vizinhança, reaproveitáveis na visão executiva |
+| Endpoint de grafo | `GET /index/graph` em `apps/ai-api/app/api/routes/index.py` | Ponto de extensão para o recorte semântico |
+| Relações HTTP entre repositórios | `apps/ai-api/app/code_graph/http_endpoints.py` | Evidência de dependência entre capacidades de repositórios diferentes |
+| Impacto cross-repo | `apps/ai-api/app/code_graph/cross_repo_impact.py` | Blast radius técnico que o mapa traduz para capacidades |
+| Snapshot versionado por SHA | `apps/ai-api/app/code_graph/snapshot.py` e `analysis-context-snapshot.entity.ts` | Base do congelamento de versão exigido por SM-10 e SM-13 |
+| Render de grafo no frontend | `apps/frontend/src/pages/RepoGraphPage.tsx` com xyflow | Base da visão executiva; hoje renderiza hierarquia de diretórios com drill-down |
+| Painel de contexto | `apps/frontend/src/components/analysis/GraphContextPanel.tsx` | Base do evidence inspector |
+| Orçamento de contexto | `apps/ai-api/app/code_graph/budget.py` | Separação entre orçamento técnico e semântico exigida pelos requisitos não funcionais |
+
+O que falta é exclusivamente a camada de significado: taxonomia persistida, procedência e confiança das associações, regras de fronteira, e o recorte semântico dentro do relatório de review. Nenhuma reescrita da camada técnica é necessária.
+
+O módulo de backend correspondente não existe ainda. O padrão a seguir é o de `apps/backend/src/modules/finding-cases`, que já combina entidade, repositório e casos de uso com eventos versionados.
 
 ## Problema
 
@@ -272,6 +295,21 @@ Uma cobertura baixa é uma informação, não um erro. O produto nunca deve esco
 5. Recorte semântico na review de PR.
 6. Somente após validação, ferramentas semânticas no chat e sugestões LLM.
 
+## Faseamento de implementação
+
+Cada fase entrega valor sozinha e não depende da seguinte para ser útil. Fases 1 a 3 já produzem um mapa navegável com detecção de violação.
+
+| Fase | Entrega | Requisitos cobertos | Depende de |
+| --- | --- | --- | --- |
+| 1 | ✅ Persistência da taxonomia: mapa, capacidade, componente, associação com evidência, rascunho e versão publicada | SM-01 a SM-06, SM-13, SM-14 | índice existente |
+| 2 | ✅ Sugestão determinística de componentes candidatos a partir do grafo e tela de confirmação humana | SM-05, SM-06, SM-15 | fase 1 |
+| 3 | ✅ Fronteiras `allow`/`deny`/`review` e detecção determinística de violação sobre arestas confirmadas | SM-08, SM-09 | fase 1 |
+| 4 | ✅ Recorte semântico congelado na análise e seção de impacto arquitetural no relatório | SM-10 a SM-12 | fases 1 e 3 |
+| 5 | ✅ Visão executiva com drill-down capacidade → componente → evidência e evidence inspector | SM-07 | fases 1 e 2 |
+| 6 | ⏳ Nomeação e descrição sugeridas por LLM, sempre `inferred` e com custo explícito | SAM-09 | fase 2 |
+
+A fase 6 é a única que introduz custo recorrente e permanece fora do caminho obrigatório, conforme o princípio de sem custo oculto.
+
 ## Gate de lançamento
 
 1. Usuário cria, publica e revisa uma nova versão sem alterar versões antigas.
@@ -286,10 +324,10 @@ Uma cobertura baixa é uma informação, não um erro. O produto nunca deve esco
 
 | História | Requisitos | Status |
 | --- | --- | --- |
-| SAM-01 | SM-01 a SM-03, SM-05 | Pendente |
-| SAM-02 | SM-04 a SM-06, SM-11 | Pendente |
-| SAM-03 | SM-06, SM-07 | Pendente |
-| SAM-04 | SM-08, SM-09 | Pendente |
-| SAM-05 | SM-10 a SM-12, SM-15 | Pendente |
-| SAM-06 | SM-02, SM-10, SM-13 | Pendente |
-| SAM-07 | SM-12 | Pendente |
+| SAM-01 | SM-01 a SM-03, SM-05 | Implementado |
+| SAM-02 | SM-04 a SM-06, SM-11 | Implementado |
+| SAM-03 | SM-06, SM-07 | Implementado |
+| SAM-04 | SM-08, SM-09 | Implementado |
+| SAM-05 | SM-10 a SM-12, SM-15 | Implementado |
+| SAM-06 | SM-02, SM-10, SM-13 | Implementado |
+| SAM-07 | SM-12 | Implementado |
