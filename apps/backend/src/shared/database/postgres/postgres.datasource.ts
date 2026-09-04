@@ -2,6 +2,11 @@ import 'dotenv/config';
 
 import { Analysis } from 'src/modules/analyses/analysis.entity';
 import { AnalysisContextSnapshotEntity } from 'src/modules/analyses/analysis-context-snapshot.entity';
+import { ArchitectureBoundary } from 'src/modules/architecture-maps/entities/architecture-boundary.entity';
+import { ArchitectureCapability } from 'src/modules/architecture-maps/entities/architecture-capability.entity';
+import { ArchitectureComponent } from 'src/modules/architecture-maps/entities/architecture-component.entity';
+import { ArchitectureMap } from 'src/modules/architecture-maps/entities/architecture-map.entity';
+import { ArchitectureMapVersion } from 'src/modules/architecture-maps/entities/architecture-map-version.entity';
 import { BenchmarkCase } from 'src/modules/benchmarks/benchmark-case.entity';
 import { BenchmarkRun } from 'src/modules/benchmarks/benchmark-run.entity';
 import { ChatMessage } from 'src/modules/chat/chat-message.entity';
@@ -42,6 +47,11 @@ export default new DataSource({
     GithubReviewRun,
     Project,
     ProjectRepositoryMember,
+    ArchitectureMap,
+    ArchitectureMapVersion,
+    ArchitectureCapability,
+    ArchitectureComponent,
+    ArchitectureBoundary,
   ],
   synchronize: false,
   migrations: [`${__dirname}/migrations/**/*{.ts,.js}`],
