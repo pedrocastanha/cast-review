@@ -110,6 +110,9 @@ function buildService() {
     findOne: jest.fn(),
   };
   const projectsService = { resolveAnalysisScope: jest.fn() };
+  const architectureMapsService = {
+    resolveImpactForAnalysis: jest.fn().mockResolvedValue(null),
+  };
   const findingLifecycleService = {
     reconcile: jest.fn().mockResolvedValue({
       summary: {
@@ -141,6 +144,7 @@ function buildService() {
     findingOccurrenceRepository as any,
     findingCaseEventRepository as any,
     projectsService as any,
+    architectureMapsService as any,
     userService as any,
     logger as any,
   );
