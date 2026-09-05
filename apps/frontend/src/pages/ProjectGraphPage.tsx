@@ -77,7 +77,8 @@ export function ProjectGraphPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to={`/projects/${id}/architecture`} className="inline-flex min-h-11 items-center justify-center border border-border-strong px-4 text-sm font-semibold text-ink hover:bg-surface-2">Arquitetura</Link>
-          <Link to={`/chat?projectId=${id}`} className="inline-flex min-h-11 items-center justify-center border border-border-strong px-4 text-sm font-semibold text-ink hover:bg-surface-2">Chat</Link>
+          <Link to={`/chat?project=${id}`} className="inline-flex min-h-11 items-center justify-center border border-border-strong px-4 text-sm font-semibold text-ink hover:bg-surface-2">Chat</Link>
+          <Link to={`/projects/${id}/board`} className="inline-flex min-h-11 items-center justify-center border border-border-strong px-4 text-sm font-semibold text-ink hover:bg-surface-2">Kanban</Link>
           <Link to={`/projects/${id}/edit`} className="inline-flex min-h-11 items-center justify-center border border-border-strong px-4 text-sm font-semibold text-ink hover:bg-surface-2">Editar</Link>
           <Button onClick={indexAll} loading={indexing}>{(graph?.stats.indexedRepositories ?? 0) === project.repositories.length ? 'Reindexar projeto' : 'Indexar projeto'}</Button>
         </div>

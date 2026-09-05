@@ -21,6 +21,9 @@ import { IntegrationsPage } from './pages/IntegrationsPage';
 import { ProjectFormPage } from './pages/ProjectFormPage';
 import { ProjectGraphPage } from './pages/ProjectGraphPage';
 import { ProjectsPage } from './pages/ProjectsPage';
+import { lazy, Suspense } from 'react';
+
+const ProjectBoardPage = lazy(() => import('./pages/ProjectBoardPage').then((module) => ({ default: module.ProjectBoardPage })));
 
 function App() {
   return (
@@ -66,6 +69,7 @@ function App() {
             path="/projects/:id/architecture"
             element={<ProtectedRoute><Layout wide><ArchitectureMapPage /></Layout></ProtectedRoute>}
           />
+          <Route path="/projects/:id/board" element={<ProtectedRoute><Layout wide><Suspense fallback={<p role="status">Carregando Kanban…</p>}><ProjectBoardPage /></Suspense></Layout></ProtectedRoute>} />
           <Route
             path="/repos"
             element={
