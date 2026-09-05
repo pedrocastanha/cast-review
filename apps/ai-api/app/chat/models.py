@@ -46,7 +46,9 @@ class ChatHistoryMessage(BaseModel):
 
 class ChatRunRequest(BaseModel):
     threadId: str
-    mode: Literal["global", "repository"]
+    mode: Literal["global", "repository", "project"]
+    assistanceMode: Literal["general", "requirements"] = "general"
+    omittedRepositories: list[str] = Field(default_factory=list)
     repositories: list[ChatScopeRepository]
     history: list[ChatHistoryMessage] = Field(default_factory=list)
     question: str
