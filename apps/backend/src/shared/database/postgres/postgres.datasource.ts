@@ -22,6 +22,8 @@ import { Project } from 'src/modules/projects/project.entity';
 import { ProjectRepositoryMember } from 'src/modules/projects/project-repository-member.entity';
 import { User } from 'src/modules/users/user.entity';
 import { DataSource } from 'typeorm';
+import { FeatureCard } from 'src/modules/feature-cards/entities/feature-card.entity';
+import { FeatureCardRevision } from 'src/modules/feature-cards/entities/feature-card-revision.entity';
 
 export default new DataSource({
   type: 'postgres',
@@ -31,6 +33,8 @@ export default new DataSource({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   entities: [
+    FeatureCard,
+    FeatureCardRevision,
     User,
     Analysis,
     AnalysisContextSnapshotEntity,
