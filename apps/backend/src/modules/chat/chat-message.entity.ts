@@ -1,5 +1,6 @@
 import { DefaultEntity } from 'src/shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
+import type { FeatureProposal } from '../feature-cards/domain/card.types';
 import type {
   ChatCitation,
   ChatMention,
@@ -11,6 +12,8 @@ import type {
 @Entity({ name: 'chat_messages' })
 @Index('IDX_chat_messages_thread_created', ['threadId', 'createdAt'])
 export class ChatMessage extends DefaultEntity<ChatMessage> {
+  @Column({ type: 'jsonb', nullable: true })
+  proposal: FeatureProposal | null;
   @Column({ name: 'thread_id', type: 'uuid' })
   threadId: string;
 

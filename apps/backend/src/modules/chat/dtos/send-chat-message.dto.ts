@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsOptional,
   IsString,
   Length,
@@ -19,6 +20,9 @@ export class ChatMentionDto {
 }
 
 export class SendChatMessageDto {
+  @IsOptional()
+  @IsIn(['general', 'requirements'])
+  assistanceMode?: 'general' | 'requirements';
   @IsString()
   @Length(1, 8000)
   content!: string;
