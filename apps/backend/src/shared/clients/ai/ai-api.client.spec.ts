@@ -3,6 +3,7 @@ import type { AgentResumeRequest, AgentRunRequest } from 'src/shared/types';
 import { AiApiClient } from './ai-api.client';
 
 const payload: AgentRunRequest = {
+  analysisId: 'analysis-1',
   diff: '',
   changedFiles: [],
   conventions: '',

@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 import configured from 'src/shared/database/postgres/postgres.datasource';
+import type { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import { FeatureCardsController } from 'src/modules/feature-cards/feature-cards.controller';
 import { FeatureCardsService } from 'src/modules/feature-cards/feature-cards.service';
@@ -26,11 +27,12 @@ describe('Feature Cards HTTP and Postgres', () => {
   let created = false;
 
   beforeAll(async () => {
-    admin = new DataSource({ ...configured.options, migrations: [], entities: [] });
+    const base = configured.options as PostgresConnectionOptions;
+    admin = new DataSource({ ...base, migrations: [], entities: [] });
     await admin.initialize();
     await admin.query(`CREATE DATABASE "${database}"`);
     created = true;
-    db = new DataSource({ ...configured.options, database });
+    db = new DataSource({ ...base, database });
     await db.initialize();
     await db.runMigrations();
     await db.query(`INSERT INTO users (id, name, email, password) VALUES ($1, 'Cards test', $2, 'test')`, [ownerId, `${ownerId}@test.invalid`]);

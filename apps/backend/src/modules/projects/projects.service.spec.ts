@@ -250,9 +250,9 @@ describe('ProjectsService', () => {
       buildService();
     memberRepository.find.mockResolvedValue([
       {
-        id: 'member-1',
         projectId: 'project-1',
         ...githubRepos[0],
+        id: 'member-1',
         githubId: '101',
       },
     ]);
