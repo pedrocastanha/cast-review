@@ -11,8 +11,8 @@ import {
 } from '@nestjs/common';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { CurrentUser } from '../auth/utils/current-user-decorator';
-import type { ArchitectureScopeType } from './domain/architecture-maps.types';
 import { ArchitectureMapsService } from './architecture-maps.service';
+import type { ArchitectureScopeType } from './domain/architecture-maps.types';
 import { AssignComponentDto } from './dtos/assign-component.dto';
 import { CreateArchitectureMapDto } from './dtos/create-architecture-map.dto';
 import { DeclareBoundaryDto } from './dtos/declare-boundary.dto';
@@ -172,10 +172,6 @@ export class ArchitectureMapsController {
     @Param('version', ParseIntPipe) version: number,
     @CurrentUser() currentUser: CurrentUserData,
   ) {
-    return this.architectureMapsService.getVersion(
-      mapId,
-      version,
-      currentUser,
-    );
+    return this.architectureMapsService.getVersion(mapId, version, currentUser);
   }
 }

@@ -7,15 +7,23 @@ function invalid(): never {
 }
 
 function object(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : invalid();
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : invalid();
 }
 
 function text(value: unknown, max = 2000): string {
-  return typeof value === 'string' && value.trim().length > 0 && value.length <= max ? value.trim() : invalid();
+  return typeof value === 'string' &&
+    value.trim().length > 0 &&
+    value.length <= max
+    ? value.trim()
+    : invalid();
 }
 
 function items(value: unknown, min = 0, max = 30): unknown[] {
-  return Array.isArray(value) && value.length >= min && value.length <= max ? value as unknown[] : invalid();
+  return Array.isArray(value) && value.length >= min && value.length <= max
+    ? (value as unknown[])
+    : invalid();
 }
 
 function strings(value: unknown, min = 0): string[] {
@@ -24,9 +32,16 @@ function strings(value: unknown, min = 0): string[] {
 
 function citation(value: unknown): ChatCitation {
   const c = object(value);
-  const line = c.line == null ? null : Number.isInteger(c.line) && Number(c.line) > 0 ? Number(c.line) : invalid();
+  const line =
+    c.line == null
+      ? null
+      : Number.isInteger(c.line) && Number(c.line) > 0
+        ? Number(c.line)
+        : invalid();
   return {
-    repoId: text(c.repoId, 200), path: text(c.path, 400), line,
+    repoId: text(c.repoId, 200),
+    path: text(c.path, 400),
+    line,
     sha: c.sha == null ? null : text(c.sha, 200),
     symbolId: c.symbolId == null ? null : text(c.symbolId, 500),
     symbolName: c.symbolName == null ? null : text(c.symbolName, 500),
@@ -40,11 +55,17 @@ function task(value: unknown): TaskProposal {
   const evidence = items(t.evidence, 0, 12).map(citation);
   if (t.confidence !== 'grounded' && t.confidence !== 'hypothesis') invalid();
   return {
-    key, title: text(t.title, 160), area: text(t.area, 80),
-    description: text(t.description), rationale: text(t.rationale),
+    key,
+    title: text(t.title, 160),
+    area: text(t.area, 80),
+    description: text(t.description),
+    rationale: text(t.rationale),
     acceptanceCriteria: strings(t.acceptanceCriteria, 1),
-    dependsOn: [...new Set(items(t.dependsOn, 0, 12).map((key) => text(key, 40)))],
-    evidence, confidence: evidence.length ? 'grounded' : 'hypothesis',
+    dependsOn: [
+      ...new Set(items(t.dependsOn, 0, 12).map((key) => text(key, 40))),
+    ],
+    evidence,
+    confidence: evidence.length ? 'grounded' : 'hypothesis',
   };
 }
 
@@ -66,21 +87,39 @@ export function validateProposal(value: unknown): FeatureProposal {
   };
   for (const key of byKey.keys()) visit(key);
   return {
-    title: text(p.title, 160), problem: text(p.problem), objective: text(p.objective),
-    scope: strings(p.scope), outOfScope: strings(p.outOfScope), businessRules: strings(p.businessRules),
-    acceptanceCriteria: strings(p.acceptanceCriteria, 1), edgeCases: strings(p.edgeCases),
-    openQuestions: strings(p.openQuestions), tasks,
+    title: text(p.title, 160),
+    problem: text(p.problem),
+    objective: text(p.objective),
+    scope: strings(p.scope),
+    outOfScope: strings(p.outOfScope),
+    businessRules: strings(p.businessRules),
+    acceptanceCriteria: strings(p.acceptanceCriteria, 1),
+    edgeCases: strings(p.edgeCases),
+    openQuestions: strings(p.openQuestions),
+    tasks,
   };
 }
 
-export function assertTransition(status: CardStatus, questions: string[], dependencies: CardStatus[], children: CardStatus[]) {
+export function assertTransition(
+  status: CardStatus,
+  questions: string[],
+  dependencies: CardStatus[],
+  children: CardStatus[],
+) {
   if (status !== 'draft' && questions.length) {
-    throw new BadRequestException('Resolva as perguntas abertas antes de avançar.');
+    throw new BadRequestException(
+      'Resolva as perguntas abertas antes de avançar.',
+    );
   }
-  if (['in_progress', 'review', 'done'].includes(status) && dependencies.some((s) => s !== 'done')) {
+  if (
+    ['in_progress', 'review', 'done'].includes(status) &&
+    dependencies.some((s) => s !== 'done')
+  ) {
     throw new BadRequestException('Conclua as dependências antes de avançar.');
   }
   if (status === 'done' && children.some((s) => s !== 'done')) {
-    throw new BadRequestException('Conclua os cards filhos antes de concluir a feature.');
+    throw new BadRequestException(
+      'Conclua os cards filhos antes de concluir a feature.',
+    );
   }
 }

@@ -14,13 +14,21 @@ import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { allowedOrigins, httpSecurity } from './shared/security/http-security';
+import { validateProductionConfig } from './shared/security/production-config';
+import { ProductionErrors } from './shared/security/production-errors';
 
 async function bootstrap() {
+  validateProductionConfig();
   const app = await NestFactory.create(AppModule, { rawBody: true });
+  app.use(httpSecurity);
+  if (process.env.NODE_ENV === 'production')
+    app.useGlobalFilters(new ProductionErrors());
+  app.enableShutdownHooks();
 
   // Front local (Vite default 5173) + margem para outros ports de dev.
   app.enableCors({
-    origin: true,
+    origin: allowedOrigins(),
     credentials: true,
   });
 

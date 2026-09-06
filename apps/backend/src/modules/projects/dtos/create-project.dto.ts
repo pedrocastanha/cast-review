@@ -1,9 +1,19 @@
-import { ArrayMinSize, ArrayUnique, IsArray, IsOptional, IsString, Length, Matches } from 'class-validator';
+import {
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+} from 'class-validator';
 
 export class CreateProjectDto {
   @IsString()
   @Length(2, 80)
-  @Matches(/\S/, { message: 'name must contain at least one visible character' })
+  @Matches(/\S/, {
+    message: 'name must contain at least one visible character',
+  })
   name: string;
 
   @IsOptional()

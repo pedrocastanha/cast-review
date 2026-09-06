@@ -8,7 +8,6 @@ import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { jwtConfig } from '../auth.config';
 import { AuthService } from '../auth.service';
-import { extractBearerToken } from './extract-bearer-token';
 
 type JwtPayload = { sub: string };
 
@@ -21,7 +20,11 @@ export class JwtRefreshGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const token = extractBearerToken(request);
+    const token = request.headers.cookie
+      ?.split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('cast_refresh='))
+      ?.slice('cast_refresh='.length);
 
     if (!token) {
       throw new UnauthorizedException('Refresh token ausente');

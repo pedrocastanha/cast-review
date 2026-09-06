@@ -13,7 +13,9 @@ function build() {
       .fn()
       .mockResolvedValue({ id: 'inst-row', installationId: '42' }),
   };
-  const installationRepository = { update: jest.fn().mockResolvedValue(undefined) };
+  const installationRepository = {
+    update: jest.fn().mockResolvedValue(undefined),
+  };
   const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
 
   return {

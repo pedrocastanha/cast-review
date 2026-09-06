@@ -8,6 +8,10 @@ export function resolveRedisConnection(): RedisOptions {
   return {
     host: url.hostname,
     port: Number(url.port || 6379),
-    ...(url.password ? { password: url.password } : {}),
+    ...(url.username ? { username: decodeURIComponent(url.username) } : {}),
+    ...(url.password ? { password: decodeURIComponent(url.password) } : {}),
+    ...(url.protocol === 'rediss:'
+      ? { tls: { rejectUnauthorized: true } }
+      : {}),
   };
 }

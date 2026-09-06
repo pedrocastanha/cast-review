@@ -1,3 +1,4 @@
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -101,7 +102,7 @@ export class AuthService {
 
   async generateRefreshToken(user: User) {
     return this.jwtService.signAsync(
-      { sub: user.id },
+      { sub: user.id, jti: randomUUID() },
       {
         secret: jwtConfig.refresh.secret,
         expiresIn: jwtConfig.refresh.expiresIn,
@@ -115,7 +116,7 @@ export class AuthService {
   ): Promise<void> {
     await this.userService.updateRefresh(
       userId,
-      await bcrypt.hash(refreshToken, 10),
+      createHash('sha256').update(refreshToken).digest('hex'),
     );
   }
 
@@ -127,7 +128,17 @@ export class AuthService {
 
     if (
       !user?.currentRefreshToken ||
-      !(await bcrypt.compare(refreshToken, user.currentRefreshToken))
+      user.currentRefreshToken.length !== 64 ||
+      !timingSafeEqual(
+        Buffer.from(createHash('sha256').update(refreshToken).digest('hex')),
+        Buffer.from(user.currentRefreshToken),
+      )
+    ) {
+      throw new UnauthorizedException('Token de atualização inválido');
+    }
+
+    if (
+      !(await this.userService.consumeRefresh(userId, user.currentRefreshToken))
     ) {
       throw new UnauthorizedException('Token de atualização inválido');
     }
@@ -137,5 +148,9 @@ export class AuthService {
 
   async comparePassword(password: string, hash: string) {
     return bcrypt.compare(password, hash);
+  }
+
+  async logout(userId: string) {
+    await this.userService.updateRefresh(userId, null);
   }
 }

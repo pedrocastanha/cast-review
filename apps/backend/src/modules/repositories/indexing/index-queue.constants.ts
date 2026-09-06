@@ -14,6 +14,10 @@ export interface IndexJobResult {
   durationMs: number;
 }
 
-export function buildIndexJobId(owner: string, repo: string, sha: string): string {
+export function buildIndexJobId(
+  owner: string,
+  repo: string,
+  sha: string,
+): string {
   return `${owner}/${repo}@${sha}`;
 }

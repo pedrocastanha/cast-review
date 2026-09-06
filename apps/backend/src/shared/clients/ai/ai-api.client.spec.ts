@@ -200,7 +200,10 @@ describe('AiApiClient.getProjectGraph', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:8000/index/project/graph',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify(requestBody) }),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      }),
     );
     expect(result).toEqual(responseBody);
   });
@@ -227,6 +230,10 @@ describe('AiApiClient.listIndexRepositories', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:8000/index/repositories?query=cast&limit=20&cursor=0',
+      expect.objectContaining({
+        redirect: 'error',
+        signal: expect.any(AbortSignal),
+      }),
     );
     expect(result).toEqual(responseBody);
   });
@@ -255,7 +262,9 @@ describe('AiApiClient.listIndexRepositories', () => {
 
     it('envia componentes junto do escopo ao resolver dependências', async () => {
       process.env.AI_API_URL = 'http://localhost:8000';
-      fetchMock.mockResolvedValue(jsonResponse({ dependencies: [], stats: {} }));
+      fetchMock.mockResolvedValue(
+        jsonResponse({ dependencies: [], stats: {} }),
+      );
       const client = new AiApiClient(logger);
 
       await client.getArchitectureDependencies(
@@ -274,9 +283,9 @@ describe('AiApiClient.listIndexRepositories', () => {
       fetchMock.mockResolvedValue(notOkResponse(503));
       const client = new AiApiClient(logger);
 
-      await expect(
-        client.getArchitectureImpact([], [], []),
-      ).rejects.toThrow('ai-api indisponível (status 503)');
+      await expect(client.getArchitectureImpact([], [], [])).rejects.toThrow(
+        'ai-api indisponível (status 503)',
+      );
       expect(logger.error).toHaveBeenCalled();
     });
   });

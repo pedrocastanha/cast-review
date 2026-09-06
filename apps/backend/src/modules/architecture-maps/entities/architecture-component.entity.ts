@@ -9,11 +9,9 @@ import type {
 } from '../domain/architecture-maps.types';
 
 @Entity({ name: 'architecture_components' })
-@Index(
-  'UQ_architecture_components_map_candidate',
-  ['mapId', 'candidateKey'],
-  { unique: true },
-)
+@Index('UQ_architecture_components_map_candidate', ['mapId', 'candidateKey'], {
+  unique: true,
+})
 @Index('IDX_architecture_components_map_capability', ['mapId', 'capabilityId'])
 export class ArchitectureComponent extends DefaultEntity<ArchitectureComponent> {
   @Column({ name: 'map_id', type: 'uuid' })

@@ -141,7 +141,9 @@ describe('GithubSessionProvider.handleGithubError', () => {
       const provider = new GithubSessionProvider(fakeUserService(), logger);
 
       expect(() => provider.handleGithubError({ status })).toThrow(
-        expected as new (...args: unknown[]) => Error,
+        expected as new (
+          ...args: unknown[]
+        ) => Error,
       );
       expect(logger.error).toHaveBeenCalledWith(
         'Falha na chamada à API do Github',

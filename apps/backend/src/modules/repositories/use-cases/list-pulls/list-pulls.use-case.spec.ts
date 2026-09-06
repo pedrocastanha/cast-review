@@ -35,7 +35,10 @@ const rawPull = {
 
 describe('ListPullsUseCase', () => {
   it('lists pulls for the session owner using the summary shape', async () => {
-    const octokit = { pulls: { list: jest.fn() }, paginate: jest.fn().mockResolvedValue([rawPull]) };
+    const octokit = {
+      pulls: { list: jest.fn() },
+      paginate: jest.fn().mockResolvedValue([rawPull]),
+    };
     const githubSession = fakeGithubSession(octokit);
     const useCase = new ListPullsUseCase(githubSession);
 
@@ -53,11 +56,18 @@ describe('ListPullsUseCase', () => {
   });
 
   it('uses the owner override instead of the session owner', async () => {
-    const octokit = { pulls: { list: jest.fn() }, paginate: jest.fn().mockResolvedValue([]) };
+    const octokit = {
+      pulls: { list: jest.fn() },
+      paginate: jest.fn().mockResolvedValue([]),
+    };
     const githubSession = fakeGithubSession(octokit);
     const useCase = new ListPullsUseCase(githubSession);
 
-    await useCase.execute({ repo: 'hello-world', currentUser, ownerOverride: 'some-org' });
+    await useCase.execute({
+      repo: 'hello-world',
+      currentUser,
+      ownerOverride: 'some-org',
+    });
 
     expect(octokit.paginate).toHaveBeenCalledWith(
       octokit.pulls.list,

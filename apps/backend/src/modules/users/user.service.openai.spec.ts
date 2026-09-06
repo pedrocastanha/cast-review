@@ -43,10 +43,14 @@ describe('UserService.getOpenaiKey', () => {
 
   it('pede configuração quando não há chave salva', async () => {
     const { service } = buildService({
-      userRepository: { findOne: jest.fn(async () => ({ id: 'user-1', openaiKey: null })) },
+      userRepository: {
+        findOne: jest.fn(async () => ({ id: 'user-1', openaiKey: null })),
+      },
     });
 
-    await expect(service.getOpenaiKey('user-1')).rejects.toThrow(/Configure sua chave/);
+    await expect(service.getOpenaiKey('user-1')).rejects.toThrow(
+      /Configure sua chave/,
+    );
   });
 
   it('vira erro legível quando a chave não decifra', async () => {

@@ -3,6 +3,7 @@ import {
   WinstonModule,
 } from 'nest-winston';
 import { createLogger, format, transports } from 'winston';
+import { redact } from './redact';
 
 export const initLogger = (appName: string) => {
   const env = process.env.NODE_ENV;
@@ -22,6 +23,7 @@ export const initLogger = (appName: string) => {
   );
 
   return createLogger({
+    format: format((info) => Object.assign(info, redact(info)))(),
     level: env === 'test' ? 'silent' : 'info',
     defaultMeta: { environment: env },
     transports: [

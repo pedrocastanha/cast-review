@@ -65,8 +65,7 @@ export function installGithubFetchStub(
     }
 
     const method = (
-      init?.method ??
-      (isRequestObject ? (input as Request).method : 'GET')
+      init?.method ?? (isRequestObject ? (input as Request).method : 'GET')
     ).toUpperCase();
 
     const call: GithubFetchCall = { method, pathname: parsed.pathname };
@@ -134,7 +133,9 @@ export function installGithubFetchStub(
 
     if (
       method === 'DELETE' &&
-      parsed.pathname.startsWith(`/repos/${config.owner}/${config.repo}/pulls/comments/`)
+      parsed.pathname.startsWith(
+        `/repos/${config.owner}/${config.repo}/pulls/comments/`,
+      )
     ) {
       return new Response(null, { status: 204 });
     }

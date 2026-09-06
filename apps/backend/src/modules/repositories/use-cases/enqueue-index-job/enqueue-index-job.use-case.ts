@@ -1,10 +1,10 @@
 import type { Queue } from 'bullmq';
 import { AppLogger } from 'src/shared/logger/logger.service';
-import { GithubSessionProvider } from '../shared/github-session.provider';
 import {
   buildIndexJobId,
   IndexJobData,
 } from '../../indexing/index-queue.constants';
+import { GithubSessionProvider } from '../shared/github-session.provider';
 import { EnqueueIndexJobDto } from './enqueue-index-job.dto';
 
 export class EnqueueIndexJobUseCase {

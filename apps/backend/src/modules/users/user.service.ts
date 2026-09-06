@@ -12,9 +12,9 @@ import { BaseService } from 'src/shared/services/base.service';
 import { CreateUserDto } from './dtos/create-user.dto';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { toUserResponse, UserResponseDto } from './dtos/user-response.dto';
+import { GithubCredentials } from './types/github-credentials.type';
 import { User } from './user.entity';
 import { UserRepository } from './user.repository';
-import { GithubCredentials } from './types/github-credentials.type';
 
 const REQUIRED_CLASSIC_SCOPES = ['repo', 'public_repo'];
 
@@ -261,6 +261,16 @@ export class UserService extends BaseService {
         currentRefreshToken: hashedRefreshToken,
       });
     });
+  }
+
+  async consumeRefresh(userId: string, hash: string): Promise<boolean> {
+    const result = await this.userRepository
+      .createQueryBuilder()
+      .update(User)
+      .set({ currentRefreshToken: null })
+      .where('id = :userId AND current_refresh_token = :hash', { userId, hash })
+      .execute();
+    return result.affected === 1;
   }
 
   private async validateGithubToken(token: string): Promise<string> {

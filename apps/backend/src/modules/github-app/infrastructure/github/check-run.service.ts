@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { AppLogger } from 'src/shared/logger/logger.service';
-import type { CheckRunSnapshot } from '../../domain/github-app.types';
 import {
   CHECK_RUN_NAME,
   type CheckRunOutput,
 } from '../../domain/check-run-output';
+import type { CheckRunSnapshot } from '../../domain/github-app.types';
 import { InstallationTokenService } from './installation-token.service';
 
 @Injectable()

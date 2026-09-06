@@ -13,14 +13,14 @@ export class SecretDecryptionError extends Error {
   }
 }
 
-let cachedKey: Buffer | null = null;
-
-function getKey(): Buffer {
-  if (cachedKey) {
-    return cachedKey;
+function getKey(keyId?: string): Buffer {
+  let raw = process.env.SECRET_ENCRYPTION_KEY?.trim();
+  if (keyId) {
+    const keys = JSON.parse(
+      process.env.SECRET_ENCRYPTION_KEYS ?? '{}',
+    ) as Record<string, string>;
+    raw = Object.hasOwn(keys, keyId) ? keys[keyId] : undefined;
   }
-
-  const raw = process.env.SECRET_ENCRYPTION_KEY?.trim();
 
   if (!raw) {
     throw new Error(
@@ -30,30 +30,33 @@ function getKey(): Buffer {
 
   const key = Buffer.from(raw, 'hex');
 
-  if (key.length !== KEY_LENGTH) {
+  if (!/^[a-fA-F0-9]{64}$/.test(raw) || key.length !== KEY_LENGTH) {
     throw new Error(
       `SECRET_ENCRYPTION_KEY deve ter ${KEY_LENGTH} bytes em hex (${KEY_LENGTH * 2} caracteres)`,
     );
   }
 
-  cachedKey = key;
   return key;
 }
 
 export function isEncrypted(value: string): boolean {
-  return value.startsWith(`${FORMAT_VERSION}:`);
+  return value.startsWith(`${FORMAT_VERSION}:`) || value.startsWith('v2:');
 }
 
 export function encryptSecret(plain: string): string {
   const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, getKey(), iv);
+  const keyId = process.env.SECRET_ENCRYPTION_ACTIVE_KEY;
+  if (keyId && !/^[a-zA-Z0-9_-]{1,64}$/.test(keyId))
+    throw new Error('Invalid encryption key ID');
+  const cipher = createCipheriv(ALGORITHM, getKey(keyId), iv);
+  if (keyId) cipher.setAAD(Buffer.from(`v2:${keyId}`));
   const ciphertext = Buffer.concat([
     cipher.update(plain, 'utf8'),
     cipher.final(),
   ]);
 
   return [
-    FORMAT_VERSION,
+    ...(keyId ? ['v2', keyId] : [FORMAT_VERSION]),
     iv.toString('base64'),
     cipher.getAuthTag().toString('base64'),
     ciphertext.toString('base64'),
@@ -61,18 +64,29 @@ export function encryptSecret(plain: string): string {
 }
 
 export function decryptSecret(payload: string): string {
-  const [version, iv, tag, ciphertext] = payload.split(':');
+  const parts = payload.split(':');
+  const version = parts.shift();
+  const keyId = version === 'v2' ? parts.shift() : undefined;
+  const [iv, tag, ciphertext] = parts;
 
-  if (version !== FORMAT_VERSION || !iv || !tag || !ciphertext) {
+  if (
+    !['v1', 'v2'].includes(version ?? '') ||
+    parts.length !== 3 ||
+    !iv ||
+    !tag ||
+    ciphertext === undefined ||
+    (version === 'v2' && !keyId)
+  ) {
     throw new SecretDecryptionError();
   }
 
   try {
     const decipher = createDecipheriv(
       ALGORITHM,
-      getKey(),
+      getKey(keyId),
       Buffer.from(iv, 'base64'),
     );
+    if (keyId) decipher.setAAD(Buffer.from(`v2:${keyId}`));
     decipher.setAuthTag(Buffer.from(tag, 'base64'));
 
     return Buffer.concat([

@@ -2,14 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import type {
   AgentEvent,
+  AgentResumeRequest,
+  AgentRunRequest,
   ArchitectureCandidatesResult,
   ArchitectureChangedFile,
   ArchitectureComponentRef,
   ArchitectureDependenciesResult,
   ArchitectureImpactResult,
   ArchitectureRepositoryRef,
-  AgentResumeRequest,
-  AgentRunRequest,
   ChatEvent,
   ChatRunRequest,
   IndexBuildRequest,
@@ -22,6 +22,7 @@ import type {
   ProjectGraphResult,
   VizGraph,
 } from 'src/shared/types';
+import { serviceFetch as fetch } from './service-fetch';
 
 const DEFAULT_AI_API_URL = 'http://localhost:8000';
 
@@ -140,10 +141,13 @@ export class AiApiClient {
     );
 
     if (!response.ok) {
-      this.logger.error('ai-api respondeu com falha ao consultar status de índice', {
-        status: response.status,
-        repoId,
-      });
+      this.logger.error(
+        'ai-api respondeu com falha ao consultar status de índice',
+        {
+          status: response.status,
+          repoId,
+        },
+      );
       throw new Error(`ai-api indisponível (status ${response.status})`);
     }
 
@@ -184,13 +188,18 @@ export class AiApiClient {
     if (focus) params.set('focus', focus);
     if (depth !== undefined) params.set('depth', String(depth));
 
-    const response = await fetch(`${resolveAiApiUrl()}/index/graph?${params.toString()}`);
+    const response = await fetch(
+      `${resolveAiApiUrl()}/index/graph?${params.toString()}`,
+    );
 
     if (!response.ok) {
-      this.logger.error('ai-api respondeu com falha ao buscar grafo de visualização', {
-        status: response.status,
-        repoId,
-      });
+      this.logger.error(
+        'ai-api respondeu com falha ao buscar grafo de visualização',
+        {
+          status: response.status,
+          repoId,
+        },
+      );
       throw new Error(`ai-api indisponível (status ${response.status})`);
     }
 
@@ -207,10 +216,13 @@ export class AiApiClient {
     });
 
     if (!response.ok) {
-      this.logger.error('ai-api respondeu com falha ao buscar grafo do projeto', {
-        status: response.status,
-        projectId: payload.projectId,
-      });
+      this.logger.error(
+        'ai-api respondeu com falha ao buscar grafo do projeto',
+        {
+          status: response.status,
+          projectId: payload.projectId,
+        },
+      );
       throw new Error(`ai-api indisponível (status ${response.status})`);
     }
 
@@ -230,11 +242,14 @@ export class AiApiClient {
     if (response.status === 404) return null;
 
     if (!response.ok) {
-      this.logger.error('ai-api respondeu com falha ao buscar arquivo do índice', {
-        status: response.status,
-        repoId,
-        path,
-      });
+      this.logger.error(
+        'ai-api respondeu com falha ao buscar arquivo do índice',
+        {
+          status: response.status,
+          repoId,
+          path,
+        },
+      );
       throw new Error(`ai-api indisponível (status ${response.status})`);
     }
 
@@ -260,10 +275,13 @@ export class AiApiClient {
     }
 
     if (!response.ok) {
-      this.logger.error('ai-api respondeu com falha ao listar arquivos do índice', {
-        status: response.status,
-        repoId,
-      });
+      this.logger.error(
+        'ai-api respondeu com falha ao listar arquivos do índice',
+        {
+          status: response.status,
+          repoId,
+        },
+      );
       throw new Error(`ai-api indisponível (status ${response.status})`);
     }
 

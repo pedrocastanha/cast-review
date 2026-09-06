@@ -1,4 +1,8 @@
-import { fallbackAnchor, resolveAnchor, rightSideLines } from './patch-anchor.helper';
+import {
+  fallbackAnchor,
+  resolveAnchor,
+  rightSideLines,
+} from './patch-anchor.helper';
 
 const SAMPLE_PATCH = `@@ -10,4 +10,5 @@ export function foo() {
      const a = 1

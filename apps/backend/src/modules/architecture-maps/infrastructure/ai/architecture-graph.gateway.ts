@@ -9,8 +9,8 @@ import type {
   ArchitectureImpactResult,
   ArchitectureRepositoryRef,
 } from 'src/shared/types';
-import type { ArchitectureComponent } from '../../entities/architecture-component.entity';
 import type { ArchitectureScope } from '../../domain/architecture-maps.types';
+import type { ArchitectureComponent } from '../../entities/architecture-component.entity';
 
 @Injectable()
 export class ArchitectureGraphGateway {

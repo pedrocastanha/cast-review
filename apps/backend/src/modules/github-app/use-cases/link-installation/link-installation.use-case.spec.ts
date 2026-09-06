@@ -66,7 +66,9 @@ describe('LinkInstallationUseCase.installUrl', () => {
 
     const { url, state } = build().useCase.installUrl(USER);
 
-    expect(url).toContain('https://github.com/apps/cast-review/installations/new');
+    expect(url).toContain(
+      'https://github.com/apps/cast-review/installations/new',
+    );
     expect(url).toContain(encodeURIComponent(state));
   });
 });

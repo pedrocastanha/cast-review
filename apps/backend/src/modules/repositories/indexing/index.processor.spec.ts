@@ -5,8 +5,8 @@ jest.mock('@octokit/rest', () => ({ Octokit: jest.fn() }));
 jest.mock('./tree-fetcher.helper');
 
 import type { AppLogger } from 'src/shared/logger/logger.service';
-import { fetchRepoTree } from './tree-fetcher.helper';
 import { IndexProcessor } from './index.processor';
+import { fetchRepoTree } from './tree-fetcher.helper';
 
 const fetchRepoTreeMock = fetchRepoTree as jest.MockedFunction<
   typeof fetchRepoTree
@@ -32,12 +32,14 @@ function fakeUserService(token = 'gh-token') {
   } as any;
 }
 
-function fakeAiApiClient(result = {
-  indexId: 'owner/repo@sha1',
-  indexedFiles: 2,
-  skippedFiles: 0,
-  durationMs: 100,
-}) {
+function fakeAiApiClient(
+  result = {
+    indexId: 'owner/repo@sha1',
+    indexedFiles: 2,
+    skippedFiles: 0,
+    durationMs: 100,
+  },
+) {
   return { buildIndex: jest.fn().mockResolvedValue(result) } as any;
 }
 

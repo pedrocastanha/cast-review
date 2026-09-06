@@ -1,12 +1,12 @@
-import { detectBoundaryViolations } from '../../domain/boundary.rules';
-import { buildCapabilityDependencies } from '../../domain/capability-graph';
-import { calculateCoverage } from '../../domain/coverage';
 import type {
   ArchitectureCoverage,
   ArchitectureScope,
   BoundaryViolation,
   CapabilityDependency,
 } from '../../domain/architecture-maps.types';
+import { detectBoundaryViolations } from '../../domain/boundary.rules';
+import { buildCapabilityDependencies } from '../../domain/capability-graph';
+import { calculateCoverage } from '../../domain/coverage';
 import type { ArchitectureBoundary } from '../../entities/architecture-boundary.entity';
 import type { ArchitectureComponent } from '../../entities/architecture-component.entity';
 import type { ArchitectureMap } from '../../entities/architecture-map.entity';

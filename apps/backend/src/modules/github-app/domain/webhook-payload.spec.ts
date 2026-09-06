@@ -1,7 +1,4 @@
-import {
-  extractPullRequestFacts,
-  redactPayload,
-} from './webhook-payload';
+import { extractPullRequestFacts, redactPayload } from './webhook-payload';
 
 const payload = {
   action: 'synchronize',

@@ -9,7 +9,10 @@ const USER: CurrentUserData = {
 };
 
 const READY = {
-  models: { testReviewer: 'gpt-5.4-mini', architectureReviewer: 'gpt-5.4-mini' },
+  models: {
+    testReviewer: 'gpt-5.4-mini',
+    architectureReviewer: 'gpt-5.4-mini',
+  },
   budgetMonthlyUsd: 10,
 };
 
@@ -31,7 +34,10 @@ function repositoryRow(overrides: Record<string, unknown> = {}) {
 }
 
 function build(
-  options: { repository?: Record<string, unknown>; openaiKey?: string | null } = {},
+  options: {
+    repository?: Record<string, unknown>;
+    openaiKey?: string | null;
+  } = {},
 ) {
   const repository = options.repository ?? repositoryRow();
   const ownership = {

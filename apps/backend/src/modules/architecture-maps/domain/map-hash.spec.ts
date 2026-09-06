@@ -60,7 +60,10 @@ describe('canonicalMapHash', () => {
       ...base,
       components: [
         ...base.components,
-        { candidateKey: 'acme/api:src/tmp', status: 'unmapped' } as ArchitectureComponent,
+        {
+          candidateKey: 'acme/api:src/tmp',
+          status: 'unmapped',
+        } as ArchitectureComponent,
       ],
     };
 

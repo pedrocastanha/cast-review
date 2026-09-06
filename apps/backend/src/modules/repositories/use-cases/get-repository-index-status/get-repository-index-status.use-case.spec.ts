@@ -24,7 +24,9 @@ function fakeQueue(job: any = null) {
   return { getJob: jest.fn().mockResolvedValue(job) } as any;
 }
 
-function fakeAiApiClient(status = { indexed: false, sha: null as string | null }) {
+function fakeAiApiClient(
+  status = { indexed: false, sha: null as string | null },
+) {
   return { getIndexStatus: jest.fn().mockResolvedValue(status) } as any;
 }
 
@@ -59,7 +61,10 @@ describe('GetRepositoryIndexStatusUseCase', () => {
   });
 
   it('returns indexing (not ai-api status) when a job is currently active', async () => {
-    const job = { getState: jest.fn().mockResolvedValue('active'), progress: 50 };
+    const job = {
+      getState: jest.fn().mockResolvedValue('active'),
+      progress: 50,
+    };
     const useCase = new GetRepositoryIndexStatusUseCase(
       fakeGithubSession('head-sha'),
       fakeQueue(job),

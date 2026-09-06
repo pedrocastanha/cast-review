@@ -23,7 +23,7 @@ export class LoggingInterceptor implements NestInterceptor {
 
     this.logger.log('Requisição recebida', {
       method: req.method,
-      url: req.originalUrl,
+      url: req.route?.path ?? '/unknown',
     });
 
     return next.handle().pipe(
@@ -31,7 +31,7 @@ export class LoggingInterceptor implements NestInterceptor {
         next: () => {
           this.logger.log('Requisição concluída', {
             method: req.method,
-            url: req.originalUrl,
+            url: req.route?.path ?? '/unknown',
             status: res.statusCode,
             durationMs: Date.now() - start,
           });
@@ -39,7 +39,7 @@ export class LoggingInterceptor implements NestInterceptor {
         error: (err: unknown) => {
           this.logger.error('Requisição falhou', {
             method: req.method,
-            url: req.originalUrl,
+            url: req.route?.path ?? '/unknown',
             status: res.statusCode,
             durationMs: Date.now() - start,
             exception: err,

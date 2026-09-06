@@ -23,7 +23,9 @@ describe('GetPullHeadShaUseCase', () => {
   it('returns the head sha of the pull', async () => {
     const octokit = {
       pulls: {
-        get: jest.fn().mockResolvedValue({ data: { head: { sha: 'sha-head' } } }),
+        get: jest
+          .fn()
+          .mockResolvedValue({ data: { head: { sha: 'sha-head' } } }),
       },
     };
     const useCase = new GetPullHeadShaUseCase(fakeGithubSession(octokit));

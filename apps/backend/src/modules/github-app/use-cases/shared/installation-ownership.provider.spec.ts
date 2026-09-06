@@ -43,7 +43,9 @@ function build() {
 describe('InstallationOwnershipProvider', () => {
   it('returns the installation to its owner', async () => {
     const { provider } = build();
-    await expect(provider.installation('inst-row', OWNER)).resolves.toMatchObject({
+    await expect(
+      provider.installation('inst-row', OWNER),
+    ).resolves.toMatchObject({
       id: 'inst-row',
     });
   });
@@ -58,10 +60,12 @@ describe('InstallationOwnershipProvider', () => {
 
   it('resolves a repository together with its owning installation', async () => {
     const { provider } = build();
-    await expect(provider.repository('repo-row', OWNER)).resolves.toMatchObject({
-      repository: { id: 'repo-row' },
-      installation: { id: 'inst-row' },
-    });
+    await expect(provider.repository('repo-row', OWNER)).resolves.toMatchObject(
+      {
+        repository: { id: 'repo-row' },
+        installation: { id: 'inst-row' },
+      },
+    );
   });
 
   it('refuses a repository whose installation belongs to someone else', async () => {

@@ -1,6 +1,4 @@
 import type { ArchitectureChangedFile } from 'src/shared/types';
-import { detectBoundaryViolations } from '../../domain/boundary.rules';
-import { buildCapabilityDependencies } from '../../domain/capability-graph';
 import type {
   ArchitectureImpact,
   ArchitectureImpactCapability,
@@ -9,6 +7,8 @@ import type {
   BoundaryKind,
   CapabilityCriticality,
 } from '../../domain/architecture-maps.types';
+import { detectBoundaryViolations } from '../../domain/boundary.rules';
+import { buildCapabilityDependencies } from '../../domain/capability-graph';
 import type { ArchitectureBoundary } from '../../entities/architecture-boundary.entity';
 import type { ArchitectureComponent } from '../../entities/architecture-component.entity';
 import type { ArchitectureMap } from '../../entities/architecture-map.entity';
@@ -184,7 +184,9 @@ export class ResolveArchitectureImpactUseCase {
       usedDraft: taxonomy.usedDraft,
       status,
       changed: [...changed.values()],
-      reached: [...reached.values()].sort((left, right) => right.count - left.count),
+      reached: [...reached.values()].sort(
+        (left, right) => right.count - left.count,
+      ),
       boundariesCrossed,
       violations,
       unmappedFiles: impact.unmapped.map(

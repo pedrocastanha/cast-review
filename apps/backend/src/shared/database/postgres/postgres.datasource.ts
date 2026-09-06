@@ -11,6 +11,8 @@ import { BenchmarkCase } from 'src/modules/benchmarks/benchmark-case.entity';
 import { BenchmarkRun } from 'src/modules/benchmarks/benchmark-run.entity';
 import { ChatMessage } from 'src/modules/chat/chat-message.entity';
 import { ChatThread } from 'src/modules/chat/chat-thread.entity';
+import { FeatureCard } from 'src/modules/feature-cards/entities/feature-card.entity';
+import { FeatureCardRevision } from 'src/modules/feature-cards/entities/feature-card-revision.entity';
 import { FindingCase } from 'src/modules/finding-cases/finding-case.entity';
 import { FindingCaseEvent } from 'src/modules/finding-cases/finding-case-event.entity';
 import { FindingOccurrence } from 'src/modules/finding-cases/finding-occurrence.entity';
@@ -22,8 +24,6 @@ import { Project } from 'src/modules/projects/project.entity';
 import { ProjectRepositoryMember } from 'src/modules/projects/project-repository-member.entity';
 import { User } from 'src/modules/users/user.entity';
 import { DataSource } from 'typeorm';
-import { FeatureCard } from 'src/modules/feature-cards/entities/feature-card.entity';
-import { FeatureCardRevision } from 'src/modules/feature-cards/entities/feature-card-revision.entity';
 
 export default new DataSource({
   type: 'postgres',
@@ -58,6 +58,13 @@ export default new DataSource({
     ArchitectureBoundary,
   ],
   synchronize: false,
+  ssl:
+    process.env.DB_SSL === 'true'
+      ? {
+          rejectUnauthorized: true,
+          ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA } : {}),
+        }
+      : false,
   migrations: [`${__dirname}/migrations/**/*{.ts,.js}`],
   migrationsTableName: 'migrations',
   useUTC: true,

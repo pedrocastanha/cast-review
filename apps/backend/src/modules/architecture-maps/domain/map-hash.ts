@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import type { ArchitectureComponent } from '../entities/architecture-component.entity';
 import type { ArchitectureBoundary } from '../entities/architecture-boundary.entity';
+import type { ArchitectureComponent } from '../entities/architecture-component.entity';
 import type { ArchitectureScopeRepository } from './architecture-maps.types';
 
 export interface CanonicalMapInput {
@@ -38,7 +38,8 @@ export function canonicalMapHash(input: CanonicalMapInput): string {
       }))
       .sort(
         (left, right) =>
-          left.from.localeCompare(right.from) || left.to.localeCompare(right.to),
+          left.from.localeCompare(right.from) ||
+          left.to.localeCompare(right.to),
       ),
     repositories: [...input.repositories]
       .map((repository) => ({ repoId: repository.repoId, sha: repository.sha }))

@@ -14,6 +14,8 @@ import type {
   ChatRunScopeRepository,
 } from 'src/shared/types';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
+import type { FeatureProposal } from '../feature-cards/domain/card.types';
+import { ProjectsService } from '../projects/projects.service';
 import type { RepositoriesService } from '../repositories/repositories.service';
 import type { UserService } from '../users/user.service';
 import type {
@@ -27,8 +29,6 @@ import type { ChatMessage } from './chat-message.entity';
 import { ChatMessageRepository } from './chat-message.repository';
 import type { ChatThread } from './chat-thread.entity';
 import { ChatThreadRepository } from './chat-thread.repository';
-import { ProjectsService } from '../projects/projects.service';
-import type { FeatureProposal } from '../feature-cards/domain/card.types';
 import type { CreateChatThreadDto } from './dtos/create-chat-thread.dto';
 import type { SendChatMessageDto } from './dtos/send-chat-message.dto';
 
@@ -88,7 +88,8 @@ export class ChatService {
     currentUser: CurrentUserData,
     filters: { repoId?: string; projectId?: string },
   ) {
-    if (filters.projectId) await this.projects.getById(filters.projectId, currentUser);
+    if (filters.projectId)
+      await this.projects.getById(filters.projectId, currentUser);
     const threads = await this.threadRepository.find({
       where: {
         userId: currentUser.id,
@@ -99,7 +100,10 @@ export class ChatService {
       order: { updatedAt: 'DESC' },
     });
     return threads
-      .filter((thread) => Boolean(filters.projectId) || thread.scopeType !== 'project')
+      .filter(
+        (thread) =>
+          Boolean(filters.projectId) || thread.scopeType !== 'project',
+      )
       .map((thread) => this.toThreadDto(thread, []));
   }
 
@@ -158,8 +162,13 @@ export class ChatService {
     res: Response,
   ) {
     const thread = await this.requireThread(id, currentUser);
-    if (dto.assistanceMode === 'requirements' && thread.scope.mode !== 'project') {
-      throw new BadRequestException('Selecione um projeto para usar o perfil Requisitos.');
+    if (
+      dto.assistanceMode === 'requirements' &&
+      thread.scope.mode !== 'project'
+    ) {
+      throw new BadRequestException(
+        'Selecione um projeto para usar o perfil Requisitos.',
+      );
     }
     const mode = thread.scope.mode;
     const included = thread.scope.repositories.filter(
@@ -211,7 +220,9 @@ export class ChatService {
       threadId: thread.id,
       mode,
       assistanceMode: dto.assistanceMode ?? 'general',
-      omittedRepositories: thread.scope.repositories.filter((r) => !r.included).map((r) => r.repoId),
+      omittedRepositories: thread.scope.repositories
+        .filter((r) => !r.included)
+        .map((r) => r.repoId),
       repositories: included.map<ChatRunScopeRepository>((repository) => ({
         repoId: repository.repoId,
         sha: repository.sha as string,
@@ -235,7 +246,9 @@ export class ChatService {
     };
 
     const abortController = new AbortController();
-    res.on?.('close', () => { if (!res.writableEnded) abortController.abort(); });
+    res.on?.('close', () => {
+      if (!res.writableEnded) abortController.abort();
+    });
 
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -360,11 +373,18 @@ export class ChatService {
     }
     if (scope?.mode === 'project') {
       const project = await this.projects.getById(scope.projectId, currentUser);
-      const status = await this.projects.getIndexStatus(project.id, currentUser);
+      const status = await this.projects.getIndexStatus(
+        project.id,
+        currentUser,
+      );
       return {
-        mode: 'project', projectId: project.id, projectName: project.name,
+        mode: 'project',
+        projectId: project.id,
+        projectName: project.name,
         repositories: status.repositories.map((r) => ({
-          repoId: r.repository, sha: r.sha, included: r.status === 'indexed' && Boolean(r.sha),
+          repoId: r.repository,
+          sha: r.sha,
+          included: r.status === 'indexed' && Boolean(r.sha),
           omissionReason: r.status === 'indexed' && r.sha ? null : r.status,
         })),
       };
@@ -459,15 +479,28 @@ export class ChatService {
     });
     if (!thread) throw new NotFoundException('Conversa não encontrada.');
     if (thread.scope.mode === 'project') {
-      const project = await this.projects.get(thread.projectId as string, currentUser);
+      const project = await this.projects.get(
+        thread.projectId as string,
+        currentUser,
+      );
       const members = new Set(project.repositories.map((r) => r.fullName));
       if (thread.scope.repositories.some((r) => !members.has(r.repoId))) {
-        throw new BadRequestException('O projeto mudou. Crie uma conversa com o escopo atualizado.');
+        throw new BadRequestException(
+          'O projeto mudou. Crie uma conversa com o escopo atualizado.',
+        );
       }
-      await Promise.all(thread.scope.repositories.filter((r) => r.included).map((r) => {
-        const { owner, name } = splitRepoId(r.repoId);
-        return this.repositoriesService.getRepositoryIndexStatus(name, currentUser, owner);
-      }));
+      await Promise.all(
+        thread.scope.repositories
+          .filter((r) => r.included)
+          .map((r) => {
+            const { owner, name } = splitRepoId(r.repoId);
+            return this.repositoriesService.getRepositoryIndexStatus(
+              name,
+              currentUser,
+              owner,
+            );
+          }),
+      );
     }
     return thread;
   }

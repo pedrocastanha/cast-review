@@ -17,7 +17,8 @@ class ChatScopeConstraint implements ValidatorConstraintInterface {
     if (!value || typeof value !== 'object') return false;
     const scope = value as Record<string, unknown>;
     if (scope.mode === 'global') return Object.keys(scope).length === 1;
-    if (scope.mode === 'project') return typeof scope.projectId === 'string' && isUUID(scope.projectId);
+    if (scope.mode === 'project')
+      return typeof scope.projectId === 'string' && isUUID(scope.projectId);
     return (
       scope.mode === 'repository' &&
       typeof scope.repoId === 'string' &&
