@@ -362,7 +362,7 @@ export function ChatPage() {
               {projects.map((p) => <option value={p.id} key={p.id}>{p.name}</option>)}
             </select>
           </label>
-          {projectId && <Link to={`/projects/${projectId}/board`} className="ml-auto py-3 text-sm font-semibold text-accent">Kanban →</Link>}
+          {projectId && <Link to={`/board?project=${projectId}`} className="ml-auto py-3 text-sm font-semibold text-accent">Board →</Link>}
         </div>
         {(missingKey || error || stale.length > 0) && (
           <div className="shrink-0 space-y-2 border-b border-border px-4 py-3">
