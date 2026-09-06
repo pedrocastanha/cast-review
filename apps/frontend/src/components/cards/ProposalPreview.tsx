@@ -48,8 +48,8 @@ export function ProposalPreview({ proposal, projectId, messageId, shaByRepo }: {
       </div>
       {error && <p role="alert" className="mt-3 text-sm text-warn">{error}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-4">
-        {saved ? <Link className="text-sm font-semibold text-accent underline" to={`/projects/${projectId}/board`}>Cards salvos · abrir Kanban →</Link> : (
-          <button type="button" disabled={saving} onClick={() => void save()} className="min-h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Salvando…' : 'Salvar proposta no Kanban'}</button>
+        {saved ? <Link className="text-sm font-semibold text-accent underline" to={`/board?project=${projectId}`}>Cards salvos · abrir board →</Link> : (
+          <button type="button" disabled={saving} onClick={() => void save()} className="min-h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Salvando…' : 'Salvar proposta no board'}</button>
         )}
         <span className="text-xs text-ink-faint">Refine no chat antes de salvar. Os cards começam em Rascunho.</span>
       </div>
