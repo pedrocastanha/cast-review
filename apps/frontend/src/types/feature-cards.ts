@@ -1,11 +1,11 @@
 import type { ChatCitation, ChatScopeRepository } from './index';
 
 export const CARD_COLUMNS = [
-  { status: 'draft', label: 'Rascunho' },
-  { status: 'ready', label: 'Pronto' },
-  { status: 'in_progress', label: 'Em andamento' },
-  { status: 'review', label: 'Em revisão' },
-  { status: 'done', label: 'Concluído' },
+  { status: 'draft', label: 'Rascunho', hint: 'Propostas salvas do chat entram aqui.' },
+  { status: 'ready', label: 'Pronto', hint: 'Sem bloqueio e com critério de aceite.' },
+  { status: 'in_progress', label: 'Em andamento', hint: 'Puxe um card pronto ao começar.' },
+  { status: 'review', label: 'Em revisão', hint: 'Aguardando revisão ou PR aberto.' },
+  { status: 'done', label: 'Concluído', hint: 'Entregue e verificado.' },
 ] as const;
 export type CardStatus = (typeof CARD_COLUMNS)[number]['status'];
 
