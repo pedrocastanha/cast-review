@@ -93,6 +93,7 @@ function buildService(overrides: any = {}) {
     aiApiClient as any,
     catalogGrantService as any,
     logger as any,
+    overrides.projects ?? { getById: jest.fn(), getIndexStatus: jest.fn(), get: jest.fn() },
   );
 
   return {
@@ -133,6 +134,28 @@ function seedThread(overrides: any = {}) {
 }
 
 describe('ChatService.create', () => {
+  it('congela membros e omissões de um projeto autorizado', async () => {
+    const projects = {
+      getById: jest.fn(async () => ({ id: 'project-1', name: 'Sistema' })),
+      getIndexStatus: jest.fn(async () => ({ repositories: [
+        { repository: 'acme/back', status: 'indexed', sha: 'abc' },
+        { repository: 'acme/front', status: 'not_indexed', sha: null },
+      ] })),
+    };
+    const { service } = buildService({ projects });
+    const thread = await service.create({ scope: { mode: 'project', projectId: 'project-1' } }, currentUser);
+    expect(thread.projectId).toBe('project-1');
+    expect(thread.scope.repositories.map((r) => r.included)).toEqual([true, false]);
+    expect(projects.getById).toHaveBeenCalledWith('project-1', currentUser);
+  });
+
+  it('recusa criação em projeto sem índices', async () => {
+    const { service } = buildService({ projects: {
+      getById: jest.fn(async () => ({ id: 'p', name: 'Sistema' })),
+      getIndexStatus: jest.fn(async () => ({ repositories: [] })),
+    } });
+    await expect(service.create({ scope: { mode: 'project', projectId: 'p' } }, currentUser)).rejects.toBeInstanceOf(BadRequestException);
+  });
   it('cria uma thread global sem congelar o catálogo', async () => {
     const { service, threads, repositoriesService } = buildService();
 

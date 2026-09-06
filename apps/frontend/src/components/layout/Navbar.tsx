@@ -19,6 +19,11 @@ const NAV_ITEMS = [
     icon: <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8z" />,
   },
   {
+    to: '/board',
+    label: 'Board',
+    icon: <path d="M4 5h4v14H4zM10 5h4v9h-4zM16 5h4v6h-4z" />,
+  },
+  {
     to: '/benchmarks',
     label: 'Benchmark Lab',
     icon: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,

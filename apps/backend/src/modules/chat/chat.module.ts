@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ProjectsModule } from '../projects/projects.module';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { RepositoriesService } from '../repositories/repositories.service';
@@ -12,7 +13,7 @@ import { ChatMessageRepository } from './chat-message.repository';
 import { ChatThreadRepository } from './chat-thread.repository';
 
 @Module({
-  imports: [RepositoriesModule, UsersModule],
+  imports: [RepositoriesModule, UsersModule, ProjectsModule],
   controllers: [ChatController, ChatCatalogController],
   providers: [
     ChatService,

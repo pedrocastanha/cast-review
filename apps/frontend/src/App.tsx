@@ -1,4 +1,4 @@
-import { Navigate, Route, BrowserRouter, Routes } from 'react-router-dom';
+import { Navigate, Route, BrowserRouter, Routes, useParams } from 'react-router-dom';
 import { GuestRoute } from './components/layout/GuestRoute';
 import { RepositoryLayout } from './components/repos/RepositoryLayout';
 import { Layout } from './components/layout/Layout';
@@ -21,6 +21,14 @@ import { IntegrationsPage } from './pages/IntegrationsPage';
 import { ProjectFormPage } from './pages/ProjectFormPage';
 import { ProjectGraphPage } from './pages/ProjectGraphPage';
 import { ProjectsPage } from './pages/ProjectsPage';
+import { lazy, Suspense } from 'react';
+
+const ProjectBoardPage = lazy(() => import('./pages/ProjectBoardPage').then((module) => ({ default: module.ProjectBoardPage })));
+
+function LegacyBoardRedirect() {
+  const { id = '' } = useParams();
+  return <Navigate to={id ? `/board?project=${encodeURIComponent(id)}` : '/board'} replace />;
+}
 
 function App() {
   return (
@@ -65,6 +73,19 @@ function App() {
           <Route
             path="/projects/:id/architecture"
             element={<ProtectedRoute><Layout wide><ArchitectureMapPage /></Layout></ProtectedRoute>}
+          />
+          <Route path="/projects/:id/board" element={<LegacyBoardRedirect />} />
+          <Route
+            path="/board"
+            element={
+              <ProtectedRoute>
+                <Layout wide>
+                  <Suspense fallback={<p role="status" className="font-mono text-[11px] tracking-[0.14em] text-ink-faint uppercase">Carregando board…</p>}>
+                    <ProjectBoardPage />
+                  </Suspense>
+                </Layout>
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/repos"

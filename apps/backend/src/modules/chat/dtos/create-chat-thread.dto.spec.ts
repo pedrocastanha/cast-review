@@ -25,13 +25,18 @@ describe('CreateChatThreadDto', () => {
     expect(value.scope).toEqual({ mode: 'global' });
   });
 
-  it('rejeita o modo de projeto removido', async () => {
+  it('rejeita projeto com ID inválido', async () => {
     await expect(
       pipe.transform(
         { scope: { mode: 'project', projectId: 'uuid-1' } },
         metadata,
       ),
     ).rejects.toBeDefined();
+  });
+
+  it('aceita escopo de projeto com UUID', async () => {
+    const scope = { mode: 'project', projectId: 'cfc2b7a8-6b94-46f9-a7c1-55136f34df73' };
+    expect((await pipe.transform({ scope }, metadata)).scope).toEqual(scope);
   });
 
   it('rejeita corpo sem scope', async () => {

@@ -14,6 +14,7 @@ from app.chat.models import (
 )
 from app.chat.prompt import SYSTEM_PROMPT, mention_block, scope_briefing
 from app.chat.tools import GlobalToolExecutor, RepoWorkspace, ToolError, ToolExecutor
+from app.chat.requirements import REQUIREMENTS_PROMPT, generate_proposal
 from app.infrastructure.llm.client import LlmError, complete_with_tools
 from app.infrastructure.llm.pricing import estimate_cost_usd
 from app.infrastructure.logging.setup import get_logger
@@ -94,6 +95,8 @@ def _initial_messages(request: ChatRunRequest) -> list[dict[str, Any]]:
         for mention in request.mentions
     ]
     parts.append(request.question)
+    if request.omittedRepositories:
+        parts.append("Repositórios sem cobertura: " + ", ".join(request.omittedRepositories))
     messages.append({"role": "user", "content": "\n\n".join(parts)})
     return messages
 
@@ -121,7 +124,7 @@ async def run_chat(cache, request: ChatRunRequest) -> AsyncIterator[ChatEvent]:
                 executor = GlobalToolExecutor(cache, CatalogClient(request.catalog))
             else:
                 workspaces = await _load_workspaces(cache, request)
-                executor = ToolExecutor(workspaces)
+                executor = ToolExecutor(workspaces, mode=request.mode)
             await _converse(queue, executor, request, bound)
         except ToolError as exc:
             await queue.put(ChatEvent(type="error", payload={"message": str(exc)}))
@@ -170,7 +173,7 @@ async def _converse(
 
     for iteration in range(1, MAX_ITERATIONS + 1):
         result = await complete_with_tools(
-            system=SYSTEM_PROMPT,
+            system=SYSTEM_PROMPT + (REQUIREMENTS_PROMPT if request.assistanceMode == "requirements" else ""),
             messages=messages,
             tools=definitions,
             model=request.model,
@@ -195,7 +198,7 @@ async def _converse(
 
         if not result.tool_calls:
             await _finish(
-                queue, result.content, citations, records, usage, executor, truncated
+                queue, result.content, citations, records, usage, executor, truncated, request
             )
             return
 
@@ -318,7 +321,7 @@ async def _converse(
 
     truncated = True
     final = await complete_with_tools(
-        system=SYSTEM_PROMPT,
+        system=SYSTEM_PROMPT + (REQUIREMENTS_PROMPT if request.assistanceMode == "requirements" else ""),
         messages=[
             *messages,
             {
@@ -350,7 +353,7 @@ async def _converse(
             6,
         ),
     )
-    await _finish(queue, final.content, citations, records, usage, executor, truncated)
+    await _finish(queue, final.content, citations, records, usage, executor, truncated, request)
 
 
 async def _finish(
@@ -361,7 +364,32 @@ async def _finish(
     usage: ChatUsage,
     executor: ToolExecutor | GlobalToolExecutor,
     truncated: bool,
+    request: ChatRunRequest | None = None,
 ) -> None:
+    valid = _validate_citations(citations, executor)
+    shas = {workspace.repo_id: workspace.sha for workspace in executor.workspaces}
+    valid = [citation.model_copy(update={"sha": shas.get(citation.repoId)}) for citation in valid]
+    proposal = None
+    if request and request.assistanceMode == "requirements":
+        try:
+            proposal, extra = await generate_proposal(request, content, valid)
+            usage.promptTokens += extra.prompt_tokens
+            usage.completionTokens += extra.completion_tokens
+            usage.cachedTokens += extra.cached_tokens
+            usage.costUsd = round(usage.costUsd + estimate_cost_usd(
+                request.model, extra.prompt_tokens, extra.completion_tokens, extra.cached_tokens
+            ), 6)
+            if proposal is None:
+                content += "\n\nNão foi possível estruturar os cards. Peça para gerar a proposta novamente."
+        except Exception:
+            content += "\n\nNão foi possível estruturar os cards. Peça para gerar a proposta novamente."
+        if proposal and request.omittedRepositories:
+            proposal["openQuestions"] = list(dict.fromkeys([
+                *proposal["openQuestions"][:29],
+                "Validar impacto nos repositórios sem cobertura: " + ", ".join(request.omittedRepositories),
+            ]))
+        if proposal and truncated:
+            proposal["openQuestions"] = [*proposal["openQuestions"][:29], "Revisar impacto: a investigação atingiu o limite de contexto."]
     await queue.put(
         ChatEvent(
             type="message_done",
@@ -369,11 +397,12 @@ async def _finish(
                 "content": content,
                 "citations": [
                     citation.model_dump()
-                    for citation in _validate_citations(citations, executor)
+                    for citation in valid
                 ],
                 "toolCalls": [record.model_dump() for record in records],
                 "usage": usage.model_dump(),
                 "truncated": truncated,
+                "proposal": proposal,
             },
         )
     )

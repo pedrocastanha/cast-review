@@ -9,7 +9,8 @@ import { consumeSseStream } from './sse';
 
 export type CreateChatThreadPayload =
   | { mode: 'global' }
-  | { mode: 'repository'; repoId: string };
+  | { mode: 'repository'; repoId: string }
+  | { mode: 'project'; projectId: string };
 
 export const chatApi = {
   create: (scope: CreateChatThreadPayload) =>

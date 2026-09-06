@@ -237,7 +237,9 @@ export interface ChatRunHistoryMessage {
 
 export interface ChatRunRequest {
   threadId: string;
-  mode: 'global' | 'repository';
+  mode: 'global' | 'repository' | 'project';
+  assistanceMode?: 'general' | 'requirements';
+  omittedRepositories?: string[];
   repositories: ChatRunScopeRepository[];
   history: ChatRunHistoryMessage[];
   question: string;

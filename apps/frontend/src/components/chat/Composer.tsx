@@ -19,7 +19,7 @@ const MAX_HEIGHT = 200;
 
 interface ComposerProps {
   threadId: string | null;
-  scopeMode: 'global' | 'repository';
+  scopeMode: 'global' | 'repository' | 'project';
   disabled: boolean;
   model: string;
   onModelChange: (model: string) => void;
@@ -63,7 +63,7 @@ export function Composer({
   }, [value]);
 
   useEffect(() => {
-    if (mentionQuery === null || !threadId || scopeMode !== 'repository') {
+    if (mentionQuery === null || !threadId || scopeMode === 'global') {
       setFileSuggestions([]);
       return;
     }
@@ -312,7 +312,7 @@ export function Composer({
             setValue(nextValue);
             setRepositoryQuery(nextRepositoryQuery);
             setMentionQuery(
-              scopeMode === 'repository'
+              scopeMode !== 'global'
                 ? activeMentionQuery(nextValue, caret)
                 : null,
             );

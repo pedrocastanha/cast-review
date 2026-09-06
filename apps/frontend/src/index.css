@@ -201,3 +201,32 @@ h3 {
   font-variant-ligatures: none;
   font-variant-numeric: tabular-nums;
 }
+
+/* React Flow entrega os controles com fundo branco fixo; sem isso eles ficam
+   como um bloco claro sobre o canvas escuro. O seletor precisa de especificidade
+   maior que a da lib, cujo CSS é importado depois deste arquivo. */
+.react-flow .react-flow__controls {
+  box-shadow: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.react-flow__controls .react-flow__controls-button {
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-ink-dim);
+}
+
+.react-flow__controls .react-flow__controls-button:last-child {
+  border-bottom: 0;
+}
+
+.react-flow__controls .react-flow__controls-button:hover {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+
+.react-flow__controls .react-flow__controls-button svg {
+  fill: currentColor;
+}

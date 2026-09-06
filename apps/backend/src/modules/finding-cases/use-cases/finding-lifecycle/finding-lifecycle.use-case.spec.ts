@@ -132,11 +132,11 @@ function harness() {
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
-    getOne: jest.fn(async () => null),
+    getOne: jest.fn(async (): Promise<Analysis | null> => null),
   };
   const analysisRepository = {
     createQueryBuilder: jest.fn(() => queryBuilder),
-    findOne: jest.fn(async () => null),
+    findOne: jest.fn(async (): Promise<Analysis | null> => null),
   };
   const service = new FindingLifecycleUseCase(
     caseRepository as unknown as FindingCaseRepository,

@@ -710,6 +710,7 @@ export interface ChatMention {
 }
 
 export interface ChatMessage {
+  proposal?: import('./feature-cards').FeatureProposal | null;
   id: string;
   role: 'user' | 'assistant';
   content: string;
@@ -752,6 +753,7 @@ export interface ChatEvent {
 }
 
 export interface SendChatMessagePayload {
+  assistanceMode?: 'general' | 'requirements';
   content: string;
   mentions: ChatMention[];
   model: string;
