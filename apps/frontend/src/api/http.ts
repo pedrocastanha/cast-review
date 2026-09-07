@@ -15,18 +15,23 @@ const BASE_URL = '/api';
 
 let refreshPromise: Promise<AuthTokens | null> | null = null;
 
-async function refreshTokens(): Promise<AuthTokens | null> {
-  const refreshToken = tokenStore.getRefresh();
-  if (!refreshToken) return null;
+export function refreshTokens(): Promise<AuthTokens | null> {
+  refreshPromise ??= performRefresh().finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
 
+async function performRefresh(): Promise<AuthTokens | null> {
+  const generation = tokenStore.generation();
   try {
     const res = await fetch(`${BASE_URL}/auth/refresh`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${refreshToken}` },
+      credentials: 'include',
+      headers: { 'X-Cast-CSRF': '1' },
     });
     if (!res.ok) return null;
 
     const tokens = (await res.json()) as AuthTokens;
+    if (generation !== tokenStore.generation()) return null;
     tokenStore.set(tokens);
     return tokens;
   } catch {
@@ -61,7 +66,7 @@ export async function request<T>(
   const { method = 'GET', body, auth = true } = options;
 
   const buildHeaders = (accessToken: string | null): HeadersInit => {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Cast-CSRF': '1' };
     if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
     return headers;
   };
@@ -69,6 +74,7 @@ export async function request<T>(
   const doFetch = (accessToken: string | null) =>
     fetch(`${BASE_URL}${path}`, {
       method,
+      credentials: 'include',
       headers: buildHeaders(accessToken),
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
@@ -76,10 +82,7 @@ export async function request<T>(
   let res = await doFetch(tokenStore.getAccess());
 
   if (res.status === 401 && auth) {
-    refreshPromise ??= refreshTokens().finally(() => {
-      refreshPromise = null;
-    });
-    const refreshed = await refreshPromise;
+    const refreshed = await refreshTokens();
 
     if (!refreshed) {
       tokenStore.clear();
@@ -114,10 +117,7 @@ export async function authorizedFetch(
   let res = await doFetch(tokenStore.getAccess());
 
   if (res.status === 401) {
-    refreshPromise ??= refreshTokens().finally(() => {
-      refreshPromise = null;
-    });
-    const refreshed = await refreshPromise;
+    const refreshed = await refreshTokens();
 
     if (!refreshed) {
       tokenStore.clear();

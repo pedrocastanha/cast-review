@@ -2,15 +2,21 @@ import type { AuthTokens } from '../types';
 
 const ACCESS_KEY = 'cast_review.accessToken';
 const REFRESH_KEY = 'cast_review.refreshToken';
+let accessToken: string | null = null;
+let generation = 0;
+localStorage.removeItem(ACCESS_KEY);
+localStorage.removeItem(REFRESH_KEY);
 
 export const tokenStore = {
-  getAccess: () => localStorage.getItem(ACCESS_KEY),
-  getRefresh: () => localStorage.getItem(REFRESH_KEY),
+  generation: () => generation,
+  getAccess: () => accessToken,
   set: (tokens: AuthTokens) => {
-    localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-    localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+    generation += 1;
+    accessToken = tokens.accessToken;
   },
   clear: () => {
+    generation += 1;
+    accessToken = null;
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
   },

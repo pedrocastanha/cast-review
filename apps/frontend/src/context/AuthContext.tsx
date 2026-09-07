@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { authApi } from '../api/auth.api';
-import { ApiError } from '../api/http';
+import { ApiError, refreshTokens } from '../api/http';
 import { decodeAccessTokenSub, tokenStore } from '../api/token-store';
 import { usersApi } from '../api/users.api';
 import type { LoginPayload, RegisterPayload, User } from '../types';
@@ -27,7 +27,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function loadUserFromToken(): Promise<User | null> {
-  const accessToken = tokenStore.getAccess();
+  const accessToken = tokenStore.getAccess() ?? (await refreshTokens())?.accessToken;
   if (!accessToken) return null;
 
   const userId = decodeAccessTokenSub(accessToken);
@@ -81,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback((payload: RegisterPayload) => authApi.register(payload), []);
 
   const logout = useCallback(() => {
+    void authApi.logout().catch(() => undefined);
     tokenStore.clear();
     setUser(null);
     setStatus('unauthenticated');
