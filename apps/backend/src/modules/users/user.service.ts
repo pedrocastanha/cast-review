@@ -6,7 +6,16 @@ import {
 } from '@nestjs/common';
 import { Octokit } from '@octokit/rest';
 import * as bcrypt from 'bcrypt';
-import { SecretDecryptionError } from 'src/shared/crypto/secret-crypto';
+import {
+  decryptBoundSecret,
+  encryptBoundSecret,
+  isBoundToOwner,
+  SecretDecryptionError,
+} from 'src/shared/crypto/secret-crypto';
+import {
+  currentRequestCredentials,
+  isEphemeralMode,
+} from 'src/shared/security/request-credentials';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import { BaseService } from 'src/shared/services/base.service';
 import { CreateUserDto } from './dtos/create-user.dto';
@@ -15,13 +24,17 @@ import { toUserResponse, UserResponseDto } from './dtos/user-response.dto';
 import { GithubCredentials } from './types/github-credentials.type';
 import { User } from './user.entity';
 import { UserRepository } from './user.repository';
+import { RefreshSessionRepository } from '../auth/refresh-session.repository';
 
 const REQUIRED_CLASSIC_SCOPES = ['repo', 'public_repo'];
+const GITHUB_TOKEN_FIELD = 'github_token';
+const OPENAI_KEY_FIELD = 'openai_key';
 
 @Injectable()
 export class UserService extends BaseService {
   constructor(
     private readonly userRepository: UserRepository,
+    private readonly refreshSessions: RefreshSessionRepository,
     logger: AppLogger,
   ) {
     super(logger);
@@ -43,6 +56,12 @@ export class UserService extends BaseService {
     const { githubToken, openaiKey, ...rest } = dto;
     const patch: Partial<User> = { ...rest };
 
+    if ((openaiKey !== undefined || githubToken !== undefined) && isEphemeralMode()) {
+      throw new BadRequestException(
+        'Esta instância não guarda credenciais. Use a sessão sem salvar nada.',
+      );
+    }
+
     if (openaiKey !== undefined) {
       const key = openaiKey.trim();
 
@@ -50,7 +69,10 @@ export class UserService extends BaseService {
         throw new BadRequestException('Chave da OpenAI é obrigatória');
       }
 
-      patch.openaiKey = key;
+      patch.openaiKey = encryptBoundSecret(key, {
+        ownerId: id,
+        field: OPENAI_KEY_FIELD,
+      });
       patch.openaiKeyLastFour = key.slice(-4);
     }
 
@@ -61,7 +83,10 @@ export class UserService extends BaseService {
         throw new BadRequestException('Token do Github é obrigatório');
       }
 
-      patch.githubToken = token;
+      patch.githubToken = encryptBoundSecret(token, {
+        ownerId: id,
+        field: GITHUB_TOKEN_FIELD,
+      });
       patch.githubTokenLastFour = token.slice(-4);
       patch.githubLogin = await this.validateGithubToken(token);
     }
@@ -76,6 +101,10 @@ export class UserService extends BaseService {
 
     if (!result.affected) {
       throw new NotFoundException('Usuário não encontrado');
+    }
+
+    if (rest.email !== undefined || rest.username !== undefined) {
+      await this.refreshSessions.revokeAllForUser(id, 'credentials_changed');
     }
 
     return this.getByIdOrFail(id);
@@ -98,27 +127,25 @@ export class UserService extends BaseService {
   }
 
   async getGithubCredentials(id: string): Promise<GithubCredentials> {
-    let user: User | null;
-
-    try {
-      user = await this.userRepository.findOne({
+    const supplied = currentRequestCredentials().githubToken;
+    if (supplied) {
+      const user = await this.userRepository.findOne({
         where: { id },
-        select: { id: true, githubToken: true, githubLogin: true },
+        select: { id: true, githubLogin: true },
       });
-    } catch (err) {
-      if (err instanceof SecretDecryptionError) {
-        this.logger.error('Falha ao decifrar o token do Github', {
-          exception: err,
-          userId: id,
-        });
-
-        throw new BadRequestException(
-          'Token do Github ilegível. Reconfigure o seu token.',
-        );
-      }
-
-      throw err;
+      return { token: supplied, login: user?.githubLogin ?? null };
     }
+
+    if (isEphemeralMode()) {
+      throw new BadRequestException(
+        'Informe o token do Github nesta sessão para continuar',
+      );
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { id },
+      select: { id: true, githubToken: true, githubLogin: true },
+    });
 
     if (!user?.githubToken?.trim()) {
       throw new BadRequestException(
@@ -126,7 +153,14 @@ export class UserService extends BaseService {
       );
     }
 
-    return { token: user.githubToken, login: user.githubLogin };
+    const token = await this.readBoundSecret(
+      id,
+      user.githubToken,
+      GITHUB_TOKEN_FIELD,
+      'Token do Github ilegível. Reconfigure o seu token.',
+    );
+
+    return { token, login: user.githubLogin };
   }
 
   async removeOpenaiKey(id: string): Promise<UserResponseDto> {
@@ -145,27 +179,19 @@ export class UserService extends BaseService {
   }
 
   async getOpenaiKey(id: string): Promise<string> {
-    let user: User | null;
+    const supplied = currentRequestCredentials().openaiKey;
+    if (supplied) return supplied;
 
-    try {
-      user = await this.userRepository.findOne({
-        where: { id },
-        select: { id: true, openaiKey: true },
-      });
-    } catch (err) {
-      if (err instanceof SecretDecryptionError) {
-        this.logger.error('Falha ao decifrar a chave da OpenAI', {
-          exception: err,
-          userId: id,
-        });
-
-        throw new BadRequestException(
-          'Chave da OpenAI ilegível. Reconfigure a chave em Configurações.',
-        );
-      }
-
-      throw err;
+    if (isEphemeralMode()) {
+      throw new BadRequestException(
+        'Informe a chave da OpenAI nesta sessão para continuar',
+      );
     }
+
+    const user = await this.userRepository.findOne({
+      where: { id },
+      select: { id: true, openaiKey: true },
+    });
 
     if (!user?.openaiKey?.trim()) {
       throw new BadRequestException(
@@ -173,7 +199,65 @@ export class UserService extends BaseService {
       );
     }
 
-    return user.openaiKey;
+    return this.readBoundSecret(
+      id,
+      user.openaiKey,
+      OPENAI_KEY_FIELD,
+      'Chave da OpenAI ilegível. Reconfigure a chave em Configurações.',
+    );
+  }
+
+  private async readBoundSecret(
+    id: string,
+    stored: string,
+    field: string,
+    failureMessage: string,
+  ): Promise<string> {
+    let plain: string;
+
+    try {
+      plain = decryptBoundSecret(stored, { ownerId: id, field });
+    } catch (err) {
+      if (err instanceof SecretDecryptionError) {
+        this.logger.error('Falha ao decifrar segredo do usuário', {
+          exception: err,
+          userId: id,
+          field,
+        });
+
+        throw new BadRequestException(failureMessage);
+      }
+
+      throw err;
+    }
+
+    if (!isBoundToOwner(stored)) {
+      await this.rebindSecret(id, stored, plain, field);
+    }
+
+    return plain;
+  }
+
+  private async rebindSecret(
+    id: string,
+    stored: string,
+    plain: string,
+    field: string,
+  ): Promise<void> {
+    try {
+      await this.userRepository
+        .createQueryBuilder()
+        .update(User)
+        .set({ [field === GITHUB_TOKEN_FIELD ? 'githubToken' : 'openaiKey']: encryptBoundSecret(plain, { ownerId: id, field }) })
+        .where('id = :id AND ' + field + ' = :stored', { id, stored })
+        .execute();
+    } catch (err) {
+      this.logger.error('Falha ao religar segredo ao dono', {
+        exception: err,
+        userId: id,
+        field,
+      });
+    }
   }
 
   async setGithubLogin(id: string, login: string): Promise<void> {
@@ -236,41 +320,6 @@ export class UserService extends BaseService {
         password: true,
       },
     });
-  }
-
-  async getByIdAndRefresh(id: string): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        username: true,
-        active: true,
-        currentRefreshToken: true,
-      },
-    });
-  }
-
-  async updateRefresh(
-    userId: string,
-    hashedRefreshToken: string | null,
-  ): Promise<void> {
-    await this.safeExecute(async () => {
-      await this.userRepository.update(userId, {
-        currentRefreshToken: hashedRefreshToken,
-      });
-    });
-  }
-
-  async consumeRefresh(userId: string, hash: string): Promise<boolean> {
-    const result = await this.userRepository
-      .createQueryBuilder()
-      .update(User)
-      .set({ currentRefreshToken: null })
-      .where('id = :userId AND current_refresh_token = :hash', { userId, hash })
-      .execute();
-    return result.affected === 1;
   }
 
   private async validateGithubToken(token: string): Promise<string> {
