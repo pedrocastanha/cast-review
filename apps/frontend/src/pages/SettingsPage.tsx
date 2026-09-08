@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError } from '../api/http';
+import { EphemeralCredentials } from '../components/settings/EphemeralCredentials';
 import { usersApi } from '../api/users.api';
 import { Button } from '../components/ui/Button';
 import { Card, PageHead } from '../components/ui/Card';
@@ -114,6 +115,10 @@ export function SettingsPage() {
         title="Configurações"
         description="Seus dados e a conexão usada para ler os repositórios."
       />
+
+      <div className="mb-5">
+        <EphemeralCredentials />
+      </div>
 
       <div className="grid items-start gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(21.25rem,100%),1fr))]">
         <Card className="p-6">

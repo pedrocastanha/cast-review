@@ -1,4 +1,5 @@
 import type { AuthTokens } from '../types';
+import { credentialStore } from './credential-store';
 
 const ACCESS_KEY = 'cast_review.accessToken';
 const REFRESH_KEY = 'cast_review.refreshToken';
@@ -17,6 +18,7 @@ export const tokenStore = {
   clear: () => {
     generation += 1;
     accessToken = null;
+    credentialStore.clear();
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
   },

@@ -1,4 +1,5 @@
 import type { ApiErrorBody, AuthTokens } from '../types';
+import { credentialHeaders } from './credential-store';
 import { tokenStore } from './token-store';
 
 export class ApiError extends Error {
@@ -66,7 +67,11 @@ export async function request<T>(
   const { method = 'GET', body, auth = true } = options;
 
   const buildHeaders = (accessToken: string | null): HeadersInit => {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Cast-CSRF': '1' };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Cast-CSRF': '1',
+      ...(auth ? credentialHeaders() : {}),
+    };
     if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
     return headers;
   };
@@ -105,6 +110,9 @@ export async function authorizedFetch(
 ): Promise<Response> {
   const buildHeaders = (accessToken: string | null): Headers => {
     const headers = new Headers(init.headers);
+    for (const [name, value] of Object.entries(credentialHeaders())) {
+      if (!headers.has(name)) headers.set(name, value);
+    }
     if (accessToken && !headers.has('Authorization')) {
       headers.set('Authorization', `Bearer ${accessToken}`);
     }
