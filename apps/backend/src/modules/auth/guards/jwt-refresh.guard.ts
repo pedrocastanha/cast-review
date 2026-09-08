@@ -7,9 +7,15 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { jwtConfig } from '../auth.config';
-import { AuthService } from '../auth.service';
+import { AuthService, type RefreshPayload } from '../auth.service';
 
-type JwtPayload = { sub: string };
+export function readRefreshCookie(request: Request): string | undefined {
+  return request.headers.cookie
+    ?.split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('cast_refresh='))
+    ?.slice('cast_refresh='.length);
+}
 
 @Injectable()
 export class JwtRefreshGuard implements CanActivate {
@@ -20,31 +26,27 @@ export class JwtRefreshGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const token = request.headers.cookie
-      ?.split(';')
-      .map((part) => part.trim())
-      .find((part) => part.startsWith('cast_refresh='))
-      ?.slice('cast_refresh='.length);
+    const token = readRefreshCookie(request);
 
     if (!token) {
       throw new UnauthorizedException('Refresh token ausente');
     }
 
-    let payload: JwtPayload;
+    let payload: RefreshPayload;
     try {
-      payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+      payload = await this.jwtService.verifyAsync<RefreshPayload>(token, {
         secret: jwtConfig.refresh.secret,
       });
     } catch {
       throw new UnauthorizedException('Refresh token inválido ou expirado');
     }
 
-    const user = await this.authService.validateRefreshToken(
-      payload.sub,
+    const { user, familyId } = await this.authService.consumeRefreshToken(
+      payload,
       token,
     );
 
-    Object.assign(request, { user });
+    Object.assign(request, { user, refreshFamilyId: familyId });
 
     return true;
   }
