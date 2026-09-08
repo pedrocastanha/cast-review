@@ -7,6 +7,7 @@ import {
 import type { Request, Response } from 'express';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
+import { openSseStream } from 'src/shared/security/sse-limits';
 import type {
   ChatEvent,
   ChatRunMention,
@@ -245,24 +246,17 @@ export class ChatService {
       apiKeys: { openai },
     };
 
-    const abortController = new AbortController();
-    res.on?.('close', () => {
-      if (!res.writableEnded) abortController.abort();
+    const stream = openSseStream({
+      req,
+      res,
+      userId: currentUser.id,
+      headers: { 'X-Chat-Message-Id': userMessage.id },
     });
-
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-      'X-Chat-Message-Id': userMessage.id,
-    });
-    res.flushHeaders();
 
     try {
       for await (const event of this.aiApiClient.runChat(
         payload,
-        abortController.signal,
+        stream.signal,
       )) {
         res.write(`data: ${JSON.stringify(event)}\n\n`);
         if (event.type === 'message_done') {

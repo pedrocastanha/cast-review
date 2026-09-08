@@ -333,6 +333,7 @@ describe('ChatService.sendMessage', () => {
     const res: any = {
       writeHead: jest.fn(),
       flushHeaders: jest.fn(),
+      on: jest.fn(),
       write: jest.fn((chunk: string) => written.push(chunk)),
       end: jest.fn(),
     };
@@ -681,6 +682,7 @@ describe('ChatService e a chave da OpenAI', () => {
     const res: any = {
       writeHead: jest.fn(),
       flushHeaders: jest.fn(),
+      on: jest.fn(),
       write: jest.fn(),
       end: jest.fn(),
     };
