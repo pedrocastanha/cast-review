@@ -1,5 +1,4 @@
 from contextlib import AsyncExitStack, asynccontextmanager
-import os
 
 from fastapi import FastAPI
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
@@ -9,7 +8,7 @@ from app.api.routes.architecture import router as architecture_router
 from app.api.routes.chat import router as chat_router
 from app.api.routes.index import router as index_router
 from app.code_graph.cache import build_neo4j_driver, build_redis_client
-from app.config.settings import REDIS_URL
+from app.config.settings import REDIS_URL, validate_production_config
 from app.graph.graph import build_graph
 from app.security import ServiceAuthentication
 from app.infrastructure.logging.setup import configure_logging, get_logger
@@ -20,8 +19,7 @@ log = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if os.environ.get('APP_ENV') == 'production' and len(os.environ.get('AI_SERVICE_TOKEN', '')) < 32:
-        raise RuntimeError('AI_SERVICE_TOKEN is required')
+    validate_production_config()
     async with AsyncExitStack() as stack:
         saver = await stack.enter_async_context(AsyncRedisSaver.from_conn_string(REDIS_URL))
         await saver.asetup()
