@@ -30,6 +30,7 @@ function fakeResponse(): { res: Response; writes: string[] } {
     writeHead: jest.fn(),
     flushHeaders: jest.fn(),
     json: jest.fn(),
+    on: jest.fn(),
   } as unknown as Response;
   return { res, writes };
 }
