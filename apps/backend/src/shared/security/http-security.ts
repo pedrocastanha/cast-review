@@ -36,8 +36,13 @@ export function httpSecurity(req: Request, res: Response, next: NextFunction) {
     'camera=(), microphone=(), geolocation=()',
   );
   res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   if (process.env.NODE_ENV === 'production')
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+    res.setHeader(
+      'Strict-Transport-Security',
+      'max-age=31536000; includeSubDomains; preload',
+    );
   if (
     /^\/auth\/(login|refresh|logout|register)\/?$/i.test(req.path) &&
     req.method === 'POST'
