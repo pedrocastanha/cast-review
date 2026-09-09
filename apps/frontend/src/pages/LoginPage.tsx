@@ -4,9 +4,10 @@ import { ApiError } from '../api/http';
 import { Button } from '../components/ui/Button';
 import { Field } from '../components/ui/Field';
 import { useAuth } from '../context/AuthContext';
+import { useInstanceInfo } from '../hooks/useInstanceInfo';
 
 export function LoginPage() {
-  const { login } = useAuth();
+  const { login, loginAsGuest } = useAuth();
   const navigate = useNavigate();
   const location = useLocation() as { state?: { registeredEmail?: string } };
 
@@ -14,6 +15,25 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const instance = useInstanceInfo();
+  const ephemeral = instance?.credentialsMode === 'ephemeral';
+  const demoAvailable = instance?.demoLogin === true;
+
+  const onGuest = async () => {
+    setError(null);
+    setGuestLoading(true);
+    try {
+      await loginAsGuest();
+      navigate('/projects', { replace: true });
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : 'Não foi possível abrir a sessão de teste.',
+      );
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -50,6 +70,21 @@ export function LoginPage() {
             <p className="font-mono text-[11px] tracking-[0.14em] text-machine-accent uppercase">Code review, com contexto</p>
             <p className="mt-4 max-w-xs font-display text-xl leading-tight font-bold">Menos ruído. Decisões de revisão mais claras.</p>
             <p className="mt-4 max-w-xs text-sm leading-6 text-machine-fg-2">Centralize pull requests, análises e evidências técnicas em um só lugar.</p>
+            {ephemeral && (
+              <div className="mt-8 max-w-xs border-t border-machine-fg-2/25 pt-6">
+                <p className="font-mono text-[11px] tracking-[0.14em] text-machine-accent uppercase">
+                  Instância de demonstração
+                </p>
+                <p className="mt-3 font-display text-base leading-snug font-bold">
+                  Teste aqui sem salvar nada.
+                </p>
+                <p className="mt-3 text-[13px] leading-6 text-machine-fg-2">
+                  Seu token do GitHub e sua chave da OpenAI ficam só na memória
+                  desta aba. Não vão para o banco, não vão para o localStorage, e
+                  somem no F5.
+                </p>
+              </div>
+            )}
           </div>
         </aside>
         <div className="w-full p-7 sm:p-10">
@@ -71,7 +106,6 @@ export function LoginPage() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            minLength={6}
             required
           />
 
@@ -85,6 +119,43 @@ export function LoginPage() {
             Entrar
           </Button>
           </form>
+
+          {demoAvailable && (
+            <div className="mt-6">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="h-px flex-1 bg-border" />
+                <span className="font-mono text-[10.5px] tracking-[0.12em] text-ink-faint uppercase">
+                  ou
+                </span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                loading={guestLoading}
+                onClick={onGuest}
+              >
+                Entrar como visitante
+              </Button>
+              <p className="mt-2.5 text-[13px] leading-6 text-ink-dim">
+                Sessão temporária, sem cadastro. A conta e tudo que você criar nela
+                são apagados quando a sessão expira.
+              </p>
+            </div>
+          )}
+
+          {ephemeral && (
+            <div className="mt-6 rounded-sm border border-border bg-surface-2 px-3.5 py-3">
+              <p className="text-[13px] leading-6 text-ink-dim">
+                <span className="font-semibold text-ink">
+                  Esta instância não guarda credenciais.
+                </span>{' '}
+                Depois de entrar, informe seu token e sua chave em Configurações:
+                eles valem só enquanto a aba estiver aberta.
+              </p>
+            </div>
+          )}
 
           <p className="mt-6 text-sm text-ink-dim">
             Ainda não tem conta?{' '}

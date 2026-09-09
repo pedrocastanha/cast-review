@@ -9,6 +9,8 @@ export interface User {
   githubTokenLastFour: string | null;
   openaiConnected: boolean;
   openaiKeyLastFour: string | null;
+  isGuest: boolean;
+  guestExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

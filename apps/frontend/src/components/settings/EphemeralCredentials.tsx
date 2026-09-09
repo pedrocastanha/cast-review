@@ -24,7 +24,11 @@ function ActiveBadge({ value }: { value: string | null }) {
   );
 }
 
-export function EphemeralCredentials() {
+export function EphemeralCredentials({
+  persistenceAvailable = true,
+}: {
+  persistenceAvailable?: boolean;
+}) {
   const credentials = useSessionCredentials();
   const [githubDraft, setGithubDraft] = useState('');
   const [openaiDraft, setOpenaiDraft] = useState('');
@@ -77,6 +81,9 @@ export function EphemeralCredentials() {
         <li>
           Em troca, o review automático da GitHub App não roda: ele acontece quando
           você não está na tela, e aí não existe sessão de onde tirar a credencial.
+          {persistenceAvailable
+            ? ' Se você precisa dele, salve a credencial nos cartões abaixo.'
+            : ' Esta instância não oferece essa opção.'}
         </li>
       </ul>
 
