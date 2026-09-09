@@ -1,0 +1,13 @@
+**/node_modules
+**/.venv
+**/.env
+**/.env.*
+**/dist
+**/__pycache__
+**/.pytest_cache
+.git
+.neo4j-plugins
+**/coverage
+**/*.pem
+**/*.key
+explanations

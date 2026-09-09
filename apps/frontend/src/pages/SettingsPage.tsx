@@ -1,14 +1,18 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError } from '../api/http';
+import { EphemeralCredentials } from '../components/settings/EphemeralCredentials';
 import { usersApi } from '../api/users.api';
 import { Button } from '../components/ui/Button';
 import { Card, PageHead } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
 import { StatusDot } from '../components/ui/List';
 import { useAuth } from '../context/AuthContext';
+import { useInstanceInfo } from '../hooks/useInstanceInfo';
 
 export function SettingsPage() {
   const { user, refreshUser } = useAuth();
+  const instance = useInstanceInfo();
+  const ephemeral = instance?.credentialsMode === 'ephemeral';
   const [name, setName] = useState(user?.name ?? '');
   const [username, setUsername] = useState(user?.username ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
@@ -115,6 +119,10 @@ export function SettingsPage() {
         description="Seus dados e a conexão usada para ler os repositórios."
       />
 
+      <div className="mb-5">
+        <EphemeralCredentials persistenceAvailable={!ephemeral} />
+      </div>
+
       <div className="grid items-start gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(21.25rem,100%),1fr))]">
         <Card className="p-6">
           <h2 className="font-display text-lg font-bold text-ink">Seu perfil</h2>
@@ -128,6 +136,7 @@ export function SettingsPage() {
           </form>
         </Card>
 
+        {!ephemeral && (
         <Card className="p-6">
           <h2 className="font-display text-lg font-bold text-ink">GitHub</h2>
           <p className="mt-1 mb-5 text-sm text-ink-dim">O token é usado para ler repositórios, pull requests e publicar comentários de revisão.</p>
@@ -153,7 +162,9 @@ export function SettingsPage() {
             <div className="flex flex-wrap gap-3"><Button type="submit" loading={savingToken}>{user.githubConnected ? 'Trocar token' : 'Conectar GitHub'}</Button>{user.githubConnected && <Button type="button" variant="danger" onClick={disconnect} loading={removingToken}>Desconectar</Button>}</div>
           </form>
         </Card>
+        )}
 
+        {!ephemeral && (
         <Card className="p-6">
           <h2 className="font-display text-lg font-bold text-ink">OpenAI</h2>
           <p className="mt-1 mb-5 text-sm text-ink-dim">A chave alimenta o chat, as revisões de pull request e o Benchmark Lab. Ela é guardada cifrada no banco e nunca volta para o navegador.</p>
@@ -179,6 +190,7 @@ export function SettingsPage() {
             <div className="flex flex-wrap gap-3"><Button type="submit" loading={savingOpenai}>{user.openaiConnected ? 'Trocar chave' : 'Salvar chave'}</Button>{user.openaiConnected && <Button type="button" variant="danger" onClick={disconnectOpenai} loading={removingOpenai}>Remover</Button>}</div>
           </form>
         </Card>
+        )}
       </div>
     </div>
   );

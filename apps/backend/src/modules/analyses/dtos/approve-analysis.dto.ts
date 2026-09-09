@@ -21,11 +21,17 @@ export class AnnotationDto {
 }
 
 @ValidatorConstraint({ name: 'annotationsRequiredOnReject', async: false })
-class AnnotationsRequiredOnRejectConstraint implements ValidatorConstraintInterface {
-  validate(annotations: AnnotationDto[] | undefined, args: ValidationArguments): boolean {
+class AnnotationsRequiredOnRejectConstraint
+  implements ValidatorConstraintInterface
+{
+  validate(
+    annotations: AnnotationDto[] | undefined,
+    args: ValidationArguments,
+  ): boolean {
     const dto = args.object as ApproveAnalysisDto;
     const requiresAnnotations =
-      (dto.stage === 'prd' || dto.stage === 'spec') && dto.decision === 'reject';
+      (dto.stage === 'prd' || dto.stage === 'spec') &&
+      dto.decision === 'reject';
 
     if (!requiresAnnotations) {
       return true;
@@ -51,7 +57,9 @@ export class ApproveAnalysisDto {
   @Validate(AnnotationsRequiredOnRejectConstraint)
   annotations?: AnnotationDto[];
 
-  @ValidateIf((o: ApproveAnalysisDto) => o.stage === 'prd' || o.stage === 'spec')
+  @ValidateIf(
+    (o: ApproveAnalysisDto) => o.stage === 'prd' || o.stage === 'spec',
+  )
   @IsDefined()
   @ValidateNested()
   @Type(() => ReviewModelsDto)

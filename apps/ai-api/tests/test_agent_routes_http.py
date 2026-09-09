@@ -45,7 +45,7 @@ def test_agent_run_http_happy_path_reaches_report_ready_with_unchanged_shape(
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
-    assert response.headers["cache-control"] == "no-cache"
+    assert response.headers["cache-control"] == "no-store"
     assert response.headers["connection"] == "keep-alive"
     assert response.headers["x-accel-buffering"] == "no"
 
@@ -108,7 +108,7 @@ def test_agent_resume_http_approve_continues_past_interrupt_to_spec_generated(
 
     assert second.status_code == 200
     assert second.headers["content-type"].startswith("text/event-stream")
-    assert second.headers["cache-control"] == "no-cache"
+    assert second.headers["cache-control"] == "no-store"
     assert second.headers["connection"] == "keep-alive"
     assert second.headers["x-accel-buffering"] == "no"
 

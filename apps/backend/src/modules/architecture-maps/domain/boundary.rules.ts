@@ -1,8 +1,8 @@
+import type { ArchitectureBoundary } from '../entities/architecture-boundary.entity';
 import type {
   BoundaryViolation,
   CapabilityDependency,
 } from './architecture-maps.types';
-import type { ArchitectureBoundary } from '../entities/architecture-boundary.entity';
 import { capabilityPairKey } from './capability-graph';
 
 export function detectBoundaryViolations(

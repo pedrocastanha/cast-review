@@ -43,9 +43,16 @@ describe('EnqueueIndexJobUseCase', () => {
     expect(queue.add).toHaveBeenCalledWith(
       'build',
       { owner: 'octocat', repo: 'hello-world', sha: 'sha1', userId: 'user-1' },
-      { jobId: 'octocat/hello-world@sha1', removeOnComplete: true, removeOnFail: true },
+      {
+        jobId: 'octocat/hello-world@sha1',
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
     );
-    expect(result).toEqual({ jobId: 'octocat/hello-world@sha1', status: 'queued' });
+    expect(result).toEqual({
+      jobId: 'octocat/hello-world@sha1',
+      status: 'queued',
+    });
   });
 
   it('uses the owner override instead of the session owner when provided', async () => {

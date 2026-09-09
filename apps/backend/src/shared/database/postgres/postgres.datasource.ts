@@ -11,6 +11,8 @@ import { BenchmarkCase } from 'src/modules/benchmarks/benchmark-case.entity';
 import { BenchmarkRun } from 'src/modules/benchmarks/benchmark-run.entity';
 import { ChatMessage } from 'src/modules/chat/chat-message.entity';
 import { ChatThread } from 'src/modules/chat/chat-thread.entity';
+import { FeatureCard } from 'src/modules/feature-cards/entities/feature-card.entity';
+import { FeatureCardRevision } from 'src/modules/feature-cards/entities/feature-card-revision.entity';
 import { FindingCase } from 'src/modules/finding-cases/finding-case.entity';
 import { FindingCaseEvent } from 'src/modules/finding-cases/finding-case-event.entity';
 import { FindingOccurrence } from 'src/modules/finding-cases/finding-occurrence.entity';
@@ -21,9 +23,28 @@ import { GithubWebhookDelivery } from 'src/modules/github-app/entities/github-we
 import { Project } from 'src/modules/projects/project.entity';
 import { ProjectRepositoryMember } from 'src/modules/projects/project-repository-member.entity';
 import { User } from 'src/modules/users/user.entity';
+import {
+  allowsPlaintextDependencies,
+  isProduction,
+} from 'src/shared/security/production-config';
 import { DataSource } from 'typeorm';
-import { FeatureCard } from 'src/modules/feature-cards/entities/feature-card.entity';
-import { FeatureCardRevision } from 'src/modules/feature-cards/entities/feature-card-revision.entity';
+
+function resolveSsl() {
+  if (process.env.DB_SSL === 'true') {
+    return {
+      rejectUnauthorized: true,
+      ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA } : {}),
+    };
+  }
+
+  if (isProduction() && !allowsPlaintextDependencies()) {
+    throw new Error(
+      'DB_SSL=true obrigatório em produção. Em self-host com Postgres em rede privada, defina ALLOW_INSECURE_DEPENDENCIES=true de forma explícita',
+    );
+  }
+
+  return false;
+}
 
 export default new DataSource({
   type: 'postgres',
@@ -58,6 +79,7 @@ export default new DataSource({
     ArchitectureBoundary,
   ],
   synchronize: false,
+  ssl: resolveSsl(),
   migrations: [`${__dirname}/migrations/**/*{.ts,.js}`],
   migrationsTableName: 'migrations',
   useUTC: true,

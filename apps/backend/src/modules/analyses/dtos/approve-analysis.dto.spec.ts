@@ -16,7 +16,9 @@ describe('ApproveAnalysisDto', () => {
     expect(errors.length).toBeGreaterThan(0);
     const annotationsError = errors.find((e) => e.property === 'annotations');
     expect(annotationsError).toBeDefined();
-    expect(annotationsError?.constraints).toHaveProperty('annotationsRequiredOnReject');
+    expect(annotationsError?.constraints).toHaveProperty(
+      'annotationsRequiredOnReject',
+    );
   });
 
   it('rejects prd+reject with annotations omitted entirely', async () => {
@@ -30,7 +32,9 @@ describe('ApproveAnalysisDto', () => {
     expect(errors.length).toBeGreaterThan(0);
     const annotationsError = errors.find((e) => e.property === 'annotations');
     expect(annotationsError).toBeDefined();
-    expect(annotationsError?.constraints).toHaveProperty('annotationsRequiredOnReject');
+    expect(annotationsError?.constraints).toHaveProperty(
+      'annotationsRequiredOnReject',
+    );
   });
 
   it('accepts prd+reject with at least one annotation and the required models', async () => {

@@ -1,11 +1,11 @@
 import type { Queue } from 'bullmq';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import { GithubSessionProvider } from '../shared/github-session.provider';
 import {
   buildIndexJobId,
   IndexJobData,
 } from '../../indexing/index-queue.constants';
 import { RepositoryIndexStatus } from '../../types/repository-index-status.type';
+import { GithubSessionProvider } from '../shared/github-session.provider';
 import { GetRepositoryIndexStatusDto } from './get-repository-index-status.dto';
 
 export class GetRepositoryIndexStatusUseCase {

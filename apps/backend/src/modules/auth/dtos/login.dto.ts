@@ -3,7 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  Length,
+  MaxLength,
 } from 'class-validator';
 
 export class LoginDto {
@@ -17,6 +17,6 @@ export class LoginDto {
 
   @IsNotEmpty()
   @IsString()
-  @Length(6, 20)
+  @MaxLength(72)
   password!: string;
 }

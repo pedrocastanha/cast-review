@@ -21,11 +21,13 @@ function fakeOctokit(
       getTree: jest.fn().mockResolvedValue({
         data: { tree: treeEntries, truncated },
       }),
-      getBlob: jest.fn().mockImplementation(({ file_sha }: { file_sha: string }) =>
-        Promise.resolve({
-          data: { content: blobBySha.get(file_sha), encoding: 'base64' },
-        }),
-      ),
+      getBlob: jest
+        .fn()
+        .mockImplementation(({ file_sha }: { file_sha: string }) =>
+          Promise.resolve({
+            data: { content: blobBySha.get(file_sha), encoding: 'base64' },
+          }),
+        ),
     },
   } as unknown as Octokit;
 }

@@ -85,7 +85,8 @@ export function buildCapabilityDependencies(
     if (
       !accumulator.components.some(
         (pair) =>
-          pair.fromComponentId === source.id && pair.toComponentId === target.id,
+          pair.fromComponentId === source.id &&
+          pair.toComponentId === target.id,
       )
     ) {
       accumulator.components.push({

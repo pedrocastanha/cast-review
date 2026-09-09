@@ -4,8 +4,12 @@ import type { Job } from 'bullmq';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import { UserService } from '../../users/user.service';
+import {
+  CODE_INDEX_QUEUE,
+  IndexJobData,
+  IndexJobResult,
+} from './index-queue.constants';
 import { fetchRepoTree } from './tree-fetcher.helper';
-import { CODE_INDEX_QUEUE, IndexJobData, IndexJobResult } from './index-queue.constants';
 
 const PROGRESS_STARTED = 5;
 const PROGRESS_TREE_FETCHED = 50;
@@ -33,7 +37,12 @@ export class IndexProcessor extends WorkerHost {
       const { token } = await this.userService.getGithubCredentials(userId);
       const octokit = new Octokit({ auth: token });
 
-      const { files, truncated } = await fetchRepoTree(octokit, owner, repo, sha);
+      const { files, truncated } = await fetchRepoTree(
+        octokit,
+        owner,
+        repo,
+        sha,
+      );
       if (truncated) {
         this.logger.warn('Árvore do repositório truncada pela API do Github', {
           owner,

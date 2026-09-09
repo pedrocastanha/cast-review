@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import type { AgentRunRequest } from 'src/shared/types';
-import type { UserService } from '../users/user.service';
 import { AnalysisRepository } from '../analyses/analysis.repository';
 import { AnalysisContextSnapshotRepository } from '../analyses/analysis-context-snapshot.repository';
 import {
@@ -16,6 +15,7 @@ import {
   emptyReview,
 } from '../analyses/helpers/apply-review-event';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
+import type { UserService } from '../users/user.service';
 import { BenchmarkCase } from './benchmark-case.entity';
 import { BenchmarkCaseRepository } from './benchmark-case.repository';
 import type { BenchmarkModelResult } from './benchmark-run.entity';
@@ -149,9 +149,7 @@ export class BenchmarksService {
 
     const results: BenchmarkModelResult[] = [];
     for (const model of models) {
-      results.push(
-        await this.runModel(benchmarkCase, model, openaiKey),
-      );
+      results.push(await this.runModel(benchmarkCase, model, openaiKey));
     }
 
     const failed = results.filter((result) => result.status === 'error');

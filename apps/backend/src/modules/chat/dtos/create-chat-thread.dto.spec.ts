@@ -35,7 +35,10 @@ describe('CreateChatThreadDto', () => {
   });
 
   it('aceita escopo de projeto com UUID', async () => {
-    const scope = { mode: 'project', projectId: 'cfc2b7a8-6b94-46f9-a7c1-55136f34df73' };
+    const scope = {
+      mode: 'project',
+      projectId: 'cfc2b7a8-6b94-46f9-a7c1-55136f34df73',
+    };
     expect((await pipe.transform({ scope }, metadata)).scope).toEqual(scope);
   });
 

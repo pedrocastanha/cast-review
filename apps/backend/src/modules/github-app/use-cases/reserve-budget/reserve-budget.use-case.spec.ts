@@ -1,5 +1,5 @@
-import type { GithubAppRepository } from '../../entities/github-app-repository.entity';
 import { defaultRepositoryConfig } from '../../domain/github-app.types';
+import type { GithubAppRepository } from '../../entities/github-app-repository.entity';
 import {
   DEFAULT_RUN_RESERVATION_USD,
   ReserveBudgetUseCase,
@@ -33,7 +33,10 @@ function build(existingRuns: Array<Record<string, unknown>> = []) {
   };
   const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
   return {
-    service: new ReserveBudgetUseCase(reviewRunRepository as any, logger as any),
+    service: new ReserveBudgetUseCase(
+      reviewRunRepository as any,
+      logger as any,
+    ),
     update,
     managerUpdate,
     reviewRunRepository,

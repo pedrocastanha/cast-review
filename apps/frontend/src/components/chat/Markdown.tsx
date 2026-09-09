@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
+import { safeUrl } from '../../lib/safe-url';
 
 const FENCE = /```(\w+)?\n([\s\S]*?)```/g;
 const INLINE =
@@ -55,9 +56,9 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
         return (
           <a
             key={key}
-            href={link[2]}
+            href={safeUrl(link[2])}
             target="_blank"
-            rel="noreferrer"
+            rel="noreferrer noopener"
             className="text-accent underline underline-offset-2 hover:text-accent-hover"
           >
             {link[1]}

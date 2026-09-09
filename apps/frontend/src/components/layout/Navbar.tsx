@@ -118,6 +118,11 @@ export function Navbar() {
       </nav>
 
       <div className="mt-auto hidden border-t border-machine-line px-5 py-4 lg:block">
+        {user?.isGuest && (
+          <p className="mb-3 rounded-sm border border-machine-accent/40 px-2.5 py-2 font-mono text-[10.5px] leading-5 tracking-[0.06em] text-machine-accent uppercase">
+            Sessão de teste · tudo é apagado ao expirar
+          </p>
+        )}
         {user && (
           <div className="mb-2 flex items-center gap-2.5">
             <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-machine-3 to-machine text-xs font-bold text-machine-fg">

@@ -23,9 +23,11 @@ describe('ListPullFilesUseCase', () => {
   it('maps paginated pull files to the filename/status/patch shape', async () => {
     const octokit = {
       pulls: { listFiles: jest.fn() },
-      paginate: jest.fn().mockResolvedValue([
-        { filename: 'src/a.ts', status: 'modified', patch: '@@ -1 +1 @@' },
-      ]),
+      paginate: jest
+        .fn()
+        .mockResolvedValue([
+          { filename: 'src/a.ts', status: 'modified', patch: '@@ -1 +1 @@' },
+        ]),
     };
     const useCase = new ListPullFilesUseCase(fakeGithubSession(octokit));
 

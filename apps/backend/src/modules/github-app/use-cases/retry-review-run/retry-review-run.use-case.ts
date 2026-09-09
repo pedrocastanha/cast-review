@@ -12,7 +12,9 @@ export class RetryReviewRunUseCase {
   ) {}
 
   async execute(runId: string, currentUser: CurrentUserData) {
-    const run = await this.reviewRunRepository.findOne({ where: { id: runId } });
+    const run = await this.reviewRunRepository.findOne({
+      where: { id: runId },
+    });
     if (!run) throw new NotFoundException('Execução não encontrada');
 
     const { repository, installation } = await this.ownership.repository(

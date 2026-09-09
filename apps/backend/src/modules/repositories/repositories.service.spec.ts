@@ -38,7 +38,9 @@ function fakeQueue(job: any = null) {
   } as any;
 }
 
-function fakeAiApiClient(status = { indexed: false, sha: null as string | null }) {
+function fakeAiApiClient(
+  status = { indexed: false, sha: null as string | null },
+) {
   return {
     getIndexStatus: jest.fn().mockResolvedValue(status),
     listIndexRepositories: jest.fn().mockResolvedValue({
@@ -91,9 +93,16 @@ describe('RepositoriesService.enqueueIndexJob', () => {
     expect(queue.add).toHaveBeenCalledWith(
       'build',
       { owner: 'octocat', repo: 'hello-world', sha: 'sha1', userId: 'user-1' },
-      { jobId: 'octocat/hello-world@sha1', removeOnComplete: true, removeOnFail: true },
+      {
+        jobId: 'octocat/hello-world@sha1',
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
     );
-    expect(result).toEqual({ jobId: 'octocat/hello-world@sha1', status: 'queued' });
+    expect(result).toEqual({
+      jobId: 'octocat/hello-world@sha1',
+      status: 'queued',
+    });
   });
 
   it('uses the owner query override instead of the session owner when provided', async () => {
@@ -158,7 +167,11 @@ describe('RepositoriesService.getRepositoryIndexStatus', () => {
       currentUser,
     );
 
-    expect(result).toEqual({ status: 'indexed', sha: 'head-sha', stale: false });
+    expect(result).toEqual({
+      status: 'indexed',
+      sha: 'head-sha',
+      stale: false,
+    });
   });
 
   it('returns indexed + stale=true when the indexed sha is behind HEAD', async () => {
@@ -179,7 +192,10 @@ describe('RepositoriesService.getRepositoryIndexStatus', () => {
   });
 
   it('returns indexing (not ai-api status) when a job is currently active', async () => {
-    const job = { getState: jest.fn().mockResolvedValue('active'), progress: 50 };
+    const job = {
+      getState: jest.fn().mockResolvedValue('active'),
+      progress: 50,
+    };
     const aiApiClient = fakeAiApiClient();
     const service = new RepositoriesService(
       fakeUserService(),
@@ -203,7 +219,10 @@ describe('RepositoriesService.getRepositoryIndexStatus', () => {
   });
 
   it('returns queued when a job exists but is not yet active', async () => {
-    const job = { getState: jest.fn().mockResolvedValue('waiting'), progress: 0 };
+    const job = {
+      getState: jest.fn().mockResolvedValue('waiting'),
+      progress: 0,
+    };
     const service = new RepositoriesService(
       fakeUserService(),
       fakeQueue(job),
@@ -222,12 +241,16 @@ describe('RepositoriesService.getRepositoryIndexStatus', () => {
 
 describe('RepositoriesService.getRepositoryGraph', () => {
   beforeEach(() => {
-    octokitInstance.repos.get.mockResolvedValue({ data: { default_branch: 'main' } });
+    octokitInstance.repos.get.mockResolvedValue({
+      data: { default_branch: 'main' },
+    });
   });
 
   it('uses the provided sha directly, without calling getIndexStatus', async () => {
     const aiApiClient = fakeAiApiClient();
-    aiApiClient.getGraph = jest.fn().mockResolvedValue({ nodes: [], edges: [], stats: { indexed: true } });
+    aiApiClient.getGraph = jest
+      .fn()
+      .mockResolvedValue({ nodes: [], edges: [], stats: { indexed: true } });
     const service = new RepositoriesService(
       fakeUserService(),
       fakeQueue(null),
@@ -235,15 +258,29 @@ describe('RepositoriesService.getRepositoryGraph', () => {
       fakeLogger(),
     );
 
-    await service.getRepositoryGraph('hello-world', currentUser, undefined, 'sha1', 'focus-id', 2);
+    await service.getRepositoryGraph(
+      'hello-world',
+      currentUser,
+      undefined,
+      'sha1',
+      'focus-id',
+      2,
+    );
 
     expect(aiApiClient.getIndexStatus).not.toHaveBeenCalled();
-    expect(aiApiClient.getGraph).toHaveBeenCalledWith('octocat/hello-world', 'sha1', 'focus-id', 2);
+    expect(aiApiClient.getGraph).toHaveBeenCalledWith(
+      'octocat/hello-world',
+      'sha1',
+      'focus-id',
+      2,
+    );
   });
 
   it('falls back to the latest indexed sha when none is provided', async () => {
     const aiApiClient = fakeAiApiClient({ indexed: true, sha: 'latest-sha' });
-    aiApiClient.getGraph = jest.fn().mockResolvedValue({ nodes: [], edges: [], stats: { indexed: true } });
+    aiApiClient.getGraph = jest
+      .fn()
+      .mockResolvedValue({ nodes: [], edges: [], stats: { indexed: true } });
     const service = new RepositoriesService(
       fakeUserService(),
       fakeQueue(null),
@@ -253,8 +290,15 @@ describe('RepositoriesService.getRepositoryGraph', () => {
 
     await service.getRepositoryGraph('hello-world', currentUser);
 
-    expect(aiApiClient.getIndexStatus).toHaveBeenCalledWith('octocat/hello-world');
-    expect(aiApiClient.getGraph).toHaveBeenCalledWith('octocat/hello-world', 'latest-sha', undefined, undefined);
+    expect(aiApiClient.getIndexStatus).toHaveBeenCalledWith(
+      'octocat/hello-world',
+    );
+    expect(aiApiClient.getGraph).toHaveBeenCalledWith(
+      'octocat/hello-world',
+      'latest-sha',
+      undefined,
+      undefined,
+    );
   });
 
   it('returns an empty not-indexed graph without calling getGraph when repo was never indexed', async () => {
@@ -488,11 +532,7 @@ describe('RepositoriesService pull/file delegation', () => {
   it('deletePullReviewComment delegates to the review comment deletion call', async () => {
     octokitInstance.pulls.deleteReviewComment.mockResolvedValue(undefined);
 
-    await makeService().deletePullReviewComment(
-      'hello-world',
-      42,
-      currentUser,
-    );
+    await makeService().deletePullReviewComment('hello-world', 42, currentUser);
 
     expect(octokitInstance.pulls.deleteReviewComment).toHaveBeenCalledWith({
       owner: 'octocat',

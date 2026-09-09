@@ -1,6 +1,5 @@
 import type { GithubAppRepository } from '../entities/github-app-repository.entity';
 import type { GithubInstallation } from '../entities/github-installation.entity';
-import { defaultRepositoryConfig } from './github-app.types';
 import {
   evaluateInstallation,
   evaluatePullEvent,
@@ -8,6 +7,7 @@ import {
   isEligibleAction,
   matchesBranch,
 } from './eligibility.rules';
+import { defaultRepositoryConfig } from './github-app.types';
 
 function installation(
   overrides: Partial<GithubInstallation> = {},

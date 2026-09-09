@@ -13,7 +13,9 @@ function fakeGithubSession(owner = 'octocat') {
   } as any;
 }
 
-function fakeAiApiClient(status = { indexed: false, sha: null as string | null }) {
+function fakeAiApiClient(
+  status = { indexed: false, sha: null as string | null },
+) {
   return {
     getIndexStatus: jest.fn().mockResolvedValue(status),
     getGraph: jest.fn(),

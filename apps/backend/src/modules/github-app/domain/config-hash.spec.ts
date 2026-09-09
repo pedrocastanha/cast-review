@@ -1,5 +1,5 @@
-import { defaultRepositoryConfig } from './github-app.types';
 import { budgetMonthFor, hashRepositoryConfig } from './config-hash';
+import { defaultRepositoryConfig } from './github-app.types';
 
 describe('hashRepositoryConfig', () => {
   it('is stable for the same configuration', () => {

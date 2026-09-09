@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { GithubInstallation } from '../../entities/github-installation.entity';
 import { defaultRepositoryConfig } from '../../domain/github-app.types';
+import type { GithubInstallation } from '../../entities/github-installation.entity';
 import type { InstallationTokenService } from '../../infrastructure/github/installation-token.service';
 import type { GithubAppRepositoryRepository } from '../../infrastructure/persistence/github-app-repository.repository';
 

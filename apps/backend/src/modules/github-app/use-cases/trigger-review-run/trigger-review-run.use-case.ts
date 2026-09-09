@@ -1,12 +1,12 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import type { CurrentUserData } from '../../../auth/utils/current-user-decorator';
-import type { TriggerReviewDto } from '../../dtos/trigger-review.dto';
 import { resolveGithubAppConfig } from '../../config/github-app.config';
 import {
   evaluateInstallation,
   evaluateRepository,
 } from '../../domain/eligibility.rules';
+import type { TriggerReviewDto } from '../../dtos/trigger-review.dto';
 import { InstallationGithubGateway } from '../../infrastructure/github/installation-github.gateway';
 import type { InstallationTokenService } from '../../infrastructure/github/installation-token.service';
 import type { EnqueueReviewRunUseCase } from '../enqueue-review-run/enqueue-review-run.use-case';

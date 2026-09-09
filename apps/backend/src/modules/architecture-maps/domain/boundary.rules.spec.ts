@@ -18,10 +18,7 @@ function component(
   } as ArchitectureComponent;
 }
 
-function dependency(
-  from: string,
-  to: string,
-): ArchitectureComponentDependency {
+function dependency(from: string, to: string): ArchitectureComponentDependency {
   return {
     fromComponentId: from,
     toComponentId: to,
@@ -38,7 +35,12 @@ function boundary(
   to: string,
   kind: ArchitectureBoundary['kind'],
 ): ArchitectureBoundary {
-  return { id, fromCapabilityId: from, toCapabilityId: to, kind } as ArchitectureBoundary;
+  return {
+    id,
+    fromCapabilityId: from,
+    toCapabilityId: to,
+    kind,
+  } as ArchitectureBoundary;
 }
 
 describe('detectBoundaryViolations', () => {

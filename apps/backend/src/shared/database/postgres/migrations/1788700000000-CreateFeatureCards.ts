@@ -13,15 +13,21 @@ export class CreateFeatureCards1788700000000 implements MigrationInterface {
       updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz, active boolean NOT NULL DEFAULT true,
       UNIQUE (source_message_id, task_key)
     )`);
-    await runner.query(`CREATE INDEX "IDX_feature_cards_board" ON feature_cards(project_id, active, id)`);
-    await runner.query(`CREATE INDEX "IDX_feature_cards_parent" ON feature_cards(parent_id)`);
+    await runner.query(
+      `CREATE INDEX "IDX_feature_cards_board" ON feature_cards(project_id, active, id)`,
+    );
+    await runner.query(
+      `CREATE INDEX "IDX_feature_cards_parent" ON feature_cards(parent_id)`,
+    );
     await runner.query(`CREATE TABLE feature_card_revisions (
       id uuid PRIMARY KEY, card_id uuid NOT NULL REFERENCES feature_cards(id) ON DELETE CASCADE,
       actor_id uuid NOT NULL REFERENCES users(id), version integer NOT NULL, snapshot jsonb NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
       deleted_at timestamptz, active boolean NOT NULL DEFAULT true
     )`);
-    await runner.query(`CREATE UNIQUE INDEX "IDX_feature_card_revisions_card" ON feature_card_revisions(card_id, version)`);
+    await runner.query(
+      `CREATE UNIQUE INDEX "IDX_feature_card_revisions_card" ON feature_card_revisions(card_id, version)`,
+    );
   }
 
   async down(runner: QueryRunner): Promise<void> {

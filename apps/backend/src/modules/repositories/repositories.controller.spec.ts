@@ -17,7 +17,9 @@ function fakeRepositoriesService() {
     listRepos: jest.fn().mockResolvedValue(['repo']),
     listPulls: jest.fn().mockResolvedValue(['pull']),
     getPullByNumber: jest.fn().mockResolvedValue({ id: 1 }),
-    enqueueIndexJob: jest.fn().mockResolvedValue({ jobId: 'job-1', status: 'queued' }),
+    enqueueIndexJob: jest
+      .fn()
+      .mockResolvedValue({ jobId: 'job-1', status: 'queued' }),
     getRepositoryIndexStatus: jest
       .fn()
       .mockResolvedValue({ status: 'not_indexed', sha: null, stale: false }),

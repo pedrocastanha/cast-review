@@ -84,20 +84,12 @@ export class GithubAppController {
 
   @Post('installations/:id/pause')
   pause(@Param('id') id: string, @CurrentUser() currentUser: CurrentUserData) {
-    return this.githubAppService.setInstallationPaused(
-      id,
-      currentUser,
-      true,
-    );
+    return this.githubAppService.setInstallationPaused(id, currentUser, true);
   }
 
   @Post('installations/:id/resume')
   resume(@Param('id') id: string, @CurrentUser() currentUser: CurrentUserData) {
-    return this.githubAppService.setInstallationPaused(
-      id,
-      currentUser,
-      false,
-    );
+    return this.githubAppService.setInstallationPaused(id, currentUser, false);
   }
 
   @Delete('installations/:id')

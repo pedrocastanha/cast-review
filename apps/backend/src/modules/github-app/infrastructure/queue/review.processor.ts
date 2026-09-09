@@ -3,20 +3,13 @@ import type { Job } from 'bullmq';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import type { FrozenImpactScope } from 'src/shared/types';
 import { AnalysesService } from '../../../analyses/analyses.service';
-import type { AnalysisReview, PublishPolicy } from '../../../analyses/analyses.types';
+import type {
+  AnalysisReview,
+  PublishPolicy,
+} from '../../../analyses/analyses.types';
 import { ProjectsService } from '../../../projects/projects.service';
 import { UserService } from '../../../users/user.service';
-import { CheckRunService } from '../github/check-run.service';
-import { GithubAppService } from '../../github-app.service';
-import type { GithubAppRepository } from '../../entities/github-app-repository.entity';
-import type { GithubInstallation } from '../../entities/github-installation.entity';
-import type { GithubReviewRun } from '../../entities/github-review-run.entity';
 import { resolveGithubAppConfig } from '../../config/github-app.config';
-import type { GithubReviewSkipReason } from '../../domain/github-app.types';
-import {
-  GITHUB_REVIEW_QUEUE,
-  type GithubReviewJobData,
-} from './github-review-queue.constants';
 import {
   buildCompletedOutput,
   buildFailedOutput,
@@ -28,11 +21,21 @@ import {
   evaluateInstallation,
   evaluateRepository,
 } from '../../domain/eligibility.rules';
+import type { GithubReviewSkipReason } from '../../domain/github-app.types';
+import type { GithubAppRepository } from '../../entities/github-app-repository.entity';
+import type { GithubInstallation } from '../../entities/github-installation.entity';
+import type { GithubReviewRun } from '../../entities/github-review-run.entity';
+import { GithubAppService } from '../../github-app.service';
+import { CheckRunService } from '../github/check-run.service';
 import { InstallationGithubGateway } from '../github/installation-github.gateway';
 import { InstallationTokenService } from '../github/installation-token.service';
 import { GithubAppRepositoryRepository } from '../persistence/github-app-repository.repository';
 import { GithubInstallationRepository } from '../persistence/github-installation.repository';
 import { GithubReviewRunRepository } from '../persistence/github-review-run.repository';
+import {
+  GITHUB_REVIEW_QUEUE,
+  type GithubReviewJobData,
+} from './github-review-queue.constants';
 
 const TERMINAL_STATUS = [
   'completed',
@@ -193,7 +196,10 @@ export class ReviewProcessor extends WorkerHost {
       await this.reviewRunRepository.update(run.id, {
         analysisId: analysis.id,
       });
-      await this.githubAppService.settleBudget(run.id, review.usage?.costUsd ?? null);
+      await this.githubAppService.settleBudget(
+        run.id,
+        review.usage?.costUsd ?? null,
+      );
 
       const current = await this.reviewRunRepository.findOne({
         where: { id: run.id },

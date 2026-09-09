@@ -1,7 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AnalysesModule } from './modules/analyses/analyses.module';
@@ -19,18 +19,24 @@ import { PostgresModule } from './shared/database/postgres/postgres.module';
 import { LoggerModule } from './shared/logger/logger.module';
 import { LoggingInterceptor } from './shared/logger/logging.interceptor';
 import { resolveRedisConnection } from './shared/queue/redis-connection';
+import { RedisThrottler } from './shared/security/redis-throttler';
 
 @Module({
   imports: [
     LoggerModule,
     PostgresModule,
     BullModule.forRoot({ connection: resolveRedisConnection() }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60_000,
-        limit: 100, // default global; auth aperta com @Throttle próprio
-      },
-    ]),
+    ThrottlerModule.forRoot({
+      ...(process.env.NODE_ENV === 'production'
+        ? { storage: new RedisThrottler() }
+        : {}),
+      throttlers: [
+        {
+          ttl: 60_000,
+          limit: 100, // default global; auth aperta com @Throttle próprio
+        },
+      ],
+    }),
     AuthModule,
     UsersModule,
     RepositoriesModule,
@@ -45,6 +51,7 @@ import { resolveRedisConnection } from './shared/queue/redis-connection';
   controllers: [AppController],
   providers: [
     AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     {
       provide: APP_GUARD,
       useClass: JwtAccessGuard,

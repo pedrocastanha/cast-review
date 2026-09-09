@@ -9,15 +9,15 @@ import type { LinkInstallationDto } from './dtos/link-installation.dto';
 import type { TriggerReviewDto } from './dtos/trigger-review.dto';
 import type { UpdateRepositoryConfigDto } from './dtos/update-repository-config.dto';
 import type { GithubAppRepository } from './entities/github-app-repository.entity';
-import {
-  GITHUB_REVIEW_QUEUE,
-  type GithubReviewJobData,
-} from './infrastructure/queue/github-review-queue.constants';
 import { InstallationTokenService } from './infrastructure/github/installation-token.service';
 import { GithubAppRepositoryRepository } from './infrastructure/persistence/github-app-repository.repository';
 import { GithubInstallationRepository } from './infrastructure/persistence/github-installation.repository';
 import { GithubReviewRunRepository } from './infrastructure/persistence/github-review-run.repository';
 import { GithubWebhookDeliveryRepository } from './infrastructure/persistence/github-webhook-delivery.repository';
+import {
+  GITHUB_REVIEW_QUEUE,
+  type GithubReviewJobData,
+} from './infrastructure/queue/github-review-queue.constants';
 import { EnqueueReviewRunUseCase } from './use-cases/enqueue-review-run/enqueue-review-run.use-case';
 import { GetInstallationUseCase } from './use-cases/get-installation/get-installation.use-case';
 import {

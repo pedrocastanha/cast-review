@@ -1,6 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
 import { Public } from './modules/auth/utils/public.decorator';
+import { demoLoginEnabled } from './shared/security/demo-access';
+import { credentialsMode } from './shared/security/request-credentials';
 
 @Controller()
 export class AppController {
@@ -16,5 +18,11 @@ export class AppController {
   @Get('health')
   health() {
     return { status: 'ok', service: 'cast-review-api' };
+  }
+
+  @Public()
+  @Get('instance')
+  instance() {
+    return { credentialsMode: credentialsMode(), demoLogin: demoLoginEnabled() };
   }
 }

@@ -2,16 +2,16 @@ import { randomUUID } from 'node:crypto';
 import { BadRequestException } from '@nestjs/common';
 import { AppLogger } from 'src/shared/logger/logger.service';
 import type { CurrentUserData } from '../../../auth/utils/current-user-decorator';
-import type { LinkInstallationDto } from '../../dtos/link-installation.dto';
 import {
   isGithubAppConfigured,
   resolveGithubAppConfig,
 } from '../../config/github-app.config';
+import type { LinkInstallationDto } from '../../dtos/link-installation.dto';
+import type { InstallationTokenService } from '../../infrastructure/github/installation-token.service';
 import {
   createInstallState,
   verifyInstallState,
 } from '../../infrastructure/github/security/install-state';
-import type { InstallationTokenService } from '../../infrastructure/github/installation-token.service';
 import type { GithubInstallationRepository } from '../../infrastructure/persistence/github-installation.repository';
 import type { SyncRepositoriesUseCase } from '../sync-repositories/sync-repositories.use-case';
 
@@ -96,9 +96,12 @@ export class LinkInstallationUseCase {
     const { data } = await octokit.apps.getInstallation({
       installation_id: Number(installationId),
     });
-    const account = data.account as
-      | { login?: string; type?: string; id?: number; slug?: string }
-      | null;
+    const account = data.account as {
+      login?: string;
+      type?: string;
+      id?: number;
+      slug?: string;
+    } | null;
     return {
       accountLogin: account?.login ?? account?.slug ?? '',
       accountType: account?.type ?? 'Organization',

@@ -30,7 +30,8 @@ export class AssignComponentUseCase {
         capabilityId: input.capabilityId,
         status: 'assigned' as const,
         confidence: 'confirmed' as const,
-        source: component.source === 'rule' ? ('manual' as const) : component.source,
+        source:
+          component.source === 'rule' ? ('manual' as const) : component.source,
       };
       await this.componentRepository.update(component.id, patch);
       return Object.assign(component, patch);

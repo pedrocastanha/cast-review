@@ -13,7 +13,9 @@ function build() {
       .fn()
       .mockResolvedValue({ id: 'inst-row', installationId: '42' }),
   };
-  const installationRepository = { update: jest.fn().mockResolvedValue(undefined) };
+  const installationRepository = {
+    update: jest.fn().mockResolvedValue(undefined),
+  };
   const execute = jest.fn();
   const appRepositoryRepository = {
     createQueryBuilder: jest.fn(() => ({
@@ -39,7 +41,8 @@ function build() {
 
 describe('UnlinkInstallationUseCase', () => {
   it('revokes the local link, disables every repository and drops the cached token', async () => {
-    const { useCase, installationRepository, tokenService, disableAll } = build();
+    const { useCase, installationRepository, tokenService, disableAll } =
+      build();
 
     await expect(useCase.execute('inst-row', USER)).resolves.toEqual({
       status: 'unlinked',

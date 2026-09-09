@@ -1,6 +1,6 @@
+import type { CapabilityCriticality } from '../../domain/architecture-maps.types';
 import type { ArchitectureCapability } from '../../entities/architecture-capability.entity';
 import type { ArchitectureComponent } from '../../entities/architecture-component.entity';
-import type { CapabilityCriticality } from '../../domain/architecture-maps.types';
 
 export interface CapabilityView {
   id: string;
@@ -37,7 +37,9 @@ export function toCapabilityViews(
       confirmedComponentCount: owned.filter(
         (component) => component.confidence === 'confirmed',
       ).length,
-      repositories: [...new Set(owned.map((component) => component.repoId))].sort(),
+      repositories: [
+        ...new Set(owned.map((component) => component.repoId)),
+      ].sort(),
       symbolCount: sum((component) => component.metrics?.symbolCount ?? 0),
       providedEndpoints: sum(
         (component) => component.metrics?.providedEndpoints ?? 0,

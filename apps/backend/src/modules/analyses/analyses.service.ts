@@ -9,6 +9,8 @@ import {
 import type { Request, Response } from 'express';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
 import { AppLogger } from 'src/shared/logger/logger.service';
+import type { SseStream } from 'src/shared/security/sse-limits';
+import { openSseStream } from 'src/shared/security/sse-limits';
 import { BaseService } from 'src/shared/services/base.service';
 import type {
   AgentEvent,
@@ -225,17 +227,22 @@ export class AnalysesService extends BaseService {
       pullNumber,
     });
 
-    const abortController = new AbortController();
-    req.on('close', () => abortController.abort());
-
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-      'X-Analysis-Id': analysis.id,
-    });
-    res.flushHeaders();
+    let stream: SseStream;
+    try {
+      stream = openSseStream({
+        req,
+        res,
+        userId: currentUser.id,
+        headers: { 'X-Analysis-Id': analysis.id },
+      });
+    } catch (err) {
+      await this.analysisRepository.update(analysis.id, {
+        status: 'error',
+        errorMessage: 'Limite de streams simultâneos atingido',
+        finishedAt: new Date(),
+      });
+      throw err;
+    }
 
     try {
       const payload = await buildAgentRunRequest(
@@ -258,7 +265,7 @@ export class AnalysesService extends BaseService {
 
       await this.streamLeg(
         analysis,
-        this.aiApiClient.runAgent(payload, abortController.signal),
+        this.aiApiClient.runAgent(payload, stream.signal),
         res,
       );
     } catch (err) {
@@ -305,17 +312,12 @@ export class AnalysesService extends BaseService {
       resumedCount: analysis.resumedCount + 1,
     });
 
-    const abortController = new AbortController();
-    req.on('close', () => abortController.abort());
-
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-      'X-Analysis-Id': analysis.id,
+    const stream = openSseStream({
+      req,
+      res,
+      userId: currentUser.id,
+      headers: { 'X-Analysis-Id': analysis.id },
     });
-    res.flushHeaders();
 
     const payload: AgentResumeRequest = {
       analysisId: analysis.id,
@@ -329,7 +331,7 @@ export class AnalysesService extends BaseService {
 
     await this.streamLeg(
       analysis,
-      this.aiApiClient.resumeAgent(payload, abortController.signal),
+      this.aiApiClient.resumeAgent(payload, stream.signal),
       res,
     );
   }
@@ -444,17 +446,12 @@ export class AnalysesService extends BaseService {
       analysis[iterationsField] = iterations;
     }
 
-    const abortController = new AbortController();
-    req.on('close', () => abortController.abort());
-
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-      'X-Analysis-Id': analysis.id,
+    const stream = openSseStream({
+      req,
+      res,
+      userId: analysis.requestedBy,
+      headers: { 'X-Analysis-Id': analysis.id },
     });
-    res.flushHeaders();
 
     try {
       const payload: AgentResumeRequest = {
@@ -478,7 +475,7 @@ export class AnalysesService extends BaseService {
 
       await this.streamLeg(
         analysis,
-        this.aiApiClient.resumeAgent(payload, abortController.signal),
+        this.aiApiClient.resumeAgent(payload, stream.signal),
         res,
       );
     } catch (err) {

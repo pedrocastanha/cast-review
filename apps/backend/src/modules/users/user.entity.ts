@@ -1,5 +1,4 @@
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { encryptedColumn } from 'src/shared/crypto/secret-crypto';
 import { DefaultEntity } from 'src/shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
 
@@ -42,7 +41,6 @@ export class User extends DefaultEntity<User> {
     type: 'varchar',
     nullable: true,
     select: false,
-    transformer: encryptedColumn,
   })
   @IsOptional()
   githubToken: string | null;
@@ -69,7 +67,6 @@ export class User extends DefaultEntity<User> {
     type: 'varchar',
     nullable: true,
     select: false,
-    transformer: encryptedColumn,
   })
   @IsOptional()
   openaiKey: string | null;
@@ -82,4 +79,12 @@ export class User extends DefaultEntity<User> {
   })
   @IsOptional()
   openaiKeyLastFour: string | null;
+
+  @Column({
+    name: 'demo_expires_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  @IsOptional()
+  demoExpiresAt: Date | null;
 }

@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { authApi } from '../api/auth.api';
-import { ApiError } from '../api/http';
+import { ApiError, refreshTokens } from '../api/http';
 import { decodeAccessTokenSub, tokenStore } from '../api/token-store';
 import { usersApi } from '../api/users.api';
 import type { LoginPayload, RegisterPayload, User } from '../types';
@@ -19,6 +19,7 @@ interface AuthContextValue {
   status: AuthStatus;
   user: User | null;
   login: (payload: LoginPayload) => Promise<void>;
+  loginAsGuest: () => Promise<void>;
   register: (payload: RegisterPayload) => Promise<User>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -27,7 +28,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function loadUserFromToken(): Promise<User | null> {
-  const accessToken = tokenStore.getAccess();
+  const accessToken = tokenStore.getAccess() ?? (await refreshTokens())?.accessToken;
   if (!accessToken) return null;
 
   const userId = decodeAccessTokenSub(accessToken);
@@ -78,9 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus(loadedUser ? 'authenticated' : 'unauthenticated');
   }, []);
 
+  const loginAsGuest = useCallback(async () => {
+    const tokens = await authApi.loginAsGuest();
+    tokenStore.set(tokens);
+    const loadedUser = await loadUserFromToken();
+    setUser(loadedUser);
+    setStatus(loadedUser ? 'authenticated' : 'unauthenticated');
+  }, []);
+
   const register = useCallback((payload: RegisterPayload) => authApi.register(payload), []);
 
   const logout = useCallback(() => {
+    void authApi.logout().catch(() => undefined);
     tokenStore.clear();
     setUser(null);
     setStatus('unauthenticated');
@@ -92,8 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, login, register, logout, refreshUser }),
-    [status, user, login, register, logout, refreshUser],
+    () => ({ status, user, login, loginAsGuest, register, logout, refreshUser }),
+    [status, user, login, loginAsGuest, register, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

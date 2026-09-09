@@ -1,20 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import { AppLogger } from 'src/shared/logger/logger.service';
-import type { GithubAppRepository } from '../../entities/github-app-repository.entity';
 import { resolveGithubAppConfig } from '../../config/github-app.config';
-import type { GithubReviewSkipReason } from '../../domain/github-app.types';
 import {
   evaluateInstallation,
   evaluatePullEvent,
   evaluateRepository,
   isEligibleAction,
 } from '../../domain/eligibility.rules';
+import type { GithubReviewSkipReason } from '../../domain/github-app.types';
 import {
   extractPullRequestFacts,
   redactPayload,
 } from '../../domain/webhook-payload';
-import { verifyWebhookSignature } from '../../infrastructure/github/security/webhook-signature';
+import type { GithubAppRepository } from '../../entities/github-app-repository.entity';
 import type { InstallationTokenService } from '../../infrastructure/github/installation-token.service';
+import { verifyWebhookSignature } from '../../infrastructure/github/security/webhook-signature';
 import type { GithubAppRepositoryRepository } from '../../infrastructure/persistence/github-app-repository.repository';
 import type { GithubInstallationRepository } from '../../infrastructure/persistence/github-installation.repository';
 import type { GithubWebhookDeliveryRepository } from '../../infrastructure/persistence/github-webhook-delivery.repository';
@@ -51,7 +51,11 @@ export class HandleWebhookUseCase {
     const config = resolveGithubAppConfig();
 
     if (
-      !verifyWebhookSignature(config.webhookSecret, input.rawBody, input.signature)
+      !verifyWebhookSignature(
+        config.webhookSecret,
+        input.rawBody,
+        input.signature,
+      )
     ) {
       this.logger.warn('Webhook do GitHub recusado por assinatura inválida', {
         deliveryId: input.deliveryId ?? null,

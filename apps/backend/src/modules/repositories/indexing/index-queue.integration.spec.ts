@@ -9,7 +9,11 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import type { Queue } from 'bullmq';
 import { resolveRedisConnection } from 'src/shared/queue/redis-connection';
-import { buildIndexJobId, CODE_INDEX_QUEUE, IndexJobData } from './index-queue.constants';
+import {
+  buildIndexJobId,
+  CODE_INDEX_QUEUE,
+  IndexJobData,
+} from './index-queue.constants';
 
 describe('code-index queue (real Redis)', () => {
   let module: TestingModule;
@@ -32,7 +36,11 @@ describe('code-index queue (real Redis)', () => {
   });
 
   it('deduplicates a second add() with the same jobId while the first still exists', async () => {
-    const jobId = buildIndexJobId('octocat', `dedupe-test-${Date.now()}`, 'sha1');
+    const jobId = buildIndexJobId(
+      'octocat',
+      `dedupe-test-${Date.now()}`,
+      'sha1',
+    );
     const data: IndexJobData = {
       owner: 'octocat',
       repo: 'dedupe-test',
@@ -63,7 +71,11 @@ describe('code-index queue (real Redis)', () => {
   });
 
   it('allows re-adding the same jobId after the previous job was removed', async () => {
-    const jobId = buildIndexJobId('octocat', `readd-test-${Date.now()}`, 'sha1');
+    const jobId = buildIndexJobId(
+      'octocat',
+      `readd-test-${Date.now()}`,
+      'sha1',
+    );
     const data: IndexJobData = {
       owner: 'octocat',
       repo: 'readd-test',

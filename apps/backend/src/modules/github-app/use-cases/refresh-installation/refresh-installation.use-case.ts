@@ -30,7 +30,8 @@ export class RefreshInstallationUseCase {
     const account = data.account as { login?: string; slug?: string } | null;
 
     await this.installationRepository.update(installation.id, {
-      accountLogin: account?.login ?? account?.slug ?? installation.accountLogin,
+      accountLogin:
+        account?.login ?? account?.slug ?? installation.accountLogin,
       repositorySelection: data.repository_selection ?? null,
       permissions: (data.permissions ?? {}) as Record<string, string>,
       events: data.events ?? [],
