@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Octokit } from '@octokit/rest';
 import * as bcrypt from 'bcrypt';
 import {
@@ -12,6 +13,7 @@ import {
   isBoundToOwner,
   SecretDecryptionError,
 } from 'src/shared/crypto/secret-crypto';
+import { demoSessionTtlMinutes } from 'src/shared/security/demo-access';
 import {
   currentRequestCredentials,
   isEphemeralMode,
@@ -56,10 +58,18 @@ export class UserService extends BaseService {
     const { githubToken, openaiKey, ...rest } = dto;
     const patch: Partial<User> = { ...rest };
 
-    if ((openaiKey !== undefined || githubToken !== undefined) && isEphemeralMode()) {
-      throw new BadRequestException(
-        'Esta instância não guarda credenciais. Use a sessão sem salvar nada.',
-      );
+    if (openaiKey !== undefined || githubToken !== undefined) {
+      if (isEphemeralMode()) {
+        throw new BadRequestException(
+          'Esta instância não guarda credenciais. Use a sessão sem salvar nada.',
+        );
+      }
+
+      if (await this.isGuest(id)) {
+        throw new BadRequestException(
+          'Contas de teste não guardam credenciais. Use a sessão sem salvar nada.',
+        );
+      }
     }
 
     if (openaiKey !== undefined) {
@@ -108,6 +118,53 @@ export class UserService extends BaseService {
     }
 
     return this.getByIdOrFail(id);
+  }
+
+  async isGuest(id: string): Promise<boolean> {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      select: { id: true, demoExpiresAt: true },
+    });
+
+    return Boolean(user?.demoExpiresAt);
+  }
+
+  async createGuestUser(): Promise<User> {
+    const id = randomUUID();
+    const expiresAt = new Date(demoSessionTtlMinutes() * 60 * 1000 + Date.now());
+    const user = this.userRepository.create({
+      id,
+      name: 'Visitante',
+      email: `guest-${id}@demo.invalid`,
+      username: null,
+      password: await bcrypt.hash(randomUUID() + randomUUID(), 12),
+      demoExpiresAt: expiresAt,
+    });
+
+    await this.userRepository.save(user);
+
+    return user;
+  }
+
+  async purgeExpiredGuests(limit = 50): Promise<number> {
+    const expired = (await this.userRepository.datasource.query(
+      `SELECT id FROM users WHERE demo_expires_at IS NOT NULL AND demo_expires_at < now() LIMIT $1`,
+      [limit],
+    )) as Array<{ id: string }>;
+
+    if (!expired.length) return 0;
+
+    const ids = expired.map((row) => row.id);
+    await this.userRepository.datasource.query(
+      `DELETE FROM analyses WHERE requested_by = ANY($1::uuid[])`,
+      [ids],
+    );
+    await this.userRepository.datasource.query(
+      `DELETE FROM users WHERE id = ANY($1::uuid[])`,
+      [ids],
+    );
+
+    return ids.length;
   }
 
   async removeGithubToken(id: string): Promise<UserResponseDto> {
@@ -282,6 +339,7 @@ export class UserService extends BaseService {
         githubLogin: true,
         githubTokenLastFour: true,
         openaiKeyLastFour: true,
+        demoExpiresAt: true,
         createdAt: true,
         updatedAt: true,
       },

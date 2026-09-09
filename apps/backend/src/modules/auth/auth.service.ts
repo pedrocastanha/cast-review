@@ -1,8 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AppLogger } from 'src/shared/logger/logger.service';
+import { demoLoginEnabled } from 'src/shared/security/demo-access';
 import { CreateUserDto } from '../users/dtos/create-user.dto';
 import { User } from '../users/user.entity';
 import { UserService } from '../users/user.service';
@@ -86,6 +91,20 @@ export class AuthService {
     const session = await this.issueSession(user, randomUUID());
 
     this.logger.log('Login bem-sucedido', { userId: user.id });
+
+    return session;
+  }
+
+  async loginAsGuest(): Promise<IssuedSession> {
+    if (!demoLoginEnabled()) {
+      throw new ForbiddenException('Acesso de teste indisponível');
+    }
+
+    const purged = await this.userService.purgeExpiredGuests();
+    const user = await this.userService.createGuestUser();
+    const session = await this.issueSession(user, randomUUID());
+
+    this.logger.log('Sessão de teste criada', { userId: user.id, purged });
 
     return session;
   }

@@ -79,4 +79,12 @@ export class User extends DefaultEntity<User> {
   })
   @IsOptional()
   openaiKeyLastFour: string | null;
+
+  @Column({
+    name: 'demo_expires_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  @IsOptional()
+  demoExpiresAt: Date | null;
 }

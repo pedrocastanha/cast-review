@@ -46,6 +46,14 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 3_600_000 } })
+  @Post('demo')
+  @HttpCode(HttpStatus.OK)
+  async demoLogin(@Res({ passthrough: true }) res: Response) {
+    return this.respond(res, await this.authService.loginAsGuest());
+  }
+
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
