@@ -154,6 +154,77 @@ describe('AuthService refresh token families', () => {
     });
   });
 
+  describe('guest login', () => {
+    const environment = { ...process.env };
+
+    afterEach(() => {
+      process.env = { ...environment };
+    });
+
+    it('is refused while the demo access is off', async () => {
+      delete process.env.DEMO_LOGIN;
+      const { service, userService } = buildService({
+        userService: {
+          createGuestUser: jest.fn(),
+          purgeExpiredGuests: jest.fn(),
+        },
+      });
+
+      await expect(service.loginAsGuest()).rejects.toThrow(
+        /Acesso de teste indispon/,
+      );
+      expect(userService.createGuestUser).not.toHaveBeenCalled();
+    });
+
+    it('issues a real session when the demo access is on', async () => {
+      process.env.DEMO_LOGIN = 'true';
+      const { service, refreshSessions } = buildService({
+        userService: {
+          createGuestUser: jest.fn(async () => activeUser({ id: 'guest-1' })),
+          purgeExpiredGuests: jest.fn(async () => 0),
+        },
+      });
+
+      const session = await service.loginAsGuest();
+
+      expect(session.accessToken).toBe('signed-token');
+      expect(refreshSessions.create).toHaveBeenCalledTimes(1);
+      expect(refreshSessions.create.mock.calls[0][0].userId).toBe('guest-1');
+    });
+
+    it('purges expired guests before creating a new one', async () => {
+      process.env.DEMO_LOGIN = 'true';
+      const purgeExpiredGuests = jest.fn(async () => 3);
+      const createGuestUser = jest.fn(async () => activeUser({ id: 'guest-2' }));
+      const { service } = buildService({
+        userService: { createGuestUser, purgeExpiredGuests },
+      });
+
+      await service.loginAsGuest();
+
+      expect(purgeExpiredGuests.mock.invocationCallOrder[0]).toBeLessThan(
+        createGuestUser.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('gives every guest its own session family', async () => {
+      process.env.DEMO_LOGIN = 'true';
+      const { service, refreshSessions } = buildService({
+        userService: {
+          createGuestUser: jest.fn(async () => activeUser({ id: 'guest-3' })),
+          purgeExpiredGuests: jest.fn(async () => 0),
+        },
+      });
+
+      await service.loginAsGuest();
+      await service.loginAsGuest();
+
+      const [first] = refreshSessions.create.mock.calls[0];
+      const [second] = refreshSessions.create.mock.calls[1];
+      expect(first.familyId).not.toBe(second.familyId);
+    });
+  });
+
   describe('consumeRefreshToken', () => {
     it('rotates a valid token and keeps the family', async () => {
       const { service, refreshSessions } = buildService();

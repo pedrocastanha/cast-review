@@ -34,7 +34,9 @@ describe('user response allowlist', () => {
         'githubConnected',
         'githubLogin',
         'githubTokenLastFour',
+        'guestExpiresAt',
         'id',
+        'isGuest',
         'name',
         'openaiConnected',
         'openaiKeyLastFour',
@@ -61,6 +63,27 @@ describe('user response allowlist', () => {
     expect(response.openaiKeyLastFour).toBe('0000');
     expect(response.githubConnected).toBe(true);
     expect(response.openaiConnected).toBe(true);
+  });
+
+  it('marks a throwaway account as a guest and shows when it dies', () => {
+    const expiry = new Date('2026-01-01T12:00:00Z');
+    const response = toUserResponse({
+      ...loadedUser(),
+      demoExpiresAt: expiry,
+    } as unknown as User);
+
+    expect(response.isGuest).toBe(true);
+    expect(response.guestExpiresAt).toBe(expiry);
+  });
+
+  it('does not mark a normal account as a guest', () => {
+    const response = toUserResponse({
+      ...loadedUser(),
+      demoExpiresAt: null,
+    } as unknown as User);
+
+    expect(response.isGuest).toBe(false);
+    expect(response.guestExpiresAt).toBeNull();
   });
 
   it('reports a disconnected account without inventing values', () => {
