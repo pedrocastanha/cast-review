@@ -44,7 +44,7 @@ export function httpSecurity(req: Request, res: Response, next: NextFunction) {
       'max-age=31536000; includeSubDomains; preload',
     );
   if (
-    /^\/auth\/(login|refresh|logout|register)\/?$/i.test(req.path) &&
+    /^\/auth\/(login|refresh|logout|register|demo)\/?$/i.test(req.path) &&
     req.method === 'POST'
   ) {
     if (
