@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import {
+  dbActorStorage,
+  setCurrentDbActor,
+} from '../../../../shared/database/postgres/db-actor';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import { resolveGithubAppConfig } from '../../config/github-app.config';
 import {
   evaluateInstallation,
@@ -48,6 +52,27 @@ export class HandleWebhookUseCase {
   ) {}
 
   async execute(input: WebhookInput): Promise<WebhookOutcome> {
+    // Webhook chega sem usuário autenticado. Abrimos o escopo como 'service',
+    // que só alcança as tabelas de entrega e a leitura de instalação — nunca
+    // dado de negócio de um usuário. Assim que a instalação é resolvida, o
+    // handler re-escopa para o dono dela (ver `adoptInstallationOwner`).
+    return dbActorStorage.run({ userId: null, actorType: 'service' }, () =>
+      this.handle(input),
+    );
+  }
+
+  /**
+   * Passa a agir em nome do dono da instalação.
+   *
+   * `ownerUserId` vem do banco, resolvido a partir do `installation_id` do
+   * payload — nunca de campo controlado por quem envia o webhook.
+   */
+  private adoptInstallationOwner(ownerUserId: string | null): void {
+    if (!ownerUserId) return;
+    setCurrentDbActor(ownerUserId, 'job');
+  }
+
+  private async handle(input: WebhookInput): Promise<WebhookOutcome> {
     const config = resolveGithubAppConfig();
 
     if (
@@ -148,6 +173,7 @@ export class HandleWebhookUseCase {
     if (!installation) {
       return { status: 'ignored', reason: 'instalação ainda não vinculada' };
     }
+    this.adoptInstallationOwner(installation.ownerUserId);
 
     if (action === 'deleted') {
       await this.installationRepository.update(installation.id, {
@@ -222,6 +248,7 @@ export class HandleWebhookUseCase {
     const installation = await this.installationRepository.findOne({
       where: { installationId: facts.installationId },
     });
+    this.adoptInstallationOwner(installation?.ownerUserId ?? null);
     const installationCheck = evaluateInstallation(installation);
     if (!installationCheck.eligible || !installation) {
       return {
@@ -302,13 +329,19 @@ export class HandleWebhookUseCase {
     if (!Number.isFinite(retentionDays) || retentionDays <= 0) return;
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
     try {
-      await this.deliveryRepository
-        .createQueryBuilder()
-        .update()
-        .set({ payload: null })
-        .where('received_at < :cutoff', { cutoff })
-        .andWhere('payload IS NOT NULL')
-        .execute();
+      // Retenção de webhook não tem dono humano: roda como 'service', que é o
+      // ator da policy de github_webhook_deliveries.
+      await this.deliveryRepository.withRlsTransaction(
+        (manager) =>
+          this.deliveryRepository
+            .createQueryBuilder(undefined, manager)
+            .update()
+            .set({ payload: null })
+            .where('received_at < :cutoff', { cutoff })
+            .andWhere('payload IS NOT NULL')
+            .execute(),
+        { actorType: 'service', userId: null },
+      );
     } catch (err) {
       this.logger.warn('Falha ao expirar payloads de webhook', {
         exception: err,

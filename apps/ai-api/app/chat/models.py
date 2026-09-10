@@ -45,6 +45,7 @@ class ChatHistoryMessage(BaseModel):
 
 
 class ChatRunRequest(BaseModel):
+    ownerId: str
     threadId: str
     mode: Literal["global", "repository", "project"]
     assistanceMode: Literal["general", "requirements"] = "general"

@@ -1,7 +1,7 @@
 import type {
   ArchitectureComponentDependency,
   ArchitectureDependencyEvidence,
-} from 'src/shared/types';
+} from '../../../shared/types';
 import type { ArchitectureComponent } from '../entities/architecture-component.entity';
 import type {
   CapabilityDependency,

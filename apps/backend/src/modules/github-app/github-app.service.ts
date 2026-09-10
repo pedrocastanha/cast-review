@@ -1,8 +1,8 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import type { Queue } from 'bullmq';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import { BaseService } from 'src/shared/services/base.service';
+import { AppLogger } from '../../shared/logger/logger.service';
+import { BaseService } from '../../shared/services/base.service';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { UserService } from '../users/user.service';
 import type { LinkInstallationDto } from './dtos/link-installation.dto';

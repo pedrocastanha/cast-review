@@ -2,7 +2,7 @@ import {
   decryptSecret,
   encryptSecret,
   isEncrypted,
-} from 'src/shared/crypto/secret-crypto';
+} from '../../../crypto/secret-crypto';
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 const UNIQUE_CONSTRAINT = 'UQ_75e3f8fedec94bab4c751ee9910';

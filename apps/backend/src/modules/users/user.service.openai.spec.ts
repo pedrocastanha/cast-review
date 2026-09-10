@@ -4,8 +4,8 @@ import {
   encryptBoundSecret,
   encryptSecret,
   isBoundToOwner,
-} from 'src/shared/crypto/secret-crypto';
-import { runWithRequestCredentials } from 'src/shared/security/request-credentials';
+} from '../../shared/crypto/secret-crypto';
+import { runWithRequestCredentials } from '../../shared/security/request-credentials';
 import { UserService } from './user.service';
 
 const OWNER = 'user-1';
@@ -21,6 +21,7 @@ function buildService(overrides: any = {}) {
       }),
     })),
     update: jest.fn(async () => ({ affected: 1 })),
+    withRlsTransaction: jest.fn(async (work: any) => work({})),
     createQueryBuilder: jest.fn(() => ({
       update: () => ({
         set: () => ({
@@ -206,6 +207,7 @@ describe('UserService.getOpenaiKey', () => {
     const { service } = buildService({
       userRepository: {
         findOne: jest.fn(async () => ({ id: OWNER, openaiKey: legacy })),
+        withRlsTransaction: jest.fn(async (work: any) => work({})),
         createQueryBuilder: jest.fn(() => ({
           update: () => ({ set: () => ({ where: () => ({ execute }) }) }),
         })),
@@ -221,6 +223,7 @@ describe('UserService.getOpenaiKey', () => {
     const { service, logger } = buildService({
       userRepository: {
         findOne: jest.fn(async () => ({ id: OWNER, openaiKey: legacy })),
+        withRlsTransaction: jest.fn(async (work: any) => work({})),
         createQueryBuilder: jest.fn(() => {
           throw new Error('banco indisponível');
         }),

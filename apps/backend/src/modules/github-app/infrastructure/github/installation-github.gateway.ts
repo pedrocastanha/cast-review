@@ -1,5 +1,5 @@
 import { Octokit } from '@octokit/rest';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import type { CurrentUserData } from '../../../auth/utils/current-user-decorator';
 import type { GithubPullFile } from '../../../repositories/types/github-pull.type';
 import type {

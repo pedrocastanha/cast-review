@@ -26,7 +26,7 @@ export class ArchiveFeatureUseCase {
     version: number,
     user: CurrentUserData,
   ) {
-    await this.repository.datasource.transaction(async (manager) => {
+    await this.repository.withRlsTransaction(async (manager) => {
       await this.ownership.lock(manager, projectId, user);
       const parent = await manager.findOne(FeatureCard, {
         where: { id, projectId, active: true },

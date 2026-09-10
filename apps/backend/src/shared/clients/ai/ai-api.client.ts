@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../logger/logger.service';
+import { INDEX_SCOPE_HEADER } from '../../security/index-scope-grant';
 import type {
   AgentEvent,
   AgentResumeRequest,
@@ -21,7 +22,7 @@ import type {
   ProjectGraphRequest,
   ProjectGraphResult,
   VizGraph,
-} from 'src/shared/types';
+} from '../../types';
 import { serviceFetch as fetch } from './service-fetch';
 
 const DEFAULT_AI_API_URL = 'http://localhost:8000';
@@ -135,9 +136,13 @@ export class AiApiClient {
     return (await response.json()) as IndexBuildResult;
   }
 
-  async getIndexStatus(repoId: string): Promise<IndexStatusResult> {
+  async getIndexStatus(
+    repoId: string,
+    ownerId: string,
+  ): Promise<IndexStatusResult> {
+    const params = new URLSearchParams({ repoId, ownerId });
     const response = await fetch(
-      `${resolveAiApiUrl()}/index/status?repoId=${encodeURIComponent(repoId)}`,
+      `${resolveAiApiUrl()}/index/status?${params.toString()}`,
     );
 
     if (!response.ok) {
@@ -155,17 +160,17 @@ export class AiApiClient {
   }
 
   async listIndexRepositories(
+    ownerId: string,
     query?: string,
     limit?: number,
     cursor?: string,
   ): Promise<IndexRepositoriesResult> {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ ownerId });
     if (query) params.set('query', query);
     if (limit !== undefined) params.set('limit', String(limit));
     if (cursor) params.set('cursor', cursor);
-    const suffix = params.size > 0 ? `?${params.toString()}` : '';
     const response = await fetch(
-      `${resolveAiApiUrl()}/index/repositories${suffix}`,
+      `${resolveAiApiUrl()}/index/repositories?${params.toString()}`,
     );
 
     if (!response.ok) {
@@ -181,10 +186,11 @@ export class AiApiClient {
   async getGraph(
     repoId: string,
     sha: string,
+    ownerId: string,
     focus?: string,
     depth?: number,
   ): Promise<VizGraph> {
-    const params = new URLSearchParams({ repoId, sha });
+    const params = new URLSearchParams({ repoId, sha, ownerId });
     if (focus) params.set('focus', focus);
     if (depth !== undefined) params.set('depth', String(depth));
 
@@ -233,10 +239,13 @@ export class AiApiClient {
     repoId: string,
     sha: string,
     path: string,
+    ownerId: string,
+    scopeGrant: string,
   ): Promise<IndexFileResult | null> {
-    const params = new URLSearchParams({ repoId, sha, path });
+    const params = new URLSearchParams({ repoId, sha, path, ownerId });
     const response = await fetch(
       `${resolveAiApiUrl()}/index/file?${params.toString()}`,
+      { headers: { [INDEX_SCOPE_HEADER]: scopeGrant } },
     );
 
     if (response.status === 404) return null;
@@ -259,15 +268,18 @@ export class AiApiClient {
   async listIndexFiles(
     repoId: string,
     sha: string,
+    ownerId: string,
+    scopeGrant: string,
     query?: string,
     limit?: number,
   ): Promise<IndexFilesResult> {
-    const params = new URLSearchParams({ repoId, sha });
+    const params = new URLSearchParams({ repoId, sha, ownerId });
     if (query) params.set('query', query);
     if (limit !== undefined) params.set('limit', String(limit));
 
     const response = await fetch(
       `${resolveAiApiUrl()}/index/files?${params.toString()}`,
+      { headers: { [INDEX_SCOPE_HEADER]: scopeGrant } },
     );
 
     if (response.status === 404) {
@@ -290,10 +302,11 @@ export class AiApiClient {
 
   async getArchitectureCandidates(
     repositories: ArchitectureRepositoryRef[],
+    ownerId: string,
   ): Promise<ArchitectureCandidatesResult> {
     return this.postJson<ArchitectureCandidatesResult>(
       '/architecture/candidates',
-      { repositories },
+      { ownerId, repositories },
       'buscar candidatos de componente',
     );
   }
@@ -301,10 +314,11 @@ export class AiApiClient {
   async getArchitectureDependencies(
     repositories: ArchitectureRepositoryRef[],
     components: ArchitectureComponentRef[],
+    ownerId: string,
   ): Promise<ArchitectureDependenciesResult> {
     return this.postJson<ArchitectureDependenciesResult>(
       '/architecture/dependencies',
-      { repositories, components },
+      { ownerId, repositories, components },
       'resolver dependências entre componentes',
     );
   }
@@ -313,10 +327,11 @@ export class AiApiClient {
     repositories: ArchitectureRepositoryRef[],
     components: ArchitectureComponentRef[],
     changedFiles: ArchitectureChangedFile[],
+    ownerId: string,
   ): Promise<ArchitectureImpactResult> {
     return this.postJson<ArchitectureImpactResult>(
       '/architecture/impact',
-      { repositories, components, changedFiles },
+      { ownerId, repositories, components, changedFiles },
       'resolver impacto arquitetural',
     );
   }

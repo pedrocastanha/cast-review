@@ -25,9 +25,22 @@ LOCK_TTL_SECONDS = 300
 EDGE_KINDS: tuple[EdgeKind, ...] = ("defines", "references", "imports", "tests")
 RELATIONSHIP_TYPE_BY_KIND = {kind: kind.upper() for kind in EDGE_KINDS}
 
+GRAPH_INDEXES = (
+    "CREATE INDEX symbol_scope IF NOT EXISTS FOR (n:Symbol) ON (n.ownerId, n.repoId, n.sha)",
+    "CREATE INDEX symbol_lookup IF NOT EXISTS FOR (n:Symbol) ON (n.ownerId, n.repoId, n.sha, n.id)",
+    "CREATE INDEX endpoint_scope IF NOT EXISTS FOR (n:ApiEndpoint) ON (n.ownerId, n.repoId, n.sha)",
+    "CREATE INDEX repoindex_scope IF NOT EXISTS FOR (n:RepoIndex) ON (n.ownerId, n.repoId)",
+)
 
-def _lock_key(repo_id: str, sha: str) -> str:
-    return f"{LOCK_KEY_PREFIX}:{repo_id}:{sha}"
+
+def _lock_key(owner_id: str, repo_id: str) -> str:
+    """Lock por (dono, repositório) — NÃO por sha.
+
+    Chavear por sha deixava duas builds do mesmo repositório em shas diferentes
+    correrem em paralelo, e a limpeza de shas antigos de uma apagava o grafo que a
+    outra acabara de escrever. Serializar por repositório é o que torna
+    `build_and_store` seguro sob concorrência."""
+    return f"{LOCK_KEY_PREFIX}:{owner_id}:{repo_id}"
 
 
 def build_redis_client(redis_url: str = REDIS_URL) -> aioredis.Redis:
@@ -38,107 +51,171 @@ def build_neo4j_driver() -> AsyncDriver:
     return AsyncGraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 
+async def ensure_graph_indexes(driver: AsyncDriver) -> None:
+    """Índices compostos que sustentam o escopo por dono.
+
+    Sem eles toda policy de escopo vira varredura completa: `ownerId` entra em
+    todo MATCH, então precisa estar na frente do índice."""
+    async with driver.session() as session:
+        for statement in GRAPH_INDEXES:
+            await session.run(statement)
+
+
 class IndexCache:
-    """Graph data (the durable, queryable artifact — CGC-02) lives in Neo4j, scoped per
-    repo@sha via `repoId`/`sha` node properties (no multi-tenancy at the database level —
-    one graph database, every repo's nodes tagged and filtered by property). The
-    concurrent-build lock stays in Redis: it's ephemeral coordination state with a TTL,
-    not data anyone should ever query — Redis is the right tool for that, Neo4j is the
-    right tool for the graph itself. See ADR Decisão A12."""
+    """Grafo (o artefato durável e consultável — CGC-02) vive no Neo4j, escopado por
+    `ownerId`/`repoId`/`sha` em propriedade de nó.
+
+    Neo4j Community não tem RLS nem RBAC de granularidade fina (ambos Enterprise):
+    o isolamento entre usuários é construído aqui, na propriedade `ownerId`, e
+    reforçado na borda pelo backend Nest, que autoriza `owner/repo` contra o GitHub
+    antes de qualquer chamada. `ownerId` é obrigatório em toda query — nunca dê
+    default, porque um default silencioso vira vazamento entre tenants.
+
+    O lock de build concorrente fica no Redis: é estado efêmero de coordenação com
+    TTL, não dado que alguém deva consultar. Ver ADR Decisão A12."""
 
     def __init__(self, driver: AsyncDriver, redis_client: aioredis.Redis):
         self._driver = driver
         self._redis = redis_client
 
-    async def build_and_store(self, repo_id: str, sha: str, graph: Graph) -> None:
-        async with self._driver.session() as session:
-            await session.run(
-                """
-                MATCH (n)
-                WHERE n.repoId = $repoId AND (n:Symbol OR n:ApiEndpoint)
-                DETACH DELETE n
-                """,
-                repoId=repo_id,
+    async def build_and_store(self, repo_id: str, sha: str, graph: Graph, owner_id: str) -> None:
+        """Ordem importa: limpa o alvo exato, escreve, aponta o RepoIndex, e só então
+        descarta os shas antigos. O grafo anterior segue legível durante toda a
+        escrita, e a virada é o MERGE do RepoIndex. A ordem antiga (apagar tudo do
+        repo primeiro) deixava o repositório sem grafo por toda a duração do build."""
+        symbols = [
+            {
+                "id": symbol.id,
+                "kind": symbol.kind,
+                "path": symbol.path,
+                "name": symbol.name,
+                "line": symbol.line,
+                "endLine": symbol.end_line,
+                "signature": symbol.signature,
+                "body": symbol.body,
+                "decorators": symbol.decorators,
+                "contentHash": symbol.content_hash,
+                "parentId": symbol.parent_id,
+            }
+            for symbol in graph.nodes.values()
+        ]
+
+        edges_by_kind: dict[EdgeKind, list[dict]] = {}
+        for edge in graph.edges:
+            edges_by_kind.setdefault(edge.kind, []).append(
+                {"fromId": edge.from_id, "toId": edge.to_id, "weight": edge.weight}
             )
-            for symbol in graph.nodes.values():
+
+        endpoints = [
+            {
+                "id": endpoint.id,
+                "role": endpoint.role,
+                "method": endpoint.method,
+                "route": endpoint.route,
+                "normalizedRoute": endpoint.normalized_route,
+                "path": endpoint.path,
+                "line": endpoint.line,
+                "framework": endpoint.framework,
+                "evidenceType": endpoint.evidence_type,
+                "symbolId": endpoint.symbol_id,
+                "symbolName": endpoint.symbol_name,
+            }
+            for endpoint in graph.endpoints
+        ]
+
+        scope = {"ownerId": owner_id, "repoId": repo_id, "sha": sha}
+
+        async with self._driver.session() as session:
+            # Reconstrução idempotente do mesmo sha.
+            await session.run(
+                "MATCH (n:Symbol {ownerId: $ownerId, repoId: $repoId, sha: $sha}) DETACH DELETE n",
+                **scope,
+            )
+            await session.run(
+                "MATCH (n:ApiEndpoint {ownerId: $ownerId, repoId: $repoId, sha: $sha}) DETACH DELETE n",
+                **scope,
+            )
+
+            if symbols:
                 await session.run(
                     """
+                    UNWIND $symbols AS s
                     CREATE (n:Symbol {
-                        id: $id, repoId: $repoId, sha: $sha, kind: $kind, path: $path,
-                        name: $name, line: $line, endLine: $endLine, signature: $signature,
-                        body: $body, decorators: $decorators, contentHash: $contentHash,
-                        parentId: $parentId
+                        id: s.id, ownerId: $ownerId, repoId: $repoId, sha: $sha,
+                        kind: s.kind, path: s.path, name: s.name, line: s.line,
+                        endLine: s.endLine, signature: s.signature, body: s.body,
+                        decorators: s.decorators, contentHash: s.contentHash,
+                        parentId: s.parentId
                     })
                     """,
-                    id=symbol.id,
-                    repoId=repo_id,
-                    sha=sha,
-                    kind=symbol.kind,
-                    path=symbol.path,
-                    name=symbol.name,
-                    line=symbol.line,
-                    endLine=symbol.end_line,
-                    signature=symbol.signature,
-                    body=symbol.body,
-                    decorators=symbol.decorators,
-                    contentHash=symbol.content_hash,
-                    parentId=symbol.parent_id,
+                    symbols=symbols,
+                    **scope,
                 )
-            for edge in graph.edges:
-                rel_type = RELATIONSHIP_TYPE_BY_KIND[edge.kind]
+
+            for kind, rows in edges_by_kind.items():
+                # `rel_type` vem do dicionário fixo RELATIONSHIP_TYPE_BY_KIND, nunca
+                # de entrada externa: tipo de relacionamento não é parametrizável em
+                # Cypher, então essa é a única interpolação permitida no arquivo.
+                rel_type = RELATIONSHIP_TYPE_BY_KIND[kind]
                 await session.run(
                     f"""
-                    MATCH (a:Symbol {{id: $fromId, repoId: $repoId, sha: $sha}}),
-                          (b:Symbol {{id: $toId, repoId: $repoId, sha: $sha}})
-                    CREATE (a)-[:{rel_type} {{weight: $weight}}]->(b)
+                    UNWIND $edges AS e
+                    MATCH (a:Symbol {{id: e.fromId, ownerId: $ownerId, repoId: $repoId, sha: $sha}}),
+                          (b:Symbol {{id: e.toId, ownerId: $ownerId, repoId: $repoId, sha: $sha}})
+                    CREATE (a)-[:{rel_type} {{weight: e.weight}}]->(b)
                     """,
-                    fromId=edge.from_id,
-                    toId=edge.to_id,
-                    repoId=repo_id,
-                    sha=sha,
-                    weight=edge.weight,
+                    edges=rows,
+                    **scope,
                 )
 
-            for endpoint in graph.endpoints:
+            if endpoints:
                 await session.run(
                     """
-                    CREATE (e:ApiEndpoint {
-                        id: $id, repoId: $repoId, sha: $sha, role: $role,
-                        method: $method, route: $route, normalizedRoute: $normalizedRoute,
-                        path: $path, line: $line, framework: $framework,
-                        evidenceType: $evidenceType, symbolId: $symbolId,
-                        symbolName: $symbolName
+                    UNWIND $endpoints AS e
+                    CREATE (n:ApiEndpoint {
+                        id: e.id, ownerId: $ownerId, repoId: $repoId, sha: $sha,
+                        role: e.role, method: e.method, route: e.route,
+                        normalizedRoute: e.normalizedRoute, path: e.path, line: e.line,
+                        framework: e.framework, evidenceType: e.evidenceType,
+                        symbolId: e.symbolId, symbolName: e.symbolName
                     })
                     """,
-                    id=endpoint.id,
-                    repoId=repo_id,
-                    sha=sha,
-                    role=endpoint.role,
-                    method=endpoint.method,
-                    route=endpoint.route,
-                    normalizedRoute=endpoint.normalized_route,
-                    path=endpoint.path,
-                    line=endpoint.line,
-                    framework=endpoint.framework,
-                    evidenceType=endpoint.evidence_type,
-                    symbolId=endpoint.symbol_id,
-                    symbolName=endpoint.symbol_name,
+                    endpoints=endpoints,
+                    **scope,
                 )
 
             await session.run(
                 """
-                MERGE (r:RepoIndex {repoId: $repoId})
+                MERGE (r:RepoIndex {ownerId: $ownerId, repoId: $repoId})
                 SET r.sha = $sha, r.indexedAt = $indexedAt
                 """,
-                repoId=repo_id,
-                sha=sha,
                 indexedAt=datetime.now(UTC).isoformat(),
+                **scope,
             )
 
-    async def get_latest_sha(self, repo_id: str) -> str | None:
+            # Um repositório tem um grafo corrente, não um por commit já indexado.
+            await session.run(
+                """
+                MATCH (n:Symbol {ownerId: $ownerId, repoId: $repoId})
+                WHERE n.sha <> $sha
+                DETACH DELETE n
+                """,
+                **scope,
+            )
+            await session.run(
+                """
+                MATCH (n:ApiEndpoint {ownerId: $ownerId, repoId: $repoId})
+                WHERE n.sha <> $sha
+                DETACH DELETE n
+                """,
+                **scope,
+            )
+
+    async def get_latest_sha(self, repo_id: str, owner_id: str) -> str | None:
         async with self._driver.session() as session:
             result = await session.run(
-                "MATCH (r:RepoIndex {repoId: $repoId}) RETURN r.sha AS sha",
+                "MATCH (r:RepoIndex {ownerId: $ownerId, repoId: $repoId}) RETURN r.sha AS sha",
+                ownerId=owner_id,
                 repoId=repo_id,
             )
             record = await result.single()
@@ -146,6 +223,7 @@ class IndexCache:
 
     async def list_repositories(
         self,
+        owner_id: str,
         query: str | None,
         limit: int,
         cursor: str | None,
@@ -159,13 +237,14 @@ class IndexCache:
         async with self._driver.session() as session:
             result = await session.run(
                 """
-                MATCH (r:RepoIndex)
+                MATCH (r:RepoIndex {ownerId: $ownerId})
                 WHERE $searchQuery IS NULL OR toLower(r.repoId) CONTAINS $searchQuery
                 RETURN r.repoId AS repoId, r.sha AS sha
                 ORDER BY r.repoId
                 SKIP $offset
                 LIMIT $fetchLimit
                 """,
+                ownerId=owner_id,
                 searchQuery=normalized_query,
                 offset=offset,
                 fetchLimit=limit + 1,
@@ -179,12 +258,12 @@ class IndexCache:
         next_cursor = str(offset + limit) if len(records) > limit else None
         return page, next_cursor
 
-    async def lookup(self, repo_id: str, sha: str) -> Graph | None:
+    async def lookup(self, repo_id: str, sha: str, owner_id: str) -> Graph | None:
+        scope = {"ownerId": owner_id, "repoId": repo_id, "sha": sha}
         async with self._driver.session() as session:
             node_result = await session.run(
-                "MATCH (n:Symbol {repoId: $repoId, sha: $sha}) RETURN n",
-                repoId=repo_id,
-                sha=sha,
+                "MATCH (n:Symbol {ownerId: $ownerId, repoId: $repoId, sha: $sha}) RETURN n",
+                **scope,
             )
             nodes: dict[str, Symbol] = {}
             async for record in node_result:
@@ -207,27 +286,31 @@ class IndexCache:
 
             edge_result = await session.run(
                 """
-                MATCH (a:Symbol {repoId: $repoId, sha: $sha})-[r]->(b:Symbol {repoId: $repoId, sha: $sha})
+                MATCH (a:Symbol {ownerId: $ownerId, repoId: $repoId, sha: $sha})
+                      -[r]->
+                      (b:Symbol {ownerId: $ownerId, repoId: $repoId, sha: $sha})
                 RETURN a.id AS fromId, b.id AS toId, type(r) AS relType, r.weight AS weight
                 """,
-                repoId=repo_id,
-                sha=sha,
+                **scope,
             )
             edges = [
                 Edge(from_id=rec["fromId"], to_id=rec["toId"], kind=rec["relType"].lower(), weight=rec["weight"])
                 async for rec in edge_result
             ]
 
-            endpoints = await self._list_endpoints_in_session(session, repo_id, sha)
+            endpoints = await self._list_endpoints_in_session(session, repo_id, sha, owner_id)
             return Graph(nodes=nodes, edges=edges, endpoints=endpoints)
 
-    async def _list_endpoints_in_session(self, session, repo_id: str, sha: str) -> list[HttpEndpoint]:
+    async def _list_endpoints_in_session(
+        self, session, repo_id: str, sha: str, owner_id: str
+    ) -> list[HttpEndpoint]:
         result = await session.run(
             """
-            MATCH (e:ApiEndpoint {repoId: $repoId, sha: $sha})
+            MATCH (e:ApiEndpoint {ownerId: $ownerId, repoId: $repoId, sha: $sha})
             RETURN e
             ORDER BY e.path, e.line, e.role, e.method
             """,
+            ownerId=owner_id,
             repoId=repo_id,
             sha=sha,
         )
@@ -251,20 +334,22 @@ class IndexCache:
             )
         return endpoints
 
-    async def list_endpoints(self, repo_id: str, sha: str) -> list[HttpEndpoint]:
+    async def list_endpoints(self, repo_id: str, sha: str, owner_id: str) -> list[HttpEndpoint]:
         async with self._driver.session() as session:
-            return await self._list_endpoints_in_session(session, repo_id, sha)
+            return await self._list_endpoints_in_session(session, repo_id, sha, owner_id)
 
     async def materialize_project_graph(
         self,
         project_id: str,
         repositories: list[ProjectRepositoryRef],
+        owner_id: str,
     ) -> ProjectGraph:
         refs = [repo.model_dump() for repo in repositories if repo.sha]
         async with self._driver.session() as session:
             await session.run(
-                "MATCH ()-[r:CONSUMES {projectId: $projectId}]->() DELETE r",
+                "MATCH ()-[r:CONSUMES {projectId: $projectId, ownerId: $ownerId}]->() DELETE r",
                 projectId=project_id,
+                ownerId=owner_id,
             )
 
             if refs:
@@ -272,12 +357,14 @@ class IndexCache:
                     """
                     UNWIND $repositories AS consumerRef
                     MATCH (consumer:ApiEndpoint {
+                        ownerId: $ownerId,
                         repoId: consumerRef.repoId,
                         sha: consumerRef.sha,
                         role: 'consumer'
                     })
                     UNWIND $repositories AS providerRef
                     MATCH (provider:ApiEndpoint {
+                        ownerId: $ownerId,
                         repoId: providerRef.repoId,
                         sha: providerRef.sha,
                         role: 'provider'
@@ -285,20 +372,22 @@ class IndexCache:
                     WHERE consumer.repoId <> provider.repoId
                       AND consumer.method = provider.method
                       AND consumer.normalizedRoute = provider.normalizedRoute
-                    MERGE (consumer)-[r:CONSUMES {projectId: $projectId}]->(provider)
+                    MERGE (consumer)-[r:CONSUMES {projectId: $projectId, ownerId: $ownerId}]->(provider)
                     SET r.confidence = 'confirmed', r.evidenceType = 'method_route'
                     """,
                     repositories=refs,
                     projectId=project_id,
+                    ownerId=owner_id,
                 )
 
             result = await session.run(
                 """
-                MATCH (consumer:ApiEndpoint)-[r:CONSUMES {projectId: $projectId}]->(provider:ApiEndpoint)
+                MATCH (consumer:ApiEndpoint)-[r:CONSUMES {projectId: $projectId, ownerId: $ownerId}]->(provider:ApiEndpoint)
                 RETURN consumer, provider
                 ORDER BY consumer.repoId, provider.repoId, consumer.method, consumer.normalizedRoute
                 """,
                 projectId=project_id,
+                ownerId=owner_id,
             )
             records = [record async for record in result]
 
@@ -363,9 +452,11 @@ class IndexCache:
             framework=endpoint["framework"],
         )
 
-    async def acquire_lock(self, repo_id: str, sha: str) -> bool:
-        acquired = await self._redis.set(_lock_key(repo_id, sha), "1", nx=True, ex=LOCK_TTL_SECONDS)
+    async def acquire_lock(self, repo_id: str, owner_id: str) -> bool:
+        acquired = await self._redis.set(
+            _lock_key(owner_id, repo_id), "1", nx=True, ex=LOCK_TTL_SECONDS
+        )
         return bool(acquired)
 
-    async def release_lock(self, repo_id: str, sha: str) -> None:
-        await self._redis.delete(_lock_key(repo_id, sha))
+    async def release_lock(self, repo_id: str, owner_id: str) -> None:
+        await self._redis.delete(_lock_key(owner_id, repo_id))

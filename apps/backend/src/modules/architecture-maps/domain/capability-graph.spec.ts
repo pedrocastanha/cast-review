@@ -1,4 +1,4 @@
-import type { ArchitectureComponentDependency } from 'src/shared/types';
+import type { ArchitectureComponentDependency } from '../../../shared/types';
 import type { ArchitectureComponent } from '../entities/architecture-component.entity';
 import { buildCapabilityDependencies } from './capability-graph';
 

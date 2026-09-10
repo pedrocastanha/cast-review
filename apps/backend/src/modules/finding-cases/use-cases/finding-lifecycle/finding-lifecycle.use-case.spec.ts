@@ -83,6 +83,7 @@ function harness() {
     work({ query: managerQuery }),
   );
   const caseRepository = {
+    withRlsTransaction: transaction,
     datasource: { transaction },
     find: jest.fn(async () => cases),
     findOne: jest.fn(

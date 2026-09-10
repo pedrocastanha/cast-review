@@ -1,8 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Octokit } from '@octokit/rest';
 import type { Job } from 'bullmq';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AiApiClient } from '../../../shared/clients/ai/ai-api.client';
+import { dbActorStorage } from '../../../shared/database/postgres/db-actor';
+import { AppLogger } from '../../../shared/logger/logger.service';
 import { UserService } from '../../users/user.service';
 import {
   CODE_INDEX_QUEUE,
@@ -26,6 +27,14 @@ export class IndexProcessor extends WorkerHost {
   }
 
   async process(job: Job<IndexJobData>): Promise<IndexJobResult> {
+    // Worker age em nome de quem pediu a indexação (SEC-17).
+    return dbActorStorage.run(
+      { userId: job.data.userId, actorType: 'job' },
+      () => this.handle(job),
+    );
+  }
+
+  private async handle(job: Job<IndexJobData>): Promise<IndexJobResult> {
     const { owner, repo, sha, userId } = job.data;
     const start = Date.now();
 
@@ -54,6 +63,9 @@ export class IndexProcessor extends WorkerHost {
       await job.updateProgress(PROGRESS_TREE_FETCHED);
 
       const result = await this.aiApiClient.buildIndex({
+        // O grafo no Neo4j é escopado por dono: o job carrega `userId` desde
+        // `enqueue-index-job`, e é ele que define de quem é o índice.
+        ownerId: job.data.userId,
         repoId: `${owner}/${repo}`,
         sha,
         files,

@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Octokit } from '@octokit/rest';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import type { CurrentUserData } from '../../../auth/utils/current-user-decorator';
 import { UserService } from '../../../users/user.service';
 import { GithubSession } from '../../types/github-session.type';
@@ -37,6 +37,11 @@ export function throwGithubError(err: unknown, logger: AppLogger): never {
 export interface GithubSessionSource {
   getSession(currentUser: CurrentUserData): Promise<GithubSession>;
   resolveOwner(session: GithubSession, ownerOverride?: string): string;
+  assertRepositoryAccess(
+    session: GithubSession,
+    owner: string,
+    repo: string,
+  ): Promise<void>;
   handleGithubError(err: unknown): never;
 }
 
@@ -59,6 +64,31 @@ export class GithubSessionProvider implements GithubSessionSource {
 
   resolveOwner(session: GithubSession, ownerOverride?: string): string {
     return ownerOverride?.trim() || session.owner;
+  }
+
+  /**
+   * Autorização de leitura para um `owner/repo` que veio do cliente.
+   *
+   * O grafo, o índice e o contexto vivem no Neo4j, que não tem noção de dono:
+   * quem chega no ai-api com o token de serviço lê qualquer repositório
+   * indexado. A barreira é aqui. `repos.get` com o token do próprio usuário
+   * responde 404 quando ele não enxerga o repositório, e `handleGithubError`
+   * traduz isso em NotFoundException — mesma resposta para "não existe" e
+   * "não é seu", sem oráculo de existência.
+   *
+   * Todo caso de uso que monte `${owner}/${repo}` a partir de parâmetro do
+   * cliente precisa passar por aqui ANTES de tocar o ai-api.
+   */
+  async assertRepositoryAccess(
+    session: GithubSession,
+    owner: string,
+    repo: string,
+  ): Promise<void> {
+    try {
+      await session.octokit.repos.get({ owner, repo });
+    } catch (err) {
+      this.handleGithubError(err);
+    }
   }
 
   async resolveDefaultBranchSha(

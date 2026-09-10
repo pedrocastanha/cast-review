@@ -104,7 +104,7 @@ def _initial_messages(request: ChatRunRequest) -> list[dict[str, Any]]:
 async def _load_workspaces(cache, request: ChatRunRequest) -> list[RepoWorkspace]:
     workspaces: list[RepoWorkspace] = []
     for repo in request.repositories:
-        graph = await cache.lookup(repo.repoId, repo.sha)
+        graph = await cache.lookup(repo.repoId, repo.sha, request.ownerId)
         if graph is None:
             continue
         workspaces.append(RepoWorkspace(repo.repoId, repo.sha, graph))
@@ -121,7 +121,9 @@ async def run_chat(cache, request: ChatRunRequest) -> AsyncIterator[ChatEvent]:
             if request.mode == "global":
                 if request.catalog is None:
                     raise ToolError("catálogo de repositórios não configurado")
-                executor = GlobalToolExecutor(cache, CatalogClient(request.catalog))
+                executor = GlobalToolExecutor(
+                    cache, CatalogClient(request.catalog), owner_id=request.ownerId
+                )
             else:
                 workspaces = await _load_workspaces(cache, request)
                 executor = ToolExecutor(workspaces, mode=request.mode)

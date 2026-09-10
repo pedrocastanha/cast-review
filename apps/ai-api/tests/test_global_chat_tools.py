@@ -3,6 +3,8 @@ import pytest
 from app.chat.tools import GlobalToolExecutor, ToolError
 from app.code_graph.models import Graph, Symbol
 
+OWNER_ID = "owner-test"
+
 
 def _graph(name: str) -> Graph:
     return Graph(
@@ -45,7 +47,7 @@ class FakeCache:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
 
-    async def lookup(self, repo_id: str, sha: str):
+    async def lookup(self, repo_id: str, sha: str, owner_id: str):
         self.calls.append((repo_id, sha))
         return _graph(repo_id.split("/")[-1])
 
@@ -54,7 +56,7 @@ class FakeCache:
 async def test_catalog_listing_does_not_load_repository_graphs():
     cache = FakeCache()
     catalog = FakeCatalog()
-    executor = GlobalToolExecutor(cache, catalog)
+    executor = GlobalToolExecutor(cache, catalog, owner_id=OWNER_ID)
 
     result = await executor.execute_async(
         "list_indexed_repositories", {"query": "acme", "limit": 10}
@@ -67,7 +69,7 @@ async def test_catalog_listing_does_not_load_repository_graphs():
 
 @pytest.mark.asyncio
 async def test_repository_tools_require_an_explicit_repo_id():
-    executor = GlobalToolExecutor(FakeCache(), FakeCatalog())
+    executor = GlobalToolExecutor(FakeCache(), FakeCatalog(), owner_id=OWNER_ID)
 
     with pytest.raises(ToolError, match="repoId"):
         await executor.execute_async("search_symbols", {"query": "login"})
@@ -77,7 +79,7 @@ async def test_repository_tools_require_an_explicit_repo_id():
 async def test_two_repositories_are_resolved_and_loaded_lazily():
     cache = FakeCache()
     catalog = FakeCatalog()
-    executor = GlobalToolExecutor(cache, catalog)
+    executor = GlobalToolExecutor(cache, catalog, owner_id=OWNER_ID)
 
     back = await executor.execute_async(
         "search_symbols", {"repoId": "acme/back", "query": "back"}
@@ -100,7 +102,7 @@ async def test_two_repositories_are_resolved_and_loaded_lazily():
 @pytest.mark.asyncio
 async def test_workspace_cache_is_bounded_by_least_recently_used_order():
     cache = FakeCache()
-    executor = GlobalToolExecutor(cache, FakeCatalog(), max_workspaces=2)
+    executor = GlobalToolExecutor(cache, FakeCatalog(), owner_id=OWNER_ID, max_workspaces=2)
 
     result = None
     for repo_id in ["acme/one", "acme/two", "acme/three"]:
@@ -118,7 +120,7 @@ async def test_workspace_cache_is_bounded_by_least_recently_used_order():
 
 
 def test_global_definitions_require_repo_id_for_graph_tools():
-    executor = GlobalToolExecutor(FakeCache(), FakeCatalog())
+    executor = GlobalToolExecutor(FakeCache(), FakeCatalog(), owner_id=OWNER_ID)
     definitions = {
         item["function"]["name"]: item["function"] for item in executor.definitions()
     }

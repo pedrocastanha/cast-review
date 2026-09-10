@@ -29,7 +29,9 @@ class IncrementalResult:
         self.truncated = truncated
 
 
-async def build_incremental(cache: IndexCache, repo_id: str, files: list[dict]) -> IncrementalResult:
+async def build_incremental(
+    cache: IndexCache, repo_id: str, files: list[dict], owner_id: str
+) -> IncrementalResult:
     """Reindexes only files whose content hash differs from the previous build
     (CGC-13) — everything else is carried forward from the old graph without
     re-running tree-sitter. Cross-file resolution (a *changed* file calling into an
@@ -44,8 +46,8 @@ async def build_incremental(cache: IndexCache, repo_id: str, files: list[dict]) 
     if file_limit_truncated:
         files = sorted(files, key=lambda f: f["path"])[:CODE_GRAPH_MAX_FILES]
 
-    old_sha = await cache.get_latest_sha(repo_id)
-    old_graph = await cache.lookup(repo_id, old_sha) if old_sha else None
+    old_sha = await cache.get_latest_sha(repo_id, owner_id)
+    old_graph = await cache.lookup(repo_id, old_sha, owner_id) if old_sha else None
 
     old_hash_by_path: dict[str, str] = {}
     if old_graph:

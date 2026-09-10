@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
+OWNER_ID = "owner-test"
+
 pytestmark = pytest.mark.integration
 
 
@@ -36,6 +38,7 @@ def test_project_graph_materializes_cross_repo_endpoint_matches():
         frontend_build = client.post(
             "/index/build",
             json={
+                "ownerId": OWNER_ID,
                 "repoId": frontend,
                 "sha": "front-sha",
                 "files": [
@@ -49,6 +52,7 @@ def test_project_graph_materializes_cross_repo_endpoint_matches():
         backend_build = client.post(
             "/index/build",
             json={
+                "ownerId": OWNER_ID,
                 "repoId": backend,
                 "sha": "back-sha",
                 "files": [
@@ -68,6 +72,7 @@ export class RepositoriesController {
         response = client.post(
             "/index/project/graph",
             json={
+                "ownerId": OWNER_ID,
                 "projectId": project_id,
                 "repositories": [
                     {"repoId": frontend, "sha": "front-sha"},
@@ -113,6 +118,7 @@ def test_project_graph_does_not_match_different_http_methods():
         client.post(
             "/index/build",
             json={
+                "ownerId": OWNER_ID,
                 "repoId": frontend,
                 "sha": "front-sha",
                 "files": [{"path": "src/api.ts", "content": "request('/health', { method: 'POST' });"}],
@@ -121,6 +127,7 @@ def test_project_graph_does_not_match_different_http_methods():
         client.post(
             "/index/build",
             json={
+                "ownerId": OWNER_ID,
                 "repoId": backend,
                 "sha": "back-sha",
                 "files": [
@@ -134,6 +141,7 @@ def test_project_graph_does_not_match_different_http_methods():
         response = client.post(
             "/index/project/graph",
             json={
+                "ownerId": OWNER_ID,
                 "projectId": project_id,
                 "repositories": [
                     {"repoId": frontend, "sha": "front-sha"},
@@ -162,6 +170,7 @@ def test_project_graph_isolated_by_sha_and_removes_previous_project_links():
         client.post(
             "/index/build",
             json={
+                "ownerId": OWNER_ID,
                 "repoId": frontend,
                 "sha": "front-current",
                 "files": [{"path": "src/api.ts", "content": "request('/health');"}],
@@ -170,6 +179,7 @@ def test_project_graph_isolated_by_sha_and_removes_previous_project_links():
         client.post(
             "/index/build",
             json={
+                "ownerId": OWNER_ID,
                 "repoId": backend,
                 "sha": "back-current",
                 "files": [
@@ -183,11 +193,12 @@ def test_project_graph_isolated_by_sha_and_removes_previous_project_links():
 
         first = client.post(
             "/index/project/graph",
-            json={"projectId": project_id, "repositories": repositories},
+            json={"ownerId": OWNER_ID, "projectId": project_id, "repositories": repositories},
         )
         stale = client.post(
             "/index/project/graph",
             json={
+                "ownerId": OWNER_ID,
                 "projectId": project_id,
                 "repositories": [
                     {"repoId": frontend, "sha": "front-stale"},

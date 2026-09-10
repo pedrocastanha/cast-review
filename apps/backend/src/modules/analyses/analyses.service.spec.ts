@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import type { AgentEvent } from 'src/shared/types';
+import type { AgentEvent } from '../../shared/types';
 import type { PublishPolicy } from './analyses.types';
 import { Analysis } from './analysis.entity';
 

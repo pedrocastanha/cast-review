@@ -5,11 +5,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import { AiApiClient } from '../../shared/clients/ai/ai-api.client';
 import type {
   FrozenImpactRepository,
   FrozenImpactScope,
-} from 'src/shared/types';
+} from '../../shared/types';
 import { DataSource } from 'typeorm';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import type { RepositoriesService } from '../repositories/repositories.service';
@@ -17,6 +17,7 @@ import type { CreateProjectDto } from './dtos/create-project.dto';
 import type { UpdateProjectDto } from './dtos/update-project.dto';
 import { ProjectRepository } from './project.repository';
 import { ProjectRepositoryMemberRepository } from './project-repository-member.repository';
+import { runInRlsTransaction } from '../../shared/database/postgres/rls-context';
 
 type AuthorizedRepository = Awaited<
   ReturnType<RepositoriesService['listRepos']>
@@ -168,7 +169,7 @@ export class ProjectsService {
       currentUser,
     );
 
-    const project = await this.dataSource.transaction(async (manager) => {
+    const project = await runInRlsTransaction(this.dataSource, async (manager) => {
       const entity = this.projectRepository.create({
         ownerId: currentUser.id,
         name: input.name.trim(),
@@ -212,7 +213,7 @@ export class ProjectsService {
       ? await this.authorizeRepositories(input.repositories, currentUser)
       : null;
 
-    await this.dataSource.transaction(async (manager) => {
+    await runInRlsTransaction(this.dataSource, async (manager) => {
       await this.projectRepository.update(
         project.id,
         {
@@ -286,6 +287,7 @@ export class ProjectsService {
   async getGraph(id: string, currentUser: CurrentUserData) {
     const status = await this.getIndexStatus(id, currentUser);
     return this.aiApiClient.getProjectGraph({
+      ownerId: currentUser.id,
       projectId: id,
       repositories: status.repositories.map((repository) => ({
         repoId: repository.repository,

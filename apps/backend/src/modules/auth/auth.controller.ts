@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { CookieOptions, Request, Response } from 'express';
-import { sessionCookiePolicy } from 'src/shared/security/production-config';
+import { sessionCookiePolicy } from '../../shared/security/production-config';
 import { CreateUserDto } from '../users/dtos/create-user.dto';
 import type { User } from '../users/user.entity';
 import { AuthService } from './auth.service';

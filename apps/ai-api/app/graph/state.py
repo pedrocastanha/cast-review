@@ -5,6 +5,7 @@ class GraphState(TypedDict, total=False):
     diff: str
     changed_files: list[dict]
     conventions: str
+    owner_id: str | None
     repo_id: str | None
     sha: str | None
     base_sha: str | None

@@ -43,6 +43,7 @@ describe('GetRepositoryIndexStatusUseCase', () => {
 
     expect(aiApiClient.getIndexStatus).toHaveBeenCalledWith(
       'octocat/hello-world',
+      'user-1',
     );
     expect(result).toEqual({ status: 'not_indexed', sha: null, stale: false });
   });

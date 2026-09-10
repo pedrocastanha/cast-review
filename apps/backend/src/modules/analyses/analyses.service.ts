@@ -7,17 +7,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import type { SseStream } from 'src/shared/security/sse-limits';
-import { openSseStream } from 'src/shared/security/sse-limits';
-import { BaseService } from 'src/shared/services/base.service';
+import { AiApiClient } from '../../shared/clients/ai/ai-api.client';
+import { AppLogger } from '../../shared/logger/logger.service';
+import type { SseStream } from '../../shared/security/sse-limits';
+import { openSseStream } from '../../shared/security/sse-limits';
+import { BaseService } from '../../shared/services/base.service';
 import type {
   AgentEvent,
   AgentResumeRequest,
   AgentRunRequest,
   FrozenImpactScope,
-} from 'src/shared/types';
+} from '../../shared/types';
 import { ArchitectureMapsService } from '../architecture-maps/architecture-maps.service';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { FindingCaseRepository } from '../finding-cases/finding-case.repository';
@@ -837,8 +837,9 @@ export class AnalysesService extends BaseService {
     const pullNumber = parseOptionalPullNumber(input.pullNumber);
     const owner = input.owner?.trim();
 
+    return this.analysisRepository.withRlsTransaction(async (manager) => {
     const query = this.analysisRepository
-      .createQueryBuilder('analysis')
+      .createQueryBuilder('analysis', manager)
       .where('analysis.requestedBy = :userId', { userId: input.currentUser.id })
       .andWhere('LOWER(analysis.repo) = LOWER(:repo)', {
         repo: input.repo.trim(),
@@ -858,6 +859,7 @@ export class AnalysesService extends BaseService {
 
     const rows = await query.getMany();
     return rows.map((row) => this.toRecord(row));
+    });
   }
 
   async getByIdForUser(

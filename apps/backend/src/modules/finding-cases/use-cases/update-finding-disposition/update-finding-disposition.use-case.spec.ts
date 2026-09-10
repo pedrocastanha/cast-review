@@ -14,6 +14,9 @@ function harness() {
   };
   const manager = { query: jest.fn(async () => []) };
   const caseRepository = {
+    withRlsTransaction: jest.fn(
+      async (work: (value: typeof manager) => unknown) => work(manager),
+    ),
     datasource: {
       transaction: jest.fn(async (work: (value: typeof manager) => unknown) =>
         work(manager),

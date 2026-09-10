@@ -1,7 +1,7 @@
 import json
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -9,6 +9,7 @@ from app.chat.agent import run_chat
 from app.chat.models import ChatEvent, ChatRunRequest
 from app.code_graph.cache import IndexCache
 from app.code_graph.file_view import distinct_paths, render_file
+from app.index_scope import INDEX_SCOPE_HEADER, authorize_index_read
 
 router = APIRouter()
 
@@ -47,9 +48,19 @@ async def chat_run(body: ChatRunRequest, request: Request) -> StreamingResponse:
 
 
 @router.get("/index/file", response_model=IndexFileResponse)
-async def index_file(repoId: str, sha: str, path: str, request: Request) -> IndexFileResponse:
+async def index_file(
+    repoId: str,
+    sha: str,
+    path: str,
+    ownerId: str,
+    request: Request,
+    x_index_scope: str | None = Header(default=None, alias=INDEX_SCOPE_HEADER),
+) -> IndexFileResponse:
+    # O token de serviço autentica o backend; ele não autoriza conteúdo. O grant
+    # carrega o conjunto de repo@sha que o backend já verificou no GitHub.
+    authorize_index_read(x_index_scope, ownerId, repoId, sha)
     cache = _get_cache(request)
-    graph = await cache.lookup(repoId, sha)
+    graph = await cache.lookup(repoId, sha, ownerId)
     if graph is None:
         raise HTTPException(status_code=404, detail="índice não encontrado para repo@sha")
 
@@ -64,12 +75,15 @@ async def index_file(repoId: str, sha: str, path: str, request: Request) -> Inde
 async def index_files(
     repoId: str,
     sha: str,
+    ownerId: str,
     request: Request,
     query: str | None = None,
     limit: int = 100,
+    x_index_scope: str | None = Header(default=None, alias=INDEX_SCOPE_HEADER),
 ) -> IndexFilesResponse:
+    authorize_index_read(x_index_scope, ownerId, repoId, sha)
     cache = _get_cache(request)
-    graph = await cache.lookup(repoId, sha)
+    graph = await cache.lookup(repoId, sha, ownerId)
     if graph is None:
         raise HTTPException(status_code=404, detail="índice não encontrado para repo@sha")
 

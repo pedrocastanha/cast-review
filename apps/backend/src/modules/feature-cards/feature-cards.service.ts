@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import { BaseService } from 'src/shared/services/base.service';
+import { AppLogger } from '../../shared/logger/logger.service';
+import { BaseService } from '../../shared/services/base.service';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { ProjectsService } from '../projects/projects.service';
 import type { BoardQueryDto, UpdateCardDto } from './dtos/card.dto';

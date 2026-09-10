@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import { setCurrentDbActor } from '../../../shared/database/postgres/db-actor';
 import { UserService } from '../../users/user.service';
 import { jwtConfig } from '../auth.config';
 import { IS_PUBLIC_KEY } from '../utils/public.decorator';
@@ -47,6 +48,11 @@ export class JwtAccessGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException('Access token inválido ou expirado');
     }
+
+    // Define o ator ANTES de qualquer leitura: `getById` abaixo já roda sob o
+    // escopo do próprio usuário. O `sub` vem do token já verificado acima, que é
+    // exatamente a fonte que SEC-16 exige — nunca body, query ou header.
+    setCurrentDbActor(payload.sub, 'user');
 
     const user = await this.userService.getById(payload.sub);
 

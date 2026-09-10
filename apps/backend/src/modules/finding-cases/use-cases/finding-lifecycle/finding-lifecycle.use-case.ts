@@ -317,7 +317,7 @@ export class FindingLifecycleUseCase {
       throw new Error('Escopo canônico da análise é obrigatório');
     }
 
-    return this.caseRepository.datasource.transaction(async (manager) => {
+    return this.caseRepository.withRlsTransaction(async (manager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [

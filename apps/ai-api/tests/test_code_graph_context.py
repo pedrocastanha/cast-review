@@ -7,6 +7,8 @@ from app.code_graph.context import assemble_related_context
 from app.code_graph.graph import build_graph, detect_test_edges
 from app.code_graph.indexer import parse_file
 
+OWNER_ID = "owner-test"
+
 pytestmark = pytest.mark.integration
 
 
@@ -37,7 +39,8 @@ async def _cleanup(driver, repo_id):
 
 async def test_never_indexed_repo_returns_empty_context_with_indexed_false(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    context = await assemble_related_context(cache, driver, repo_id, "sha1", ["src/z.ts"])
+    context = await assemble_related_context(cache, driver, repo_id, "sha1", ["src/z.ts"],
+        OWNER_ID)
 
     assert context.stats.indexed is False
     assert context.callers == []
@@ -55,9 +58,10 @@ async def test_assembles_callers_callees_and_tests_for_changed_file(driver, redi
     graph = detect_test_edges(graph)
 
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", graph)
+    await cache.build_and_store(repo_id, "sha1", graph, OWNER_ID)
 
-    context = await assemble_related_context(cache, driver, repo_id, "sha1", ["src/z.ts"])
+    context = await assemble_related_context(cache, driver, repo_id, "sha1", ["src/z.ts"],
+        OWNER_ID)
 
     assert context.stats.indexed is True
     caller_names = {ref.name for ref in context.callers}
@@ -87,7 +91,7 @@ async def test_hunk_scoped_context_ignores_untouched_siblings_in_a_changed_file(
     h2 = parse_file("src/h2.ts", "function helperTwo() { return 2; }\n")
 
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", build_graph([z, h1, h2]))
+    await cache.build_and_store(repo_id, "sha1", build_graph([z, h1, h2]), OWNER_ID)
 
     context = await assemble_related_context(
         cache,
@@ -95,6 +99,7 @@ async def test_hunk_scoped_context_ignores_untouched_siblings_in_a_changed_file(
         repo_id,
         "sha1",
         ["src/z.ts"],
+        OWNER_ID,
         changed_files=[
             {
                 "path": "src/z.ts",
@@ -117,9 +122,10 @@ async def test_dead_code_candidate_surfaced_only_when_in_changed_files(driver, r
 
     graph = build_graph([orphan_in_changed, orphan_elsewhere])
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", graph)
+    await cache.build_and_store(repo_id, "sha1", graph, OWNER_ID)
 
-    context = await assemble_related_context(cache, driver, repo_id, "sha1", ["src/z.ts"])
+    context = await assemble_related_context(cache, driver, repo_id, "sha1", ["src/z.ts"],
+        OWNER_ID)
     dead_names = {ref.name for ref in context.deadCodeCandidates}
 
     assert "orphanZ" in dead_names
@@ -135,7 +141,7 @@ async def test_symbol_left_dead_by_the_diff_surfaces_even_from_an_unchanged_file
     caller = parse_file("src/caller.ts", "function caller() {\n  return 1;\n}\n")
 
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", build_graph([orphan, caller]))
+    await cache.build_and_store(repo_id, "sha1", build_graph([orphan, caller]), OWNER_ID)
 
     context = await assemble_related_context(
         cache,
@@ -143,6 +149,7 @@ async def test_symbol_left_dead_by_the_diff_surfaces_even_from_an_unchanged_file
         repo_id,
         "sha1",
         ["src/caller.ts"],
+        OWNER_ID,
         changed_files=[
             {
                 "path": "src/caller.ts",
@@ -163,7 +170,7 @@ async def test_changed_symbol_exercised_only_by_tests_lands_in_its_own_bucket(
     test = parse_file("src/foo.test.ts", "import { foo } from './foo';\nfoo();\n")
 
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", detect_test_edges(build_graph([prod, test])))
+    await cache.build_and_store(repo_id, "sha1", detect_test_edges(build_graph([prod, test])), OWNER_ID)
 
     context = await assemble_related_context(
         cache,
@@ -171,6 +178,7 @@ async def test_changed_symbol_exercised_only_by_tests_lands_in_its_own_bucket(
         repo_id,
         "sha1",
         ["src/foo.ts"],
+        OWNER_ID,
         changed_files=[
             {
                 "path": "src/foo.ts",
@@ -189,9 +197,10 @@ async def test_repo_map_only_contains_signatures_not_full_bodies(driver, redis_c
     changed = parse_file("src/z.ts", "function z() { return 1; }\n")
     graph = build_graph([changed])
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", graph)
+    await cache.build_and_store(repo_id, "sha1", graph, OWNER_ID)
 
-    context = await assemble_related_context(cache, driver, repo_id, "sha1", ["src/z.ts"], token_budget=8_000)
+    context = await assemble_related_context(cache, driver, repo_id, "sha1", ["src/z.ts"],
+        OWNER_ID, token_budget=8_000)
 
     assert isinstance(context.repoMap, str)
 

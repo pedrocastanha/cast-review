@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AiApiClient } from '../../../../shared/clients/ai/ai-api.client';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import type {
   ArchitectureCandidatesResult,
   ArchitectureChangedFile,
@@ -8,7 +8,7 @@ import type {
   ArchitectureComponentRef,
   ArchitectureImpactResult,
   ArchitectureRepositoryRef,
-} from 'src/shared/types';
+} from '../../../../shared/types';
 import type { ArchitectureScope } from '../../domain/architecture-maps.types';
 import type { ArchitectureComponent } from '../../entities/architecture-component.entity';
 
@@ -41,6 +41,7 @@ export class ArchitectureGraphGateway {
   candidates(scope: ArchitectureScope): Promise<ArchitectureCandidatesResult> {
     return this.aiApiClient.getArchitectureCandidates(
       this.usableRepositories(scope),
+      scope.ownerId,
     );
   }
 
@@ -60,6 +61,7 @@ export class ArchitectureGraphGateway {
       const result = await this.aiApiClient.getArchitectureDependencies(
         repositories,
         this.toComponentRefs(components),
+        scope.ownerId,
       );
       return { dependencies: result.dependencies, available: true };
     } catch (err) {
@@ -80,6 +82,7 @@ export class ArchitectureGraphGateway {
       this.usableRepositories(scope),
       this.toComponentRefs(components),
       changedFiles,
+      scope.ownerId,
     );
   }
 }

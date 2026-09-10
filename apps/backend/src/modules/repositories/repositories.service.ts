@@ -1,9 +1,9 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Queue } from 'bullmq';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import { BaseService } from 'src/shared/services/base.service';
+import { AiApiClient } from '../../shared/clients/ai/ai-api.client';
+import { AppLogger } from '../../shared/logger/logger.service';
+import { BaseService } from '../../shared/services/base.service';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { UserService } from '../users/user.service';
 import {
@@ -102,6 +102,7 @@ export class RepositoriesService extends BaseService {
     let cursor: string | undefined;
     do {
       const page = await this.aiApiClient.listIndexRepositories(
+        currentUser.id,
         undefined,
         200,
         cursor,
@@ -115,6 +116,24 @@ export class RepositoriesService extends BaseService {
     return repositories.filter((repository) =>
       indexed.has(repository.fullName.toLowerCase()),
     );
+  }
+
+  /**
+   * Autorização de leitura para um `owner/repo`. Lança `NotFoundException` se o
+   * usuário não enxerga o repositório no GitHub.
+   *
+   * Exposta publicamente porque o escopo persistido de uma thread de chat
+   * precisa ser revalidado a cada uso: permissão do GitHub muda depois que a
+   * thread foi criada, e o grafo indexado continua acessível se ninguém
+   * perguntar de novo.
+   */
+  async assertRepositoryAccess(
+    owner: string,
+    repo: string,
+    currentUser: CurrentUserData,
+  ): Promise<void> {
+    const session = await this.githubSession.getSession(currentUser);
+    await this.githubSession.assertRepositoryAccess(session, owner, repo);
   }
 
   async listIndexedCatalog(
@@ -132,6 +151,7 @@ export class RepositoriesService extends BaseService {
 
     while (selected.length < limit) {
       const page = await this.aiApiClient.listIndexRepositories(
+        currentUser.id,
         query,
         limit,
         nextCursor,

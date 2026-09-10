@@ -3,6 +3,8 @@ import pytest
 from app.graph.nodes.change_analyzer import analyze_changes
 from app.graph.nodes.change_analyzer.agent import node
 
+OWNER_ID = "owner-test"
+
 def test_classifies_tests_migrations_and_source():
     result = analyze_changes(
         [
@@ -44,7 +46,7 @@ async def test_node_related_context_none_when_repo_id_missing():
 
 @pytest.mark.asyncio
 async def test_node_related_context_none_when_sha_missing():
-    state = {"changed_files": [{"path": "src/a.ts"}], "diff": "", "repo_id": "owner/repo"}
+    state = {"changed_files": [{"path": "src/a.ts"}], "diff": "", "owner_id": OWNER_ID, "repo_id": "owner/repo"}
     result = await node(state)
     assert result["change_analysis"]["relatedContext"] is None
 
@@ -59,7 +61,7 @@ async def test_node_related_context_degrades_to_none_on_exception(monkeypatch):
     state = {
         "changed_files": [{"path": "src/a.ts"}],
         "diff": "",
-        "repo_id": "owner/repo",
+        "owner_id": OWNER_ID, "repo_id": "owner/repo",
         "sha": "sha1",
     }
     result = await node(state)
@@ -92,7 +94,7 @@ async def test_node_uses_frozen_context_without_querying_graph(monkeypatch):
     state = {
         "changed_files": [{"path": "src/a.ts"}],
         "diff": "",
-        "repo_id": "owner/repo",
+        "owner_id": OWNER_ID, "repo_id": "owner/repo",
         "sha": "sha1",
         "frozen_context": {"graphSnapshot": frozen},
     }
@@ -137,6 +139,7 @@ async def test_project_mode_falls_back_to_local_snapshot_when_project_graph_fail
         "run_id": "analysis-1",
         "changed_files": [],
         "diff": "",
+        "owner_id": OWNER_ID,
         "repo_id": "cast/backend",
         "sha": "head-sha",
         "base_sha": "base-sha",

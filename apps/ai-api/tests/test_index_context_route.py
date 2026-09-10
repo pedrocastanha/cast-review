@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
+OWNER_ID = "owner-test"
+
 pytestmark = pytest.mark.integration
 
 
@@ -32,7 +34,7 @@ def test_index_context_returns_not_indexed_when_repo_never_built(repo_id):
     with TestClient(app) as client:
         response = client.post(
             "/index/context",
-            json={"repoId": repo_id, "sha": "sha1", "changedFiles": ["src/z.ts"]},
+            json={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "changedFiles": ["src/z.ts"]},
         )
 
     assert response.status_code == 200
@@ -45,6 +47,7 @@ def test_index_context_returns_callers_after_build(repo_id):
         client.post(
             "/index/build",
             json={
+                "ownerId": OWNER_ID,
                 "repoId": repo_id,
                 "sha": "sha1",
                 "files": [
@@ -55,7 +58,7 @@ def test_index_context_returns_callers_after_build(repo_id):
         )
         response = client.post(
             "/index/context",
-            json={"repoId": repo_id, "sha": "sha1", "changedFiles": ["src/b.ts"]},
+            json={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "changedFiles": ["src/b.ts"]},
         )
 
     assert response.status_code == 200

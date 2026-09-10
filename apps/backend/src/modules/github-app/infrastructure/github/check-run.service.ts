@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import {
   CHECK_RUN_NAME,
   type CheckRunOutput,

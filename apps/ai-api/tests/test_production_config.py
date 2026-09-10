@@ -228,3 +228,16 @@ class TestServiceAuthentication:
         )
         response = client.post("/index/build", json={"files": ["x" * 500]})
         assert response.status_code == 401
+
+
+def test_production_refuses_the_default_neo4j_admin_account(monkeypatch):
+    # Community não tem RBAC, então isto é separação de credencial, não de
+    # privilégio: a conta da aplicação deixa de ser a que administra o servidor.
+    settings = load_settings(monkeypatch, NEO4J_USER="neo4j")
+    with pytest.raises(RuntimeError, match="NEO4J_USER"):
+        settings.validate_production_config()
+
+
+def test_a_dedicated_neo4j_user_is_accepted(monkeypatch):
+    settings = load_settings(monkeypatch, NEO4J_USER="cast_runtime")
+    settings.validate_production_config()

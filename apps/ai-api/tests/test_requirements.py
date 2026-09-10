@@ -4,6 +4,8 @@ from pydantic import ValidationError
 from app.chat.requirements import FeatureProposal, ground_proposal
 from app.chat.models import Citation
 
+OWNER_ID = "owner-test"
+
 
 def proposal(**changes):
     return {
@@ -77,12 +79,12 @@ async def test_requirements_agent_emits_proposal_with_cost_and_project_tools(mon
         return LlmResult(data=proposal(openQuestions=["Qual canal?"]), usage=usage)
 
     class Cache:
-        async def lookup(self, repo_id, sha):
+        async def lookup(self, repo_id, sha, owner_id):
             return Graph()
 
     monkeypatch.setattr("app.chat.agent.complete_with_tools", answer)
     monkeypatch.setattr("app.chat.requirements.complete_json", structure)
-    request = ChatRunRequest(threadId="t", mode="project", assistanceMode="requirements", repositories=[{"repoId": "acme/api", "sha": "abc"}], question="Quero notificações", model="gpt-4o", apiKeys={"openai": "test"})
+    request = ChatRunRequest(ownerId=OWNER_ID, threadId="t", mode="project", assistanceMode="requirements", repositories=[{"repoId": "acme/api", "sha": "abc"}], question="Quero notificações", model="gpt-4o", apiKeys={"openai": "test"})
     events = [event async for event in run_chat(Cache(), request)]
     done = events[-1].payload
     assert done["proposal"]["openQuestions"] == ["Qual canal?"]
@@ -105,7 +107,7 @@ async def test_invalid_structure_preserves_generation_usage(monkeypatch):
         return LlmResult(data={"title": "incomplete"}, usage=usage)
 
     monkeypatch.setattr("app.chat.requirements.complete_json", invalid)
-    request = ChatRunRequest(threadId="t", mode="project", repositories=[], question="Feature", model="gpt-4o", apiKeys={"openai": "test"})
+    request = ChatRunRequest(ownerId=OWNER_ID, threadId="t", mode="project", repositories=[], question="Feature", model="gpt-4o", apiKeys={"openai": "test"})
     data, measured = await generate_proposal(request, "Investigação", [])
     assert data is None
     assert measured == usage

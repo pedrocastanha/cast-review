@@ -7,7 +7,11 @@ from app.api.routes.agent import router as agent_router
 from app.api.routes.architecture import router as architecture_router
 from app.api.routes.chat import router as chat_router
 from app.api.routes.index import router as index_router
-from app.code_graph.cache import build_neo4j_driver, build_redis_client
+from app.code_graph.cache import (
+    build_neo4j_driver,
+    build_redis_client,
+    ensure_graph_indexes,
+)
 from app.config.settings import REDIS_URL, validate_production_config
 from app.graph.graph import build_graph
 from app.security import ServiceAuthentication
@@ -26,6 +30,9 @@ async def lifespan(app: FastAPI):
         app.state.graph = build_graph(saver)
 
         app.state.neo4j_driver = await stack.enter_async_context(build_neo4j_driver())
+        # Escopo por dono entra em todo MATCH: sem os índices compostos, cada leitura
+        # vira varredura completa do grafo.
+        await ensure_graph_indexes(app.state.neo4j_driver)
         app.state.index_redis = await stack.enter_async_context(build_redis_client())
         log.info("app.startup")
         yield

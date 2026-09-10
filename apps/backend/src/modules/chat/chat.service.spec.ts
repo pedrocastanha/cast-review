@@ -2,6 +2,12 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { ChatService } from './chat.service';
 
+// O grant de escopo das rotas de conteúdo é assinado com chave derivada do
+// AI_SERVICE_TOKEN.
+beforeAll(() => {
+  process.env.AI_SERVICE_TOKEN = 'a'.repeat(48);
+});
+
 const currentUser: CurrentUserData = {
   id: 'user-1',
   username: 'pedrocastanha',
@@ -84,6 +90,13 @@ function buildService(overrides: any = {}) {
     issue: jest.fn(() => 'catalog-grant'),
     ...overrides.catalogGrantService,
   };
+  // Por padrão o escopo continua autorizado; os testes de revogação
+  // sobrescrevem para provar o corte.
+  const scopeRevalidator = {
+    accessible: jest.fn(async (repoIds: string[]) => new Set(repoIds)),
+    isAccessible: jest.fn(async () => true),
+    ...overrides.scopeRevalidator,
+  };
 
   const service = new ChatService(
     threads as any,
@@ -98,10 +111,12 @@ function buildService(overrides: any = {}) {
       getIndexStatus: jest.fn(),
       get: jest.fn(),
     },
+    scopeRevalidator as any,
   );
 
   return {
     service,
+    scopeRevalidator,
     threads,
     messages,
     repositoriesService,
@@ -316,6 +331,8 @@ describe('ChatService.listFiles', () => {
     expect(aiApiClient.listIndexFiles).toHaveBeenCalledWith(
       'acme/back',
       'sha-abc',
+      currentUser.id,
+      expect.any(String),
       'src',
       50,
     );
@@ -492,6 +509,8 @@ describe('ChatService.sendMessage', () => {
       'acme/back',
       'sha-abc',
       'src/a.ts',
+      currentUser.id,
+      expect.any(String),
     );
     expect(repositoriesService.getFileContent).not.toHaveBeenCalled();
     const payload = (aiApiClient.runChat as jest.Mock).mock.calls[0][0];
@@ -547,6 +566,63 @@ describe('ChatService.sendMessage', () => {
       {
         content: 'e isso?',
         mentions: [{ repoId: 'outro/repo', path: 'src/x.ts' }],
+        model: 'gpt-4o',
+      },
+      currentUser,
+      req,
+      res,
+    );
+
+    const payload = (aiApiClient.runChat as jest.Mock).mock.calls[0][0];
+    expect(payload.mentions).toEqual([]);
+    expect(aiApiClient.getIndexFile).not.toHaveBeenCalled();
+  });
+
+  it('derruba do escopo o repositório cujo acesso foi revogado no GitHub', async () => {
+    const threads = threadRepository([seedThread()]);
+    const { service, aiApiClient } = buildService({
+      threads,
+      aiApiClient: { runChat: events([]) },
+      // O escopo persistido na thread continua dizendo que o repo está incluído;
+      // o GitHub é que não autoriza mais.
+      scopeRevalidator: {
+        accessible: jest.fn(async () => new Set<string>()),
+        isAccessible: jest.fn(async () => false),
+      },
+    });
+    const { req, res } = httpDoubles();
+
+    await expect(
+      service.sendMessage(
+        'thread-1',
+        { content: 'e agora?', model: 'gpt-4o' },
+        currentUser,
+        req,
+        res,
+      ),
+    ).rejects.toThrow('Nenhum repositório indexado nesta conversa.');
+
+    expect(aiApiClient.runChat).not.toHaveBeenCalled();
+  });
+
+  it('não resolve menção de repositório cujo acesso foi revogado', async () => {
+    const threads = threadRepository([seedThread()]);
+    const { service, aiApiClient } = buildService({
+      threads,
+      aiApiClient: { runChat: events([]) },
+      scopeRevalidator: {
+        // Ainda no escopo do run, mas negado na hora de ler o arquivo.
+        accessible: jest.fn(async (repoIds: string[]) => new Set(repoIds)),
+        isAccessible: jest.fn(async () => false),
+      },
+    });
+    const { req, res } = httpDoubles();
+
+    await service.sendMessage(
+      'thread-1',
+      {
+        content: 'e isso?',
+        mentions: [{ repoId: 'acme/back', path: 'src/a.ts' }],
         model: 'gpt-4o',
       },
       currentUser,

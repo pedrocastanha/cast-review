@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Queue } from 'bullmq';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import { In, Not } from 'typeorm';
 import { budgetMonthFor, hashRepositoryConfig } from '../../domain/config-hash';
 import type {
@@ -34,7 +34,8 @@ export interface EnqueueReviewRunInput {
 
 export type EnqueueOutcome =
   | { status: 'queued'; reviewRunId: string }
-  | { status: 'duplicate'; reviewRunId: string | null };
+  | { status: 'duplicate'; reviewRunId: string | null }
+  | { status: 'skipped'; reason: GithubReviewSkipReason };
 
 export class EnqueueReviewRunUseCase {
   constructor(
@@ -46,6 +47,24 @@ export class EnqueueReviewRunUseCase {
   async execute(input: EnqueueReviewRunInput): Promise<EnqueueOutcome> {
     const { installation, repository, facts } = input;
     const configHash = hashRepositoryConfig(repository.config);
+
+    // O worker precisa de um ator para ter contexto de RLS. Instalação sem dono
+    // vinculado não tem em nome de quem agir — falha fechada, não enfileira.
+    //
+    // Classificado como `skipped/configuration_required`, e NÃO como duplicata:
+    // duplicata é resultado normal e some no ruído, o que esconderia uma App
+    // instalada sem vínculo com conta Cast revisando nada em silêncio.
+    const actorUserId = installation.ownerUserId;
+    if (!actorUserId) {
+      this.logger.warn(
+        'Instalação sem dono vinculado: revisão não enfileirada',
+        {
+          installationId: installation.installationId,
+          repository: repository.fullName,
+        },
+      );
+      return { status: 'skipped', reason: 'configuration_required' };
+    }
 
     const duplicate = await this.reviewRunRepository.findOne({
       where: {
@@ -107,7 +126,7 @@ export class EnqueueReviewRunUseCase {
 
     await this.reviewQueue.add(
       'review',
-      { reviewRunId: run.id },
+      { reviewRunId: run.id, actorUserId },
       {
         jobId: buildReviewJobId(run.id),
         attempts: 3,

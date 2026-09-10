@@ -1,4 +1,4 @@
-import { decryptSecret } from 'src/shared/crypto/secret-crypto';
+import { decryptSecret } from '../../../crypto/secret-crypto';
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddGithubTokenLastFour1786500000000 implements MigrationInterface {

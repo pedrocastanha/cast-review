@@ -13,6 +13,7 @@ async def rank(
     repo_id: str,
     sha: str,
     changed_paths: list[str],
+    owner_id: str,
     source_symbol_ids: list[str] | None = None,
 ) -> list[ScoredNode]:
     """Personalized PageRank over the `REFERENCES` subgraph only — `IMPORTS` never
@@ -37,8 +38,8 @@ async def rank(
         try:
             await session.run(
                 """
-                MATCH (s:Symbol {repoId: $repoId, sha: $sha})
-                OPTIONAL MATCH (s)-[r:REFERENCES]->(t:Symbol {repoId: $repoId, sha: $sha})
+                MATCH (s:Symbol {ownerId: $ownerId, repoId: $repoId, sha: $sha})
+                OPTIONAL MATCH (s)-[r:REFERENCES]->(t:Symbol {ownerId: $ownerId, repoId: $repoId, sha: $sha})
                 WITH gds.graph.project(
                     $graphName,
                     coalesce(t, s),
@@ -51,6 +52,7 @@ async def rank(
                 ) AS g
                 RETURN g
                 """,
+                ownerId=owner_id,
                 repoId=repo_id,
                 sha=sha,
                 graphName=graph_name,
@@ -59,10 +61,11 @@ async def rank(
             if source_symbol_ids:
                 source_result = await session.run(
                     """
-                    MATCH (s:Symbol {repoId: $repoId, sha: $sha})
+                    MATCH (s:Symbol {ownerId: $ownerId, repoId: $repoId, sha: $sha})
                     WHERE s.id IN $symbolIds
                     RETURN collect(id(s)) AS sourceIds
                     """,
+                    ownerId=owner_id,
                     repoId=repo_id,
                     sha=sha,
                     symbolIds=source_symbol_ids,
@@ -70,10 +73,11 @@ async def rank(
             else:
                 source_result = await session.run(
                     """
-                    MATCH (s:Symbol {repoId: $repoId, sha: $sha})
+                    MATCH (s:Symbol {ownerId: $ownerId, repoId: $repoId, sha: $sha})
                     WHERE s.path IN $changedPaths
                     RETURN collect(id(s)) AS sourceIds
                     """,
+                    ownerId=owner_id,
                     repoId=repo_id,
                     sha=sha,
                     changedPaths=changed_paths,

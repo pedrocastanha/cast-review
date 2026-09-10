@@ -5,6 +5,8 @@ import pytest
 from app.code_graph.cache import IndexCache, build_neo4j_driver, build_redis_client
 from app.code_graph.models import Edge, Graph, HttpEndpoint, Symbol
 
+OWNER_ID = "owner-test"
+
 pytestmark = pytest.mark.integration
 
 
@@ -66,9 +68,9 @@ async def _cleanup(driver, repo_id, sha="sha1"):
 async def test_build_and_store_then_lookup_roundtrip(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
     graph = _sample_graph()
-    await cache.build_and_store(repo_id, "sha1", graph)
+    await cache.build_and_store(repo_id, "sha1", graph, OWNER_ID)
 
-    recovered = await cache.lookup(repo_id, "sha1")
+    recovered = await cache.lookup(repo_id, "sha1", OWNER_ID)
     assert recovered is not None
     assert recovered.nodes.keys() == graph.nodes.keys()
     assert len(recovered.edges) == 3
@@ -83,16 +85,16 @@ async def test_build_and_store_then_lookup_roundtrip(driver, redis_client, repo_
 
 async def test_lookup_never_indexed_returns_none(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    result = await cache.lookup(repo_id, "never-indexed-sha")
+    result = await cache.lookup(repo_id, "never-indexed-sha", OWNER_ID)
     assert result is None
 
 
 async def test_build_and_store_is_idempotent_rebuild(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", _sample_graph())
-    await cache.build_and_store(repo_id, "sha1", _sample_graph())
+    await cache.build_and_store(repo_id, "sha1", _sample_graph(), OWNER_ID)
+    await cache.build_and_store(repo_id, "sha1", _sample_graph(), OWNER_ID)
 
-    recovered = await cache.lookup(repo_id, "sha1")
+    recovered = await cache.lookup(repo_id, "sha1", OWNER_ID)
     assert len(recovered.nodes) == 3
     assert len(recovered.edges) == 3
 
@@ -102,9 +104,9 @@ async def test_build_and_store_is_idempotent_rebuild(driver, redis_client, repo_
 async def test_different_repos_do_not_leak_into_each_other(driver, redis_client, repo_id):
     other_repo_id = f"{repo_id}-other"
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", _sample_graph())
+    await cache.build_and_store(repo_id, "sha1", _sample_graph(), OWNER_ID)
 
-    result = await cache.lookup(other_repo_id, "sha1")
+    result = await cache.lookup(other_repo_id, "sha1", OWNER_ID)
     assert result is None
 
     await _cleanup(driver, repo_id)
@@ -112,13 +114,13 @@ async def test_different_repos_do_not_leak_into_each_other(driver, redis_client,
 
 async def test_get_latest_sha_never_indexed_returns_none(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    assert await cache.get_latest_sha(repo_id) is None
+    assert await cache.get_latest_sha(repo_id, OWNER_ID) is None
 
 
 async def test_get_latest_sha_returns_indexed_sha(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", _sample_graph())
-    assert await cache.get_latest_sha(repo_id) == "sha1"
+    await cache.build_and_store(repo_id, "sha1", _sample_graph(), OWNER_ID)
+    assert await cache.get_latest_sha(repo_id, OWNER_ID) == "sha1"
 
     await _cleanup(driver, repo_id)
 
@@ -127,9 +129,9 @@ async def test_list_repositories_queries_neo4j_without_parameter_collision(
     driver, redis_client, repo_id
 ):
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", _sample_graph())
+    await cache.build_and_store(repo_id, "sha1", _sample_graph(), OWNER_ID)
 
-    repositories, next_cursor = await cache.list_repositories(repo_id, 20, None)
+    repositories, next_cursor = await cache.list_repositories(OWNER_ID, repo_id, 20, None)
 
     assert repositories == [{"repoId": repo_id, "sha": "sha1"}]
     assert next_cursor is None
@@ -138,32 +140,32 @@ async def test_list_repositories_queries_neo4j_without_parameter_collision(
 
 async def test_reindex_new_sha_updates_latest_and_drops_old_nodes(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", _sample_graph())
-    await cache.build_and_store(repo_id, "sha2", _sample_graph())
+    await cache.build_and_store(repo_id, "sha1", _sample_graph(), OWNER_ID)
+    await cache.build_and_store(repo_id, "sha2", _sample_graph(), OWNER_ID)
 
-    assert await cache.get_latest_sha(repo_id) == "sha2"
+    assert await cache.get_latest_sha(repo_id, OWNER_ID) == "sha2"
     # Old sha's nodes must be gone — a repo has one current graph, not one per commit
     # ever indexed (see the comment on `build_and_store`'s cleanup query).
-    assert await cache.lookup(repo_id, "sha1") is None
-    assert await cache.lookup(repo_id, "sha2") is not None
+    assert await cache.lookup(repo_id, "sha1", OWNER_ID) is None
+    assert await cache.lookup(repo_id, "sha2", OWNER_ID) is not None
 
     await _cleanup(driver, repo_id)
 
 
 async def test_acquire_lock_blocks_concurrent_second_call(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    first = await cache.acquire_lock(repo_id, "sha1")
-    second = await cache.acquire_lock(repo_id, "sha1")
+    first = await cache.acquire_lock(repo_id, OWNER_ID)
+    second = await cache.acquire_lock(repo_id, OWNER_ID)
     assert first is True
     assert second is False
 
-    await cache.release_lock(repo_id, "sha1")
+    await cache.release_lock(repo_id, OWNER_ID)
 
 
 async def test_release_lock_allows_reacquisition(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    await cache.acquire_lock(repo_id, "sha1")
-    await cache.release_lock(repo_id, "sha1")
+    await cache.acquire_lock(repo_id, OWNER_ID)
+    await cache.release_lock(repo_id, OWNER_ID)
 
 
 async def test_build_and_store_roundtrips_http_endpoints(driver, redis_client, repo_id):
@@ -184,8 +186,8 @@ async def test_build_and_store_roundtrips_http_endpoints(driver, redis_client, r
         )
     ]
 
-    await cache.build_and_store(repo_id, "sha1", graph)
-    endpoints = await cache.list_endpoints(repo_id, "sha1")
+    await cache.build_and_store(repo_id, "sha1", graph, OWNER_ID)
+    endpoints = await cache.list_endpoints(repo_id, "sha1", OWNER_ID)
 
     assert len(endpoints) == 1
     assert endpoints[0].normalized_route == "/health"
@@ -237,16 +239,104 @@ async def test_reindex_replaces_only_target_repo_endpoints(driver, redis_client,
         )
     ]
 
-    await cache.build_and_store(repo_id, "sha1", first)
-    await cache.build_and_store(other_repo_id, "sha1", other)
-    await cache.build_and_store(repo_id, "sha2", replacement)
+    await cache.build_and_store(repo_id, "sha1", first, OWNER_ID)
+    await cache.build_and_store(other_repo_id, "sha1", other, OWNER_ID)
+    await cache.build_and_store(repo_id, "sha2", replacement, OWNER_ID)
 
-    assert [item.id for item in await cache.list_endpoints(repo_id, "sha2")] == ["new"]
-    assert [item.id for item in await cache.list_endpoints(other_repo_id, "sha1")] == ["other"]
+    assert [item.id for item in await cache.list_endpoints(repo_id, "sha2", OWNER_ID)] == ["new"]
+    assert [item.id for item in await cache.list_endpoints(other_repo_id, "sha1", OWNER_ID)] == ["other"]
 
     await _cleanup(driver, repo_id)
     await _cleanup(driver, other_repo_id)
-    reacquired = await cache.acquire_lock(repo_id, "sha1")
+    reacquired = await cache.acquire_lock(repo_id, OWNER_ID)
     assert reacquired is True
 
-    await cache.release_lock(repo_id, "sha1")
+    await cache.release_lock(repo_id, OWNER_ID)
+
+
+# --- Isolamento por dono -----------------------------------------------------
+# Neo4j Community não tem RLS: o escopo por `ownerId` é a única coisa separando
+# dois usuários que indexaram o MESMO repoId. Estes testes prendem esse contrato.
+
+OTHER_OWNER_ID = "owner-test-other"
+
+
+async def test_same_repo_indexed_by_two_owners_does_not_leak(driver, redis_client, repo_id):
+    cache = IndexCache(driver, redis_client)
+    await cache.build_and_store(repo_id, "sha1", _sample_graph(), OWNER_ID)
+
+    # Mesmo repoId, mesmo sha, dono diferente: não enxerga nada.
+    assert await cache.lookup(repo_id, "sha1", OTHER_OWNER_ID) is None
+    assert await cache.get_latest_sha(repo_id, OTHER_OWNER_ID) is None
+
+    page, _ = await cache.list_repositories(OTHER_OWNER_ID, None, 20, None)
+    assert all(entry["repoId"] != repo_id for entry in page)
+
+    await _cleanup(driver, repo_id)
+
+
+async def test_reindex_by_one_owner_leaves_the_other_owner_graph_intact(
+    driver, redis_client, repo_id
+):
+    cache = IndexCache(driver, redis_client)
+    await cache.build_and_store(repo_id, "sha1", _sample_graph(), OWNER_ID)
+    await cache.build_and_store(repo_id, "sha1", _sample_graph(), OTHER_OWNER_ID)
+
+    # A limpeza de shas antigos é escopada por dono: reindexar como OWNER_ID em
+    # outro sha não pode apagar o grafo de OTHER_OWNER_ID.
+    await cache.build_and_store(repo_id, "sha2", _sample_graph(), OWNER_ID)
+
+    assert await cache.get_latest_sha(repo_id, OWNER_ID) == "sha2"
+    assert await cache.get_latest_sha(repo_id, OTHER_OWNER_ID) == "sha1"
+    assert await cache.lookup(repo_id, "sha1", OTHER_OWNER_ID) is not None
+    assert await cache.lookup(repo_id, "sha1", OWNER_ID) is None
+
+    await _cleanup(driver, repo_id)
+
+
+async def test_endpoints_are_scoped_by_owner(driver, redis_client, repo_id):
+    cache = IndexCache(driver, redis_client)
+    graph = _sample_graph()
+    graph.endpoints = [
+        HttpEndpoint(
+            id="provider-health",
+            role="provider",
+            method="GET",
+            route="/health",
+            normalized_route="/health",
+            path="a.ts",
+            line=1,
+            framework="nestjs",
+        )
+    ]
+    await cache.build_and_store(repo_id, "sha1", graph, OWNER_ID)
+
+    assert await cache.list_endpoints(repo_id, "sha1", OWNER_ID) != []
+    assert await cache.list_endpoints(repo_id, "sha1", OTHER_OWNER_ID) == []
+
+    await _cleanup(driver, repo_id)
+
+
+async def test_lock_serializes_builds_of_the_same_repo_across_shas(
+    driver, redis_client, repo_id
+):
+    """Regressão: o lock era chaveado por repo+sha, então duas builds do mesmo
+    repositório em shas diferentes corriam juntas e a limpeza de uma apagava o
+    grafo recém-escrito pela outra."""
+    cache = IndexCache(driver, redis_client)
+    try:
+        assert await cache.acquire_lock(repo_id, OWNER_ID) is True
+        assert await cache.acquire_lock(repo_id, OWNER_ID) is False
+    finally:
+        await cache.release_lock(repo_id, OWNER_ID)
+
+
+async def test_lock_does_not_block_a_different_owner(driver, redis_client, repo_id):
+    cache = IndexCache(driver, redis_client)
+    try:
+        assert await cache.acquire_lock(repo_id, OWNER_ID) is True
+        # Grafos de donos diferentes não colidem, então não devem se serializar.
+        assert await cache.acquire_lock(repo_id, OTHER_OWNER_ID) is True
+    finally:
+        await cache.release_lock(repo_id, OWNER_ID)
+        await cache.release_lock(repo_id, OTHER_OWNER_ID)

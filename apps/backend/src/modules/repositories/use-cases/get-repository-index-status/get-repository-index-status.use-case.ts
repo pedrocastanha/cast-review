@@ -1,5 +1,5 @@
 import type { Queue } from 'bullmq';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import { AiApiClient } from '../../../../shared/clients/ai/ai-api.client';
 import {
   buildIndexJobId,
   IndexJobData,
@@ -43,7 +43,10 @@ export class GetRepositoryIndexStatusUseCase {
       }
 
       const repoId = `${owner}/${repo}`;
-      const { indexed, sha } = await this.aiApiClient.getIndexStatus(repoId);
+      const { indexed, sha } = await this.aiApiClient.getIndexStatus(
+        repoId,
+        currentUser.id,
+      );
 
       return {
         status: indexed ? 'indexed' : 'not_indexed',

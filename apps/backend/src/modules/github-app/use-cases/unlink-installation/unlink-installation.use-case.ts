@@ -1,4 +1,4 @@
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import type { CurrentUserData } from '../../../auth/utils/current-user-decorator';
 import type { InstallationTokenService } from '../../infrastructure/github/installation-token.service';
 import type { GithubAppRepositoryRepository } from '../../infrastructure/persistence/github-app-repository.repository';
@@ -23,12 +23,14 @@ export class UnlinkInstallationUseCase {
       currentUser,
     );
 
-    await this.appRepositoryRepository
-      .createQueryBuilder()
-      .update()
-      .set({ enabled: false, removedAt: new Date() })
-      .where('installation_id = :id', { id: installation.id })
-      .execute();
+    await this.appRepositoryRepository.withRlsTransaction((manager) =>
+      this.appRepositoryRepository
+        .createQueryBuilder(undefined, manager)
+        .update()
+        .set({ enabled: false, removedAt: new Date() })
+        .where('installation_id = :id', { id: installation.id })
+        .execute(),
+    );
 
     await this.installationRepository.update(installation.id, {
       ownerUserId: null,

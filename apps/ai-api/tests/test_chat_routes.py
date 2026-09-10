@@ -7,6 +7,60 @@ from fastapi.testclient import TestClient
 from app.chat.models import ChatEvent
 from app.main import app
 
+OWNER_ID = "owner-test"
+SERVICE_TOKEN = "t" * 48
+
+
+@pytest.fixture(autouse=True)
+def _service_token(monkeypatch):
+    """Escopado ao módulo de teste: definir AI_SERVICE_TOKEN no import vazaria
+    para os outros testes e ligaria a autenticação de serviço neles."""
+    monkeypatch.setenv("AI_SERVICE_TOKEN", SERVICE_TOKEN)
+
+
+def _client() -> TestClient:
+    """Client já autenticado como serviço.
+
+    Definir AI_SERVICE_TOKEN liga o ServiceAuthentication middleware, então todo
+    request precisa do bearer — o grant de escopo é uma camada ADICIONAL sobre
+    ele, não um substituto.
+    """
+    return TestClient(app, headers={"authorization": f"Bearer {SERVICE_TOKEN}"})
+
+
+def _scope_headers(repo_id: str, sha: str = "sha1", owner_id: str = OWNER_ID) -> dict:
+    """Grant que o backend emitiria para este repo@sha."""
+    from app.index_scope import INDEX_SCOPE_HEADER
+
+    return {INDEX_SCOPE_HEADER: _issue_grant(owner_id, [(repo_id, sha)])}
+
+
+def _issue_grant(owner_id: str, repositories: list[tuple[str, str]], ttl_ms: int = 300_000) -> str:
+    import base64
+    import hashlib
+    import hmac
+    import json as _json
+    import time
+
+    payload = base64.urlsafe_b64encode(
+        _json.dumps(
+            {
+                "ownerId": owner_id,
+                "repositories": [{"repoId": r, "sha": s} for r, s in repositories],
+                "expiresAt": time.time() * 1000 + ttl_ms,
+            }
+        ).encode()
+    ).rstrip(b"=").decode()
+    key = hmac.new(
+        SERVICE_TOKEN.encode(), b"index-scope-grant-v1", hashlib.sha256
+    ).digest()
+    signature = (
+        base64.urlsafe_b64encode(hmac.new(key, payload.encode(), hashlib.sha256).digest())
+        .rstrip(b"=")
+        .decode()
+    )
+    return f"{payload}.{signature}"
+
 pytestmark = pytest.mark.integration
 
 FILES = [
@@ -40,14 +94,16 @@ def _cleanup(repo_id):
 
 
 def _build(client, repo_id):
-    client.post("/index/build", json={"repoId": repo_id, "sha": "sha1", "files": FILES})
+    client.post("/index/build", json={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "files": FILES})
 
 
 def test_index_file_renders_from_graph(repo_id):
-    with TestClient(app) as client:
+    with _client() as client:
         _build(client, repo_id)
         response = client.get(
-            "/index/file", params={"repoId": repo_id, "sha": "sha1", "path": "src/auth.ts"}
+            "/index/file",
+            params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "path": "src/auth.ts"},
+            headers=_scope_headers(repo_id),
         )
 
     assert response.status_code == 200
@@ -58,10 +114,12 @@ def test_index_file_renders_from_graph(repo_id):
 
 
 def test_index_file_unknown_path_returns_404(repo_id):
-    with TestClient(app) as client:
+    with _client() as client:
         _build(client, repo_id)
         response = client.get(
-            "/index/file", params={"repoId": repo_id, "sha": "sha1", "path": "README.md"}
+            "/index/file",
+            params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "path": "README.md"},
+            headers=_scope_headers(repo_id),
         )
 
     assert response.status_code == 404
@@ -69,20 +127,24 @@ def test_index_file_unknown_path_returns_404(repo_id):
 
 
 def test_index_file_unknown_index_returns_404(repo_id):
-    with TestClient(app) as client:
+    with _client() as client:
         response = client.get(
-            "/index/file", params={"repoId": repo_id, "sha": "nope", "path": "src/auth.ts"}
+            "/index/file",
+            params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "nope", "path": "src/auth.ts"},
+            headers=_scope_headers(repo_id, sha="nope"),
         )
 
     assert response.status_code == 404
 
 
 def test_index_files_lists_and_filters_paths(repo_id):
-    with TestClient(app) as client:
+    with _client() as client:
         _build(client, repo_id)
-        every = client.get("/index/files", params={"repoId": repo_id, "sha": "sha1"}).json()
+        every = client.get("/index/files", params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1"}, headers=_scope_headers(repo_id)).json()
         filtered = client.get(
-            "/index/files", params={"repoId": repo_id, "sha": "sha1", "query": "auth"}
+            "/index/files",
+            params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "query": "auth"},
+            headers=_scope_headers(repo_id),
         ).json()
 
     assert set(every["paths"]) == {"src/auth.ts", "src/other.ts"}
@@ -114,11 +176,12 @@ def test_chat_run_streams_tool_and_message_events(repo_id, monkeypatch):
 
     monkeypatch.setattr("app.chat.agent.complete_with_tools", fake)
 
-    with TestClient(app) as client:
+    with _client() as client:
         _build(client, repo_id)
         response = client.post(
             "/chat/run",
             json={
+                "ownerId": OWNER_ID,
                 "threadId": "t1",
                 "mode": "repository",
                 "repositories": [{"repoId": repo_id, "sha": "sha1"}],
@@ -148,10 +211,11 @@ def test_chat_run_streams_tool_and_message_events(repo_id, monkeypatch):
 
 
 def test_chat_run_on_unindexed_repo_emits_error(repo_id, monkeypatch):
-    with TestClient(app) as client:
+    with _client() as client:
         response = client.post(
             "/chat/run",
             json={
+                "ownerId": OWNER_ID,
                 "threadId": "t1",
                 "mode": "repository",
                 "repositories": [{"repoId": repo_id, "sha": "nope"}],

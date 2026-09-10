@@ -27,7 +27,7 @@ export class PublishArchitectureMapUseCase {
     });
     const version = (map.publishedVersion ?? 0) + 1;
 
-    return this.mapRepository.datasource.transaction(async (manager) => {
+    return this.mapRepository.withRlsTransaction(async (manager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`architecture-map|${map.id}`],

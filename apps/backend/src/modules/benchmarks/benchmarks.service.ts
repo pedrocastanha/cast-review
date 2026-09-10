@@ -6,8 +6,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import type { AgentRunRequest } from 'src/shared/types';
+import { AiApiClient } from '../../shared/clients/ai/ai-api.client';
+import type { AgentRunRequest } from '../../shared/types';
 import { AnalysisRepository } from '../analyses/analysis.repository';
 import { AnalysisContextSnapshotRepository } from '../analyses/analysis-context-snapshot.repository';
 import {
@@ -149,7 +149,9 @@ export class BenchmarksService {
 
     const results: BenchmarkModelResult[] = [];
     for (const model of models) {
-      results.push(await this.runModel(benchmarkCase, model, openaiKey));
+      results.push(
+        await this.runModel(benchmarkCase, model, openaiKey, currentUser.id),
+      );
     }
 
     const failed = results.filter((result) => result.status === 'error');
@@ -168,12 +170,16 @@ export class BenchmarksService {
     benchmarkCase: BenchmarkCase,
     model: string,
     openaiKey: string,
+    ownerId: string,
   ): Promise<BenchmarkModelResult> {
     const startedAt = Date.now();
     let report = emptyReview();
     try {
       const input = benchmarkCase.inputSnapshot;
       const payload: AgentRunRequest = {
+        // Benchmark roda sobre snapshot congelado: o ai-api não lê o grafo, mas o
+        // contrato exige escopo declarado — nunca mandar vazio.
+        ownerId,
         analysisId: randomUUID(),
         diff: input.diff,
         changedFiles: input.changedFiles,

@@ -1,4 +1,4 @@
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import type { CurrentUserData } from '../../../auth/utils/current-user-decorator';
 import type { GithubInstallationRepository } from '../../infrastructure/persistence/github-installation.repository';
 import type { InstallationOwnershipProvider } from '../shared/installation-ownership.provider';

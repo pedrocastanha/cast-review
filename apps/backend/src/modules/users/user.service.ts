@@ -1,10 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import { Octokit } from '@octokit/rest';
 import * as bcrypt from 'bcrypt';
 import {
@@ -12,21 +12,21 @@ import {
   encryptBoundSecret,
   isBoundToOwner,
   SecretDecryptionError,
-} from 'src/shared/crypto/secret-crypto';
-import { demoSessionTtlMinutes } from 'src/shared/security/demo-access';
+} from '../../shared/crypto/secret-crypto';
+import { AppLogger } from '../../shared/logger/logger.service';
+import { demoSessionTtlMinutes } from '../../shared/security/demo-access';
 import {
   currentRequestCredentials,
   isEphemeralMode,
-} from 'src/shared/security/request-credentials';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import { BaseService } from 'src/shared/services/base.service';
+} from '../../shared/security/request-credentials';
+import { BaseService } from '../../shared/services/base.service';
+import { RefreshSessionRepository } from '../auth/refresh-session.repository';
 import { CreateUserDto } from './dtos/create-user.dto';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { toUserResponse, UserResponseDto } from './dtos/user-response.dto';
 import { GithubCredentials } from './types/github-credentials.type';
 import { User } from './user.entity';
 import { UserRepository } from './user.repository';
-import { RefreshSessionRepository } from '../auth/refresh-session.repository';
 
 const REQUIRED_CLASSIC_SCOPES = ['repo', 'public_repo'];
 const GITHUB_TOKEN_FIELD = 'github_token';
@@ -42,13 +42,21 @@ export class UserService extends BaseService {
     super(logger);
   }
 
+  /**
+   * Cadastro roda sem usuário autenticado (rota `@Public()`), então o ator do
+   * escopo é anônimo — que sob RLS não escreve nada. `users_auth_signup` cobre
+   * exatamente este caso, e só INSERT.
+   */
   async createUser(dto: CreateUserDto): Promise<UserResponseDto> {
     return await this.safeExecute(async () => {
       const user = this.userRepository.create({
         ...dto,
         password: await bcrypt.hash(dto.password, 12),
       });
-      await this.userRepository.save(user);
+      await this.userRepository.withRlsTransaction(
+        (manager) => this.userRepository.save(user, undefined, manager),
+        { actorType: 'auth', userId: null },
+      );
 
       return toUserResponse(user);
     });
@@ -131,7 +139,9 @@ export class UserService extends BaseService {
 
   async createGuestUser(): Promise<User> {
     const id = randomUUID();
-    const expiresAt = new Date(demoSessionTtlMinutes() * 60 * 1000 + Date.now());
+    const expiresAt = new Date(
+      demoSessionTtlMinutes() * 60 * 1000 + Date.now(),
+    );
     const user = this.userRepository.create({
       id,
       name: 'Visitante',
@@ -141,30 +151,46 @@ export class UserService extends BaseService {
       demoExpiresAt: expiresAt,
     });
 
-    await this.userRepository.save(user);
+    // Mesma razão de `createUser`: o login demo é rota pública.
+    await this.userRepository.withRlsTransaction(
+      (manager) => this.userRepository.save(user, undefined, manager),
+      { actorType: 'auth', userId: null },
+    );
 
     return user;
   }
 
+  /**
+   * Expurgo de contas demo. Não tem dono humano, então roda como ator `job`,
+   * coberto pelas policies `users_demo_reaper` e `analyses_demo_reaper` — que
+   * só alcançam linhas cujo usuário tem `demo_expires_at` preenchido.
+   *
+   * Tudo numa transação só: apagar as análises e não apagar os usuários
+   * deixaria o expurgo pela metade.
+   */
   async purgeExpiredGuests(limit = 50): Promise<number> {
-    const expired = (await this.userRepository.datasource.query(
-      `SELECT id FROM users WHERE demo_expires_at IS NOT NULL AND demo_expires_at < now() LIMIT $1`,
-      [limit],
-    )) as Array<{ id: string }>;
+    return this.userRepository.withRlsTransaction(
+      async (manager) => {
+        const expired = (await manager.query(
+          `SELECT id FROM users WHERE demo_expires_at IS NOT NULL AND demo_expires_at < now() LIMIT $1`,
+          [limit],
+        )) as Array<{ id: string }>;
 
-    if (!expired.length) return 0;
+        if (!expired.length) return 0;
 
-    const ids = expired.map((row) => row.id);
-    await this.userRepository.datasource.query(
-      `DELETE FROM analyses WHERE requested_by = ANY($1::uuid[])`,
-      [ids],
+        const ids = expired.map((row) => row.id);
+        await manager.query(
+          `DELETE FROM analyses WHERE requested_by = ANY($1::uuid[])`,
+          [ids],
+        );
+        await manager.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [
+          ids,
+        ]);
+
+        return ids.length;
+      },
+      { actorType: 'job', userId: null },
     );
-    await this.userRepository.datasource.query(
-      `DELETE FROM users WHERE id = ANY($1::uuid[])`,
-      [ids],
-    );
-
-    return ids.length;
   }
 
   async removeGithubToken(id: string): Promise<UserResponseDto> {
@@ -302,12 +328,17 @@ export class UserService extends BaseService {
     field: string,
   ): Promise<void> {
     try {
-      await this.userRepository
-        .createQueryBuilder()
-        .update(User)
-        .set({ [field === GITHUB_TOKEN_FIELD ? 'githubToken' : 'openaiKey']: encryptBoundSecret(plain, { ownerId: id, field }) })
-        .where('id = :id AND ' + field + ' = :stored', { id, stored })
-        .execute();
+      await this.userRepository.withRlsTransaction((manager) =>
+        this.userRepository
+          .createQueryBuilder(undefined, manager)
+          .update(User)
+          .set({
+            [field === GITHUB_TOKEN_FIELD ? 'githubToken' : 'openaiKey']:
+              encryptBoundSecret(plain, { ownerId: id, field }),
+          })
+          .where('id = :id AND ' + field + ' = :stored', { id, stored })
+          .execute(),
+      );
     } catch (err) {
       this.logger.error('Falha ao religar segredo ao dono', {
         exception: err,
@@ -325,6 +356,24 @@ export class UserService extends BaseService {
 
   async getById(id: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { id } });
+  }
+
+  /**
+   * Resolve o dono de uma sessão de refresh.
+   *
+   * O refresh é rota `@Public()`: o ator do escopo é anônimo, então `getById`
+   * comum não devolveria nada sob RLS. Método separado de propósito — dar o
+   * privilégio de bootstrap ao `getById` geral alargaria o buraco para todo
+   * caminho que resolve usuário por id.
+   *
+   * O `id` vem da sessão de refresh já validada por token hash, nunca do
+   * cliente.
+   */
+  async getForSessionRefresh(id: string): Promise<User | null> {
+    return this.userRepository.withRlsTransaction(
+      (manager) => this.userRepository.findOne({ where: { id } }, manager),
+      { actorType: 'auth', userId: null },
+    );
   }
 
   async getByIdOrFail(id: string): Promise<UserResponseDto> {
@@ -352,32 +401,40 @@ export class UserService extends BaseService {
     return toUserResponse(user);
   }
 
+  /**
+   * Login por e-mail devolve, por definição, a linha de alguém que ainda não se
+   * autenticou — não há `app.user_id` para escopar. Roda sob a policy
+   * `users_auth_bootstrap`, que é SELECT apenas.
+   */
   async getByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: { email },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        username: true,
-        active: true,
-        password: true,
-      },
-    });
+    return this.authLookup({ email });
   }
 
   async getByUsername(username: string): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: { username },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        username: true,
-        active: true,
-        password: true,
-      },
-    });
+    return this.authLookup({ username });
+  }
+
+  private async authLookup(
+    where: { email: string } | { username: string },
+  ): Promise<User | null> {
+    return this.userRepository.withRlsTransaction(
+      (manager) =>
+        this.userRepository.findOne(
+          {
+            where,
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              username: true,
+              active: true,
+              password: true,
+            },
+          },
+          manager,
+        ),
+      { actorType: 'auth', userId: null },
+    );
   }
 
   private async validateGithubToken(token: string): Promise<string> {

@@ -15,7 +15,7 @@ export class DeleteCapabilityUseCase {
   async execute(map: ArchitectureMap, capabilityId: string) {
     const capability = await this.ownership.capability(map, capabilityId);
 
-    return this.capabilityRepository.datasource.transaction(async (manager) => {
+    return this.capabilityRepository.withRlsTransaction(async (manager) => {
       const owned = await this.componentRepository.find(
         { where: { mapId: map.id, capabilityId: capability.id, active: true } },
         manager,

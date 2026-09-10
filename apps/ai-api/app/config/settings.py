@@ -58,6 +58,15 @@ def validate_production_config() -> None:
     if NEO4J_PASSWORD == "portfolio123":
         raise RuntimeError("NEO4J_PASSWORD inválido")
 
+    # Neo4j Community não tem RBAC: um usuário dedicado NÃO reduz privilégio,
+    # todos são efetivamente admin. O que ele dá é separação de credencial —
+    # a credencial da aplicação pode ser rotacionada ou revogada sem mexer na
+    # conta `neo4j`, que é a que administra auth e configuração do servidor.
+    if NEO4J_USER == "neo4j":
+        raise RuntimeError(
+            "NEO4J_USER não deve ser a conta administrativa padrão em produção"
+        )
+
     if ALLOW_INSECURE_DEPENDENCIES:
         return
 

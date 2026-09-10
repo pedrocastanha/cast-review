@@ -1,32 +1,32 @@
 import 'dotenv/config';
 
-import { Analysis } from 'src/modules/analyses/analysis.entity';
-import { AnalysisContextSnapshotEntity } from 'src/modules/analyses/analysis-context-snapshot.entity';
-import { ArchitectureBoundary } from 'src/modules/architecture-maps/entities/architecture-boundary.entity';
-import { ArchitectureCapability } from 'src/modules/architecture-maps/entities/architecture-capability.entity';
-import { ArchitectureComponent } from 'src/modules/architecture-maps/entities/architecture-component.entity';
-import { ArchitectureMap } from 'src/modules/architecture-maps/entities/architecture-map.entity';
-import { ArchitectureMapVersion } from 'src/modules/architecture-maps/entities/architecture-map-version.entity';
-import { BenchmarkCase } from 'src/modules/benchmarks/benchmark-case.entity';
-import { BenchmarkRun } from 'src/modules/benchmarks/benchmark-run.entity';
-import { ChatMessage } from 'src/modules/chat/chat-message.entity';
-import { ChatThread } from 'src/modules/chat/chat-thread.entity';
-import { FeatureCard } from 'src/modules/feature-cards/entities/feature-card.entity';
-import { FeatureCardRevision } from 'src/modules/feature-cards/entities/feature-card-revision.entity';
-import { FindingCase } from 'src/modules/finding-cases/finding-case.entity';
-import { FindingCaseEvent } from 'src/modules/finding-cases/finding-case-event.entity';
-import { FindingOccurrence } from 'src/modules/finding-cases/finding-occurrence.entity';
-import { GithubAppRepository } from 'src/modules/github-app/entities/github-app-repository.entity';
-import { GithubInstallation } from 'src/modules/github-app/entities/github-installation.entity';
-import { GithubReviewRun } from 'src/modules/github-app/entities/github-review-run.entity';
-import { GithubWebhookDelivery } from 'src/modules/github-app/entities/github-webhook-delivery.entity';
-import { Project } from 'src/modules/projects/project.entity';
-import { ProjectRepositoryMember } from 'src/modules/projects/project-repository-member.entity';
-import { User } from 'src/modules/users/user.entity';
+import { Analysis } from '../../../modules/analyses/analysis.entity';
+import { AnalysisContextSnapshotEntity } from '../../../modules/analyses/analysis-context-snapshot.entity';
+import { ArchitectureBoundary } from '../../../modules/architecture-maps/entities/architecture-boundary.entity';
+import { ArchitectureCapability } from '../../../modules/architecture-maps/entities/architecture-capability.entity';
+import { ArchitectureComponent } from '../../../modules/architecture-maps/entities/architecture-component.entity';
+import { ArchitectureMap } from '../../../modules/architecture-maps/entities/architecture-map.entity';
+import { ArchitectureMapVersion } from '../../../modules/architecture-maps/entities/architecture-map-version.entity';
+import { BenchmarkCase } from '../../../modules/benchmarks/benchmark-case.entity';
+import { BenchmarkRun } from '../../../modules/benchmarks/benchmark-run.entity';
+import { ChatMessage } from '../../../modules/chat/chat-message.entity';
+import { ChatThread } from '../../../modules/chat/chat-thread.entity';
+import { FeatureCard } from '../../../modules/feature-cards/entities/feature-card.entity';
+import { FeatureCardRevision } from '../../../modules/feature-cards/entities/feature-card-revision.entity';
+import { FindingCase } from '../../../modules/finding-cases/finding-case.entity';
+import { FindingCaseEvent } from '../../../modules/finding-cases/finding-case-event.entity';
+import { FindingOccurrence } from '../../../modules/finding-cases/finding-occurrence.entity';
+import { GithubAppRepository } from '../../../modules/github-app/entities/github-app-repository.entity';
+import { GithubInstallation } from '../../../modules/github-app/entities/github-installation.entity';
+import { GithubReviewRun } from '../../../modules/github-app/entities/github-review-run.entity';
+import { GithubWebhookDelivery } from '../../../modules/github-app/entities/github-webhook-delivery.entity';
+import { Project } from '../../../modules/projects/project.entity';
+import { ProjectRepositoryMember } from '../../../modules/projects/project-repository-member.entity';
+import { User } from '../../../modules/users/user.entity';
 import {
   allowsPlaintextDependencies,
   isProduction,
-} from 'src/shared/security/production-config';
+} from '../../security/production-config';
 import { DataSource } from 'typeorm';
 
 function resolveSsl() {

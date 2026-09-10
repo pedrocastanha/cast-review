@@ -33,13 +33,20 @@ services:
       timeout: 3s
       retries: 5
 
+  # DESENVOLVIMENTO APENAS. Para produção, ver docs/feature-production-readiness/
+  # NEO4J-ISOLATION.md seção 6: credenciais reais, TLS, usuário dedicado e o
+  # plugin do GDS embutido numa imagem em vez de bind-mount.
   neo4j:
     image: neo4j:5-community
     container_name: portfolio-neo4j
     restart: unless-stopped
     environment:
       NEO4J_AUTH: "neo4j/portfolio123"
-      NEO4J_dbms_security_procedures_unrestricted: "gds.*"
+      # Sandbox liberado apenas para as procedures do GDS que o ranker usa
+      # (app/code_graph/ranker.py). `gds.*` liberava a biblioteca inteira sem
+      # necessidade — só estas cinco são chamadas.
+      NEO4J_dbms_security_procedures_unrestricted: "gds.graph.project,gds.graph.exists,gds.graph.drop,gds.pageRank.stream,gds.util.asNode"
+      NEO4J_dbms_security_procedures_allowlist: "gds.graph.project,gds.graph.exists,gds.graph.drop,gds.pageRank.stream,gds.util.asNode"
       NEO4J_server_memory_heap_initial__size: "128m"
       NEO4J_server_memory_heap_max__size: "512m"
       NEO4J_server_memory_pagecache_size: "256m"
@@ -48,6 +55,9 @@ services:
       - "7687:7687"
     volumes:
       - neo4j_data:/data
+      # Bind-mount de plugin é conveniência de dev: o jar do GDS vem do disco do
+      # host, sem verificação de integridade nem versão fixada na imagem. Em
+      # produção, embuta o plugin numa imagem versionada.
       - ./.neo4j-plugins:/var/lib/neo4j/plugins
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]

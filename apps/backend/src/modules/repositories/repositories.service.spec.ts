@@ -149,6 +149,7 @@ describe('RepositoriesService.getRepositoryIndexStatus', () => {
 
     expect(aiApiClient.getIndexStatus).toHaveBeenCalledWith(
       'octocat/hello-world',
+      currentUser.id,
     );
     expect(result).toEqual({ status: 'not_indexed', sha: null, stale: false });
   });
@@ -271,6 +272,7 @@ describe('RepositoriesService.getRepositoryGraph', () => {
     expect(aiApiClient.getGraph).toHaveBeenCalledWith(
       'octocat/hello-world',
       'sha1',
+      currentUser.id,
       'focus-id',
       2,
     );
@@ -292,10 +294,12 @@ describe('RepositoriesService.getRepositoryGraph', () => {
 
     expect(aiApiClient.getIndexStatus).toHaveBeenCalledWith(
       'octocat/hello-world',
+      currentUser.id,
     );
     expect(aiApiClient.getGraph).toHaveBeenCalledWith(
       'octocat/hello-world',
       'latest-sha',
+      currentUser.id,
       undefined,
       undefined,
     );
@@ -404,6 +408,7 @@ describe('RepositoriesService pull/file delegation', () => {
     const result = await service.listRepos(currentUser, true);
 
     expect(aiApiClient.listIndexRepositories).toHaveBeenCalledWith(
+      currentUser.id,
       undefined,
       200,
       undefined,

@@ -55,6 +55,12 @@ async def _graph_context(state: GraphState) -> tuple[dict | None, dict | None]:
         rendered = frozen_snapshot.get("rendered") or {}
         return rendered.get("relatedContext"), frozen_snapshot
 
+    # Sem dono não há escopo de grafo possível. Degradar para "sem contexto" é o
+    # mesmo contrato de "repositório nunca indexado" — nunca ler sem escopo.
+    owner_id = state.get("owner_id")
+    if not owner_id:
+        return None, None
+
     impact_scope = state.get("impact_scope") or {"requestedMode": "repository"}
     related, local_snapshot = await _local_graph_context(state)
     if impact_scope.get("requestedMode") != "project":
@@ -78,6 +84,7 @@ async def _graph_context(state: GraphState) -> tuple[dict | None, dict | None]:
             _driver, cache = _get_index_cache()
             resolution = await resolve_cross_repo_impacts(
                 cache=cache,
+                owner_id=owner_id,
                 source_repo_id=state.get("repo_id") or "unknown/unknown",
                 source_sha=state.get("sha") or "unknown",
                 source_base_sha=state.get("base_sha"),
@@ -111,7 +118,8 @@ async def _local_graph_context(state: GraphState) -> tuple[dict | None, dict | N
 
     repo_id = state.get("repo_id")
     sha = state.get("sha")
-    if not repo_id or not sha:
+    owner_id = state.get("owner_id")
+    if not repo_id or not sha or not owner_id:
         return None, None
 
     try:
@@ -127,9 +135,10 @@ async def _local_graph_context(state: GraphState) -> tuple[dict | None, dict | N
             repo_id,
             sha,
             changed_paths,
+            owner_id,
             changed_files=state["changed_files"],
         )
-        graph = await cache.lookup(repo_id, sha) or Graph()
+        graph = await cache.lookup(repo_id, sha, owner_id) or Graph()
         snapshot = build_context_snapshot(
             analysis_id=state.get("run_id"),
             repo_id=repo_id,

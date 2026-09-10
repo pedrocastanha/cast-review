@@ -385,8 +385,9 @@ class ToolExecutor:
 
 
 class GlobalToolExecutor:
-    def __init__(self, cache, catalog, *, max_workspaces: int = 3) -> None:
+    def __init__(self, cache, catalog, *, owner_id: str, max_workspaces: int = 3) -> None:
         self._cache = cache
+        self._owner_id = owner_id
         self._catalog = catalog
         self._max_workspaces = max(1, max_workspaces)
         self._workspaces: OrderedDict[str, RepoWorkspace] = OrderedDict()
@@ -488,7 +489,7 @@ class GlobalToolExecutor:
         sha = str(entry.get("sha") or "").strip()
         if not canonical_repo_id or not sha:
             raise ToolError(f"repositório '{repo_id}' não está indexado ou acessível")
-        graph = await self._cache.lookup(canonical_repo_id, sha)
+        graph = await self._cache.lookup(canonical_repo_id, sha, self._owner_id)
         if graph is None:
             raise ToolError(f"índice de '{canonical_repo_id}' não está disponível")
 

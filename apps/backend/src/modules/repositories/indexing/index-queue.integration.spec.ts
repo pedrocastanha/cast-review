@@ -8,7 +8,7 @@ import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import type { Queue } from 'bullmq';
-import { resolveRedisConnection } from 'src/shared/queue/redis-connection';
+import { resolveRedisConnection } from '../../../shared/queue/redis-connection';
 import {
   buildIndexJobId,
   CODE_INDEX_QUEUE,

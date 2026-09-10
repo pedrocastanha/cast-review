@@ -3,7 +3,7 @@ import type {
   ChangedFileContext,
   FrozenImpactScope,
   RelatedFile,
-} from 'src/shared/types';
+} from '../../../shared/types';
 import type { CurrentUserData } from '../../auth/utils/current-user-decorator';
 import type { GithubPullGateway } from '../../repositories/types/github-pull-gateway.type';
 import type { RunAnalysisDto } from '../dtos/run-analysis.dto';
@@ -68,6 +68,7 @@ export async function buildAgentRunRequest(
   );
 
   return {
+    ownerId: currentUser.id,
     analysisId,
     diff,
     changedFiles,

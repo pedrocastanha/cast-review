@@ -6,6 +6,8 @@ from app.code_graph import incremental as incremental_module
 from app.code_graph.cache import IndexCache, build_neo4j_driver, build_redis_client
 from app.code_graph.incremental import build_incremental
 
+OWNER_ID = "owner-test"
+
 pytestmark = pytest.mark.integration
 
 
@@ -43,8 +45,8 @@ BASE_FILES = [
 
 async def test_first_build_reparses_everything_nothing_reused(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    result = await build_incremental(cache, repo_id, BASE_FILES)
-    await cache.build_and_store(repo_id, "sha1", result.graph)
+    result = await build_incremental(cache, repo_id, BASE_FILES, OWNER_ID)
+    await cache.build_and_store(repo_id, "sha1", result.graph, OWNER_ID)
 
     assert result.reparsed_files == 3
     assert result.reused_files == 0
@@ -54,8 +56,8 @@ async def test_first_build_reparses_everything_nothing_reused(driver, redis_clie
 
 async def test_reindex_unchanged_content_reuses_all_reparses_none(driver, redis_client, repo_id, monkeypatch):
     cache = IndexCache(driver, redis_client)
-    first = await build_incremental(cache, repo_id, BASE_FILES)
-    await cache.build_and_store(repo_id, "sha1", first.graph)
+    first = await build_incremental(cache, repo_id, BASE_FILES, OWNER_ID)
+    await cache.build_and_store(repo_id, "sha1", first.graph, OWNER_ID)
 
     parse_calls = []
     original_index_files = incremental_module.index_files
@@ -66,8 +68,8 @@ async def test_reindex_unchanged_content_reuses_all_reparses_none(driver, redis_
 
     monkeypatch.setattr(incremental_module, "index_files", spy_index_files)
 
-    second = await build_incremental(cache, repo_id, BASE_FILES)
-    await cache.build_and_store(repo_id, "sha2", second.graph)
+    second = await build_incremental(cache, repo_id, BASE_FILES, OWNER_ID)
+    await cache.build_and_store(repo_id, "sha2", second.graph, OWNER_ID)
 
     assert second.reparsed_files == 0
     assert second.reused_files == 3
@@ -78,15 +80,15 @@ async def test_reindex_unchanged_content_reuses_all_reparses_none(driver, redis_
 
 async def test_reindex_one_changed_file_reparses_only_that_one(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    first = await build_incremental(cache, repo_id, BASE_FILES)
-    await cache.build_and_store(repo_id, "sha1", first.graph)
+    first = await build_incremental(cache, repo_id, BASE_FILES, OWNER_ID)
+    await cache.build_and_store(repo_id, "sha1", first.graph, OWNER_ID)
 
     changed = [
         BASE_FILES[0],
         {"path": "src/b.ts", "content": "function b() { return 999; }\n"},  # content changed
         BASE_FILES[2],
     ]
-    second = await build_incremental(cache, repo_id, changed)
+    second = await build_incremental(cache, repo_id, changed, OWNER_ID)
 
     assert second.reparsed_files == 1
     assert second.reused_files == 2
@@ -102,16 +104,16 @@ async def test_cross_file_resolution_survives_reindex_when_caller_unchanged_call
     this edge would silently vanish on reindex, breaking caller discovery for exactly
     the scenario this whole feature exists to fix."""
     cache = IndexCache(driver, redis_client)
-    first = await build_incremental(cache, repo_id, BASE_FILES)
-    await cache.build_and_store(repo_id, "sha1", first.graph)
+    first = await build_incremental(cache, repo_id, BASE_FILES, OWNER_ID)
+    await cache.build_and_store(repo_id, "sha1", first.graph, OWNER_ID)
 
     changed = [
         BASE_FILES[0],  # a.ts unchanged — still calls b()
         {"path": "src/b.ts", "content": "function b() { return 42; }\n"},  # b.ts changed
         BASE_FILES[2],
     ]
-    second = await build_incremental(cache, repo_id, changed)
-    await cache.build_and_store(repo_id, "sha2", second.graph)
+    second = await build_incremental(cache, repo_id, changed, OWNER_ID)
+    await cache.build_and_store(repo_id, "sha2", second.graph, OWNER_ID)
 
     fn_a = next(n for n in second.graph.nodes.values() if n.name == "a" and n.kind == "function")
     fn_b = next(n for n in second.graph.nodes.values() if n.name == "b" and n.kind == "function")
@@ -129,18 +131,18 @@ async def test_reused_caller_edge_into_changed_file_persists_after_store_and_loo
     round-trip — proves the merged (partly reused, partly fresh) graph persists
     correctly, not just in the in-memory `Graph` object."""
     cache = IndexCache(driver, redis_client)
-    first = await build_incremental(cache, repo_id, BASE_FILES)
-    await cache.build_and_store(repo_id, "sha1", first.graph)
+    first = await build_incremental(cache, repo_id, BASE_FILES, OWNER_ID)
+    await cache.build_and_store(repo_id, "sha1", first.graph, OWNER_ID)
 
     changed = [
         BASE_FILES[0],
         {"path": "src/b.ts", "content": "function b() { return 'changed'; }\n"},
         BASE_FILES[2],
     ]
-    second = await build_incremental(cache, repo_id, changed)
-    await cache.build_and_store(repo_id, "sha2", second.graph)
+    second = await build_incremental(cache, repo_id, changed, OWNER_ID)
+    await cache.build_and_store(repo_id, "sha2", second.graph, OWNER_ID)
 
-    reloaded = await cache.lookup(repo_id, "sha2")
+    reloaded = await cache.lookup(repo_id, "sha2", OWNER_ID)
     fn_a = next(n for n in reloaded.nodes.values() if n.name == "a" and n.kind == "function")
     fn_b = next(n for n in reloaded.nodes.values() if n.name == "b" and n.kind == "function")
     assert any(
@@ -155,7 +157,7 @@ async def test_file_count_truncated_above_configured_limit(driver, redis_client,
 
     files = [{"path": f"src/f{i}.ts", "content": f"function f{i}() {{}}\n"} for i in range(5)]
     cache = IndexCache(driver, redis_client)
-    result = await build_incremental(cache, repo_id, files)
+    result = await build_incremental(cache, repo_id, files, OWNER_ID)
 
     assert result.truncated is True
     assert result.reparsed_files == 2
@@ -165,7 +167,7 @@ async def test_file_count_truncated_above_configured_limit(driver, redis_client,
 
 async def test_file_count_not_truncated_within_limit(driver, redis_client, repo_id):
     cache = IndexCache(driver, redis_client)
-    result = await build_incremental(cache, repo_id, BASE_FILES)
+    result = await build_incremental(cache, repo_id, BASE_FILES, OWNER_ID)
     assert result.truncated is False
 
     await _cleanup(driver, repo_id)

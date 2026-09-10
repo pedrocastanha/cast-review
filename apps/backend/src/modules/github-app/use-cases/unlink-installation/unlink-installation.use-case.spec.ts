@@ -18,6 +18,7 @@ function build() {
   };
   const execute = jest.fn();
   const appRepositoryRepository = {
+    withRlsTransaction: jest.fn(async (work: any) => work({})),
     createQueryBuilder: jest.fn(() => ({
       update: () => ({ set: () => ({ where: () => ({ execute }) }) }),
     })),

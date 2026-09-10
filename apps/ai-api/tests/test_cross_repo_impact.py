@@ -10,6 +10,8 @@ from app.code_graph.cross_repo_impact import (
 from app.code_graph.http_endpoints import extract_http_endpoints
 from app.code_graph.models import Graph, HttpEndpoint
 
+OWNER_ID = "owner-test"
+
 
 def test_contract_delta_preserves_removed_and_added_provider_as_modified():
     changes = extract_contract_changes(
@@ -56,7 +58,7 @@ class FakeCache:
         self.endpoints = endpoints
         self.calls = []
 
-    async def list_endpoints(self, repo_id, sha):
+    async def list_endpoints(self, repo_id, sha, owner_id):
         self.calls.append((repo_id, sha))
         return self.endpoints.get((repo_id, sha), [])
 
@@ -108,6 +110,7 @@ async def test_removed_provider_finds_frozen_cross_repo_consumer_with_evidence()
     }
 
     result = await resolve_cross_repo_impacts(
+        owner_id=OWNER_ID,
         cache=cache,
         source_repo_id="cast/backend",
         source_sha="head-sha",
@@ -128,6 +131,7 @@ async def test_removed_provider_finds_frozen_cross_repo_consumer_with_evidence()
 async def test_resolver_never_queries_repository_mode():
     cache = FakeCache({})
     result = await resolve_cross_repo_impacts(
+        owner_id=OWNER_ID,
         cache=cache,
         source_repo_id="cast/backend",
         source_sha="head-sha",
@@ -163,8 +167,10 @@ async def test_removed_provider_resolves_consumer_from_real_frozen_neo4j_index()
             consumer_repo_id,
             consumer_sha,
             Graph(endpoints=consumer_endpoints),
+            OWNER_ID,
         )
         result = await resolve_cross_repo_impacts(
+            owner_id=OWNER_ID,
             cache=cache,
             source_repo_id=source_repo_id,
             source_sha="backend-head-sha",

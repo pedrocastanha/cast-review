@@ -4,7 +4,7 @@
 jest.mock('@octokit/rest', () => ({ Octokit: jest.fn() }));
 jest.mock('./tree-fetcher.helper');
 
-import type { AppLogger } from 'src/shared/logger/logger.service';
+import type { AppLogger } from '../../../shared/logger/logger.service';
 import { IndexProcessor } from './index.processor';
 import { fetchRepoTree } from './tree-fetcher.helper';
 
@@ -83,6 +83,7 @@ describe('IndexProcessor', () => {
       'sha1',
     );
     expect(aiApiClient.buildIndex).toHaveBeenCalledWith({
+      ownerId: 'user-1',
       repoId: 'octocat/hello-world',
       sha: 'sha1',
       files: [

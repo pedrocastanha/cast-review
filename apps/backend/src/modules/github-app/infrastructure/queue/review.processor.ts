@@ -1,7 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import type { FrozenImpactScope } from 'src/shared/types';
+import { dbActorStorage } from '../../../../shared/database/postgres/db-actor';
+import { AppLogger } from '../../../../shared/logger/logger.service';
+import type { FrozenImpactScope } from '../../../../shared/types';
 import { AnalysesService } from '../../../analyses/analyses.service';
 import type {
   AnalysisReview,
@@ -63,6 +64,15 @@ export class ReviewProcessor extends WorkerHost {
   }
 
   async process(job: Job<GithubReviewJobData>): Promise<void> {
+    // Worker age em nome do dono da instalação (SEC-17). Sem abrir este escopo,
+    // toda leitura abaixo roda como anônimo — e anônimo não lê nada sob RLS.
+    return dbActorStorage.run(
+      { userId: job.data.actorUserId, actorType: 'job' },
+      () => this.handle(job),
+    );
+  }
+
+  private async handle(job: Job<GithubReviewJobData>): Promise<void> {
     const run = await this.reviewRunRepository.findOne({
       where: { id: job.data.reviewRunId },
     });
