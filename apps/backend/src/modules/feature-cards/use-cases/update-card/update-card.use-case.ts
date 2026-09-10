@@ -29,7 +29,7 @@ export class UpdateCardUseCase {
     dto: UpdateCardDto,
     user: CurrentUserData,
   ) {
-    return this.repository.datasource.transaction(async (manager) => {
+    return this.repository.withRlsTransaction(async (manager) => {
       await this.ownership.lock(manager, projectId, user);
       const card = await manager.findOne(FeatureCard, {
         where: { id, projectId, active: true },

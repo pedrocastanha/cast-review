@@ -41,6 +41,7 @@ export class ArchitectureGraphGateway {
   candidates(scope: ArchitectureScope): Promise<ArchitectureCandidatesResult> {
     return this.aiApiClient.getArchitectureCandidates(
       this.usableRepositories(scope),
+      scope.ownerId,
     );
   }
 
@@ -60,6 +61,7 @@ export class ArchitectureGraphGateway {
       const result = await this.aiApiClient.getArchitectureDependencies(
         repositories,
         this.toComponentRefs(components),
+        scope.ownerId,
       );
       return { dependencies: result.dependencies, available: true };
     } catch (err) {
@@ -80,6 +82,7 @@ export class ArchitectureGraphGateway {
       this.usableRepositories(scope),
       this.toComponentRefs(components),
       changedFiles,
+      scope.ownerId,
     );
   }
 }

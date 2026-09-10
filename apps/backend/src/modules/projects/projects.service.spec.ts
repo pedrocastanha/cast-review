@@ -62,7 +62,11 @@ function buildService() {
   };
   const aiApiClient = { getProjectGraph: jest.fn() };
   const dataSource = {
-    transaction: jest.fn(async (callback) => callback({ id: 'manager' })),
+    // `query` existe porque runInRlsTransaction injeta o contexto de RLS antes
+    // de entregar o manager ao caso de uso.
+    transaction: jest.fn(async (callback) =>
+      callback({ id: 'manager', query: jest.fn().mockResolvedValue([]) }),
+    ),
   };
   const service = new ProjectsService(
     projectRepository as any,
@@ -385,6 +389,7 @@ describe('ProjectsService', () => {
     await service.getGraph('project-1', currentUser);
 
     expect(aiApiClient.getProjectGraph).toHaveBeenCalledWith({
+      ownerId: currentUser.id,
       projectId: 'project-1',
       repositories: [
         { repoId: 'cast/frontend', sha: 'front-sha' },

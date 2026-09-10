@@ -66,6 +66,8 @@ export interface Policies {
 }
 
 export interface AgentRunRequest {
+  /** Dono do índice no Neo4j. Sem ele o ai-api não monta contexto de grafo. */
+  ownerId: string;
   analysisId: string;
   diff: string;
   changedFiles: ChangedFileContext[];
@@ -105,6 +107,7 @@ export interface IndexBuildFile {
 }
 
 export interface IndexBuildRequest {
+  ownerId: string;
   repoId: string;
   sha: string;
   files: IndexBuildFile[];
@@ -153,6 +156,7 @@ export interface VizGraph {
 }
 
 export interface ProjectGraphRequest {
+  ownerId: string;
   projectId: string;
   repositories: Array<{ repoId: string; sha: string | null }>;
 }
@@ -236,6 +240,8 @@ export interface ChatRunHistoryMessage {
 }
 
 export interface ChatRunRequest {
+  /** Dono do índice no Neo4j. Escopa toda leitura de grafo feita pelo chat. */
+  ownerId: string;
   threadId: string;
   mode: 'global' | 'repository' | 'project';
   assistanceMode?: 'general' | 'requirements';

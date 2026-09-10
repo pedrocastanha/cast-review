@@ -20,7 +20,7 @@ export class UpdateFindingDispositionUseCase {
     const disposition = this.parseDisposition(input.disposition);
     const note = this.normalizeNote(disposition, input.note);
 
-    return this.caseRepository.datasource.transaction(async (manager) => {
+    return this.caseRepository.withRlsTransaction(async (manager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`finding-case|${caseId}`],

@@ -316,6 +316,7 @@ describe('ChatService.listFiles', () => {
     expect(aiApiClient.listIndexFiles).toHaveBeenCalledWith(
       'acme/back',
       'sha-abc',
+      currentUser.id,
       'src',
       50,
     );
@@ -492,6 +493,7 @@ describe('ChatService.sendMessage', () => {
       'acme/back',
       'sha-abc',
       'src/a.ts',
+      currentUser.id,
     );
     expect(repositoriesService.getFileContent).not.toHaveBeenCalled();
     const payload = (aiApiClient.runChat as jest.Mock).mock.calls[0][0];

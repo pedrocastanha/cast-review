@@ -43,7 +43,10 @@ export class GetRepositoryIndexStatusUseCase {
       }
 
       const repoId = `${owner}/${repo}`;
-      const { indexed, sha } = await this.aiApiClient.getIndexStatus(repoId);
+      const { indexed, sha } = await this.aiApiClient.getIndexStatus(
+        repoId,
+        currentUser.id,
+      );
 
       return {
         status: indexed ? 'indexed' : 'not_indexed',

@@ -21,7 +21,7 @@ export class SaveProposalUseCase {
 
   async execute(projectId: string, messageId: string, user: CurrentUserData) {
     await this.projects.getById(projectId, user);
-    return this.repository.datasource.transaction(async (manager) => {
+    return this.repository.withRlsTransaction(async (manager) => {
       await this.ownership.lock(manager, projectId, user);
       const message = await manager.findOne(ChatMessage, {
         where: { id: messageId, active: true, role: 'assistant' },

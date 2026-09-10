@@ -34,6 +34,7 @@ function setup() {
   };
   const useCase = new UpdateCardUseCase(
     {
+      withRlsTransaction: (fn: (m: unknown) => unknown) => fn(manager),
       datasource: { transaction: (fn: (m: unknown) => unknown) => fn(manager) },
     } as never,
     {} as never,

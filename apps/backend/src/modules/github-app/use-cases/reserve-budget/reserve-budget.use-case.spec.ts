@@ -21,15 +21,13 @@ function build(existingRuns: Array<Record<string, unknown>> = []) {
   const reviewRunRepository = {
     find: jest.fn().mockResolvedValue(existingRuns),
     update,
-    datasource: {
-      transaction: jest.fn(
-        async (_level: string, work: (manager: unknown) => Promise<boolean>) =>
-          work({
-            find: jest.fn().mockResolvedValue(existingRuns),
-            update: managerUpdate,
-          }),
-      ),
-    },
+    withRlsTransaction: jest.fn(
+      async (_level: string, work: (manager: unknown) => Promise<boolean>) =>
+        work({
+          find: jest.fn().mockResolvedValue(existingRuns),
+          update: managerUpdate,
+        }),
+    ),
   };
   const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
   return {
@@ -92,7 +90,7 @@ describe('ReserveBudgetUseCase.execute', () => {
   it('runs the ceiling check inside a SERIALIZABLE transaction', async () => {
     const { service, reviewRunRepository } = build([]);
     await service.execute(repository(10), 'run-5', 1);
-    expect(reviewRunRepository.datasource.transaction).toHaveBeenCalledWith(
+    expect(reviewRunRepository.withRlsTransaction).toHaveBeenCalledWith(
       'SERIALIZABLE',
       expect.any(Function),
     );

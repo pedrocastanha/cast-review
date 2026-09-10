@@ -142,6 +142,7 @@ export class ChatService {
         const result = await this.aiApiClient.listIndexFiles(
           repository.repoId,
           repository.sha as string,
+          currentUser.id,
           query,
           limit,
         );
@@ -218,6 +219,7 @@ export class ChatService {
     }
 
     const payload: ChatRunRequest = {
+      ownerId: currentUser.id,
       threadId: thread.id,
       mode,
       assistanceMode: dto.assistanceMode ?? 'general',
@@ -327,6 +329,7 @@ export class ChatService {
         repository.repoId,
         repository.sha,
         mention.path,
+        currentUser.id,
       );
       if (fromGraph) {
         resolved.push({

@@ -46,7 +46,7 @@ function setup() {
   const transaction = jest.fn(async (fn) => fn(manager));
   const projects = { getById: jest.fn(async () => ({ id: 'p' })) };
   const useCase = new SaveProposalUseCase(
-    { datasource: { transaction } } as never,
+    { withRlsTransaction: transaction, datasource: { transaction } } as never,
     projects as never,
   );
   return { useCase, manager, projects, source, transaction };

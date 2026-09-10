@@ -68,6 +68,7 @@ export async function buildAgentRunRequest(
   );
 
   return {
+    ownerId: currentUser.id,
     analysisId,
     diff,
     changedFiles,

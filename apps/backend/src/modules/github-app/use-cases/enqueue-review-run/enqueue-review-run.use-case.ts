@@ -47,6 +47,17 @@ export class EnqueueReviewRunUseCase {
     const { installation, repository, facts } = input;
     const configHash = hashRepositoryConfig(repository.config);
 
+    // O worker precisa de um ator para ter contexto de RLS. Instalação sem dono
+    // vinculado não tem em nome de quem agir — falha fechada, não enfileira.
+    const actorUserId = installation.ownerUserId;
+    if (!actorUserId) {
+      this.logger.warn('Instalação sem dono vinculado: revisão não enfileirada', {
+        installationId: installation.installationId,
+        repository: repository.fullName,
+      });
+      return { status: 'duplicate', reviewRunId: null };
+    }
+
     const duplicate = await this.reviewRunRepository.findOne({
       where: {
         repositoryId: repository.id,
@@ -107,7 +118,7 @@ export class EnqueueReviewRunUseCase {
 
     await this.reviewQueue.add(
       'review',
-      { reviewRunId: run.id },
+      { reviewRunId: run.id, actorUserId },
       {
         jobId: buildReviewJobId(run.id),
         attempts: 3,

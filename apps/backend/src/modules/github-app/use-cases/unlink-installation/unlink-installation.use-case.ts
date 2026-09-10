@@ -23,12 +23,14 @@ export class UnlinkInstallationUseCase {
       currentUser,
     );
 
-    await this.appRepositoryRepository
-      .createQueryBuilder()
-      .update()
-      .set({ enabled: false, removedAt: new Date() })
-      .where('installation_id = :id', { id: installation.id })
-      .execute();
+    await this.appRepositoryRepository.withRlsTransaction((manager) =>
+      this.appRepositoryRepository
+        .createQueryBuilder(undefined, manager)
+        .update()
+        .set({ enabled: false, removedAt: new Date() })
+        .where('installation_id = :id', { id: installation.id })
+        .execute(),
+    );
 
     await this.installationRepository.update(installation.id, {
       ownerUserId: null,

@@ -62,6 +62,7 @@ export class ArchitectureScopeProvider {
     return {
       scopeType: map.scopeType,
       scopeRef: map.scopeRef,
+      ownerId: currentUser.id,
       repositories,
     };
   }

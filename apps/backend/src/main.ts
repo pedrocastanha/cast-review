@@ -17,14 +17,18 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
+import {
+  type DbActor,
+  dbActorStorage,
+} from './shared/database/postgres/db-actor';
 import { allowedOrigins, httpSecurity } from './shared/security/http-security';
-import { requestCredentials } from './shared/security/request-credentials';
 import {
   requestLimits,
   trustProxyHops,
   validateProductionConfig,
 } from './shared/security/production-config';
 import { ProductionErrors } from './shared/security/production-errors';
+import { requestCredentials } from './shared/security/request-credentials';
 
 const WEBHOOK_PATH = '/github-app/webhooks';
 
@@ -48,6 +52,14 @@ async function bootstrap() {
   app.use(urlencoded({ extended: false, limit: limits.urlencodedBody }));
   app.use(httpSecurity);
   app.use(requestCredentials);
+  // Abre o escopo do ator do banco para toda a cadeia da requisição. Middleware,
+  // e não interceptor, porque precisa cobrir também streams SSE de vida longa.
+  // O objeto começa anônimo e o `JwtAccessGuard` o preenche depois de verificar
+  // o token — sob RLS, anônimo não lê nada.
+  app.use((_req, _res, next) => {
+    const actor: DbActor = { userId: null, actorType: 'anonymous' };
+    dbActorStorage.run(actor, () => next());
+  });
   if (process.env.NODE_ENV === 'production')
     app.useGlobalFilters(new ProductionErrors());
   app.enableShutdownHooks();

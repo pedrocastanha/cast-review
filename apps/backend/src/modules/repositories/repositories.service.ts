@@ -102,6 +102,7 @@ export class RepositoriesService extends BaseService {
     let cursor: string | undefined;
     do {
       const page = await this.aiApiClient.listIndexRepositories(
+        currentUser.id,
         undefined,
         200,
         cursor,
@@ -132,6 +133,7 @@ export class RepositoriesService extends BaseService {
 
     while (selected.length < limit) {
       const page = await this.aiApiClient.listIndexRepositories(
+        currentUser.id,
         query,
         limit,
         nextCursor,

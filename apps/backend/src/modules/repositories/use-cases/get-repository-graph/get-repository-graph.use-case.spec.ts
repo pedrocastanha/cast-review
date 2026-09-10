@@ -1,92 +1,114 @@
+import { NotFoundException } from '@nestjs/common';
 import type { CurrentUserData } from '../../../auth/utils/current-user-decorator';
+import type { GithubSessionSource } from '../shared/github-session.provider';
 import { GetRepositoryGraphUseCase } from './get-repository-graph.use-case';
 
 const currentUser: CurrentUserData = {
-  id: 'user-1',
-  username: 'octocat',
-  email: 'octocat@example.com',
+  id: 'user-b',
+  username: 'mallory',
+  email: 'mallory@example.com',
 };
 
-function fakeGithubSession(owner = 'octocat') {
+function fakeSession(overrides: Partial<GithubSessionSource> = {}) {
+  const session = { octokit: {} as never, owner: 'mallory' };
   return {
-    getSession: jest.fn().mockResolvedValue({ octokit: {}, owner }),
-  } as any;
+    getSession: jest.fn().mockResolvedValue(session),
+    resolveOwner: jest.fn(
+      (_session: unknown, ownerOverride?: string) =>
+        ownerOverride?.trim() || 'mallory',
+    ),
+    assertRepositoryAccess: jest.fn().mockResolvedValue(undefined),
+    handleGithubError: jest.fn(() => {
+      throw new NotFoundException('Recurso não encontrado no Github');
+    }),
+    ...overrides,
+  } as unknown as GithubSessionSource & {
+    assertRepositoryAccess: jest.Mock;
+    getSession: jest.Mock;
+  };
 }
 
-function fakeAiApiClient(
-  status = { indexed: false, sha: null as string | null },
-) {
+function fakeAiApi() {
   return {
-    getIndexStatus: jest.fn().mockResolvedValue(status),
-    getGraph: jest.fn(),
+    getIndexStatus: jest
+      .fn()
+      .mockResolvedValue({ indexed: true, sha: 'sha-1' }),
+    getGraph: jest.fn().mockResolvedValue({ nodes: ['secret'], edges: [] }),
   } as any;
 }
 
 describe('GetRepositoryGraphUseCase', () => {
-  it('uses the provided sha directly, without calling getIndexStatus', async () => {
-    const aiApiClient = fakeAiApiClient();
-    aiApiClient.getGraph.mockResolvedValue({
-      nodes: [],
-      edges: [],
-      stats: { indexed: true },
-    });
-    const useCase = new GetRepositoryGraphUseCase(
-      fakeGithubSession(),
-      aiApiClient,
-    );
+  it('refuses a repository the current user cannot see on GitHub', async () => {
+    const githubSession = fakeSession({
+      assertRepositoryAccess: jest
+        .fn()
+        .mockRejectedValue(new NotFoundException('Recurso não encontrado')),
+    } as any);
+    const aiApiClient = fakeAiApi();
+    const useCase = new GetRepositoryGraphUseCase(githubSession, aiApiClient);
+
+    await expect(
+      useCase.execute({
+        repo: 'private-repo',
+        currentUser,
+        ownerOverride: 'victim-org',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    // O ponto do teste: nada do grafo pode ser lido antes da autorização.
+    expect(aiApiClient.getIndexStatus).not.toHaveBeenCalled();
+    expect(aiApiClient.getGraph).not.toHaveBeenCalled();
+  });
+
+  it('authorizes the owner override, not only the session owner', async () => {
+    const githubSession = fakeSession();
+    const aiApiClient = fakeAiApi();
+    const useCase = new GetRepositoryGraphUseCase(githubSession, aiApiClient);
 
     await useCase.execute({
-      repo: 'hello-world',
+      repo: 'private-repo',
       currentUser,
-      sha: 'sha1',
-      focus: 'focus-id',
-      depth: 2,
+      ownerOverride: 'victim-org',
     });
 
-    expect(aiApiClient.getIndexStatus).not.toHaveBeenCalled();
-    expect(aiApiClient.getGraph).toHaveBeenCalledWith(
-      'octocat/hello-world',
-      'sha1',
-      'focus-id',
-      2,
+    expect((githubSession as any).assertRepositoryAccess).toHaveBeenCalledWith(
+      expect.anything(),
+      'victim-org',
+      'private-repo',
     );
   });
 
-  it('falls back to the latest indexed sha when none is provided', async () => {
-    const aiApiClient = fakeAiApiClient({ indexed: true, sha: 'latest-sha' });
-    aiApiClient.getGraph.mockResolvedValue({
-      nodes: [],
-      edges: [],
-      stats: { indexed: true },
+  it('checks access even when the caller supplies an explicit sha', async () => {
+    const githubSession = fakeSession();
+    const aiApiClient = fakeAiApi();
+    const useCase = new GetRepositoryGraphUseCase(githubSession, aiApiClient);
+
+    await useCase.execute({
+      repo: 'private-repo',
+      currentUser,
+      ownerOverride: 'victim-org',
+      sha: 'sha-forced',
     });
-    const useCase = new GetRepositoryGraphUseCase(
-      fakeGithubSession(),
-      aiApiClient,
-    );
 
-    await useCase.execute({ repo: 'hello-world', currentUser });
-
-    expect(aiApiClient.getIndexStatus).toHaveBeenCalledWith(
-      'octocat/hello-world',
-    );
+    expect((githubSession as any).assertRepositoryAccess).toHaveBeenCalled();
     expect(aiApiClient.getGraph).toHaveBeenCalledWith(
-      'octocat/hello-world',
-      'latest-sha',
+      'victim-org/private-repo',
+      'sha-forced',
+      currentUser.id,
       undefined,
       undefined,
     );
   });
 
-  it('returns an empty not-indexed graph without calling getGraph when repo was never indexed', async () => {
-    const aiApiClient = fakeAiApiClient({ indexed: false, sha: null });
-    const useCase = new GetRepositoryGraphUseCase(
-      fakeGithubSession(),
-      aiApiClient,
-    );
+  it('returns an empty graph when the repository is authorized but not indexed', async () => {
+    const githubSession = fakeSession();
+    const aiApiClient = fakeAiApi();
+    aiApiClient.getIndexStatus.mockResolvedValue({ indexed: false, sha: null });
+    const useCase = new GetRepositoryGraphUseCase(githubSession, aiApiClient);
 
-    const result = await useCase.execute({ repo: 'hello-world', currentUser });
+    const result = await useCase.execute({ repo: 'mine', currentUser });
 
-    expect(aiApiClient.getGraph).not.toHaveBeenCalled();
     expect(result).toEqual({ nodes: [], edges: [], stats: { indexed: false } });
+    expect(aiApiClient.getGraph).not.toHaveBeenCalled();
   });
 });

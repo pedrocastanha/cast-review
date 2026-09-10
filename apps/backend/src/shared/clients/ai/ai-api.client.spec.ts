@@ -3,6 +3,7 @@ import type { AgentResumeRequest, AgentRunRequest } from 'src/shared/types';
 import { AiApiClient } from './ai-api.client';
 
 const payload: AgentRunRequest = {
+  ownerId: 'owner-1',
   analysisId: 'analysis-1',
   diff: '',
   changedFiles: [],
@@ -189,6 +190,7 @@ describe('AiApiClient.getProjectGraph', () => {
     fetchMock.mockResolvedValue(jsonResponse(responseBody));
     const client = new AiApiClient(logger);
     const requestBody = {
+      ownerId: 'owner-1',
       projectId: 'project-1',
       repositories: [
         { repoId: 'cast/frontend', sha: 'front-sha' },
@@ -226,10 +228,15 @@ describe('AiApiClient.listIndexRepositories', () => {
     fetchMock.mockResolvedValue(jsonResponse(responseBody));
     const client = new AiApiClient(logger);
 
-    const result = await client.listIndexRepositories('cast', 20, '0');
+    const result = await client.listIndexRepositories(
+      'owner-1',
+      'cast',
+      20,
+      '0',
+    );
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:8000/index/repositories?query=cast&limit=20&cursor=0',
+      'http://localhost:8000/index/repositories?ownerId=owner-1&query=cast&limit=20&cursor=0',
       expect.objectContaining({
         redirect: 'error',
         signal: expect.any(AbortSignal),
@@ -245,15 +252,17 @@ describe('AiApiClient.listIndexRepositories', () => {
       );
       const client = new AiApiClient(logger);
 
-      await client.getArchitectureCandidates([
-        { repoId: 'acme/api', sha: 'sha1' },
-      ]);
+      await client.getArchitectureCandidates(
+        [{ repoId: 'acme/api', sha: 'sha1' }],
+        'owner-1',
+      );
 
       expect(fetchMock).toHaveBeenCalledWith(
         'http://localhost:8000/architecture/candidates',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
+            ownerId: 'owner-1',
             repositories: [{ repoId: 'acme/api', sha: 'sha1' }],
           }),
         }),
@@ -270,6 +279,7 @@ describe('AiApiClient.listIndexRepositories', () => {
       await client.getArchitectureDependencies(
         [{ repoId: 'acme/api', sha: 'sha1' }],
         [{ componentId: 'c1', repoId: 'acme/api', pathPrefix: 'src/auth' }],
+        'owner-1',
       );
 
       const [, init] = fetchMock.mock.calls[0];
@@ -283,7 +293,9 @@ describe('AiApiClient.listIndexRepositories', () => {
       fetchMock.mockResolvedValue(notOkResponse(503));
       const client = new AiApiClient(logger);
 
-      await expect(client.getArchitectureImpact([], [], [])).rejects.toThrow(
+      await expect(
+        client.getArchitectureImpact([], [], [], 'owner-1'),
+      ).rejects.toThrow(
         'ai-api indisponível (status 503)',
       );
       expect(logger.error).toHaveBeenCalled();

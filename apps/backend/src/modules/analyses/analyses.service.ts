@@ -837,8 +837,9 @@ export class AnalysesService extends BaseService {
     const pullNumber = parseOptionalPullNumber(input.pullNumber);
     const owner = input.owner?.trim();
 
+    return this.analysisRepository.withRlsTransaction(async (manager) => {
     const query = this.analysisRepository
-      .createQueryBuilder('analysis')
+      .createQueryBuilder('analysis', manager)
       .where('analysis.requestedBy = :userId', { userId: input.currentUser.id })
       .andWhere('LOWER(analysis.repo) = LOWER(:repo)', {
         repo: input.repo.trim(),
@@ -858,6 +859,7 @@ export class AnalysesService extends BaseService {
 
     const rows = await query.getMany();
     return rows.map((row) => this.toRecord(row));
+    });
   }
 
   async getByIdForUser(

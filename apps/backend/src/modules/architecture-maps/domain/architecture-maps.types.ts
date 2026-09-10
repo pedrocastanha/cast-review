@@ -93,6 +93,8 @@ export interface ArchitectureScopeRepository {
 export interface ArchitectureScope {
   scopeType: ArchitectureScopeType;
   scopeRef: string;
+  /** Dono do índice no Neo4j. Vem do usuário autenticado, nunca do payload. */
+  ownerId: string;
   repositories: ArchitectureScopeRepository[];
 }
 

@@ -83,6 +83,7 @@ describe('IndexProcessor', () => {
       'sha1',
     );
     expect(aiApiClient.buildIndex).toHaveBeenCalledWith({
+      ownerId: 'user-1',
       repoId: 'octocat/hello-world',
       sha: 'sha1',
       files: [

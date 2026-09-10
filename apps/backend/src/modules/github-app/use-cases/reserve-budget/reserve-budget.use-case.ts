@@ -69,7 +69,7 @@ export class ReserveBudgetUseCase {
       return true;
     }
 
-    return this.reviewRunRepository.datasource.transaction(
+    return this.reviewRunRepository.withRlsTransaction(
       'SERIALIZABLE',
       async (manager) => {
         const runs = await manager.find(GithubReviewRun, {
