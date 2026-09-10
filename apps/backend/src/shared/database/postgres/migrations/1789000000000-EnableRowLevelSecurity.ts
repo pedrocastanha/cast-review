@@ -199,11 +199,20 @@ export class EnableRowLevelSecurity1789000000000 implements MigrationInterface {
         WITH CHECK (app.actor_type() = 'auth' OR user_id = app.current_user_id())
     `);
     // Login por e-mail devolve, por definição, a linha de quem ainda não se
-    // autenticou. Só SELECT, só sob actor_type 'auth'.
+    // autenticou. O mesmo vale para o refresh, que resolve o dono da sessão por
+    // id antes de existir contexto de usuário. Só SELECT, só sob 'auth'.
     await queryRunner.query(`
       CREATE POLICY "users_auth_bootstrap" ON "users"
         FOR SELECT
         USING (app.actor_type() = 'auth')
+    `);
+    // Cadastro e conta demo criam usuário sem que exista usuário autenticado.
+    // Só INSERT: o bootstrap pode ler e criar, nunca alterar ou apagar conta
+    // existente — por isso é uma policy separada, e não um FOR ALL.
+    await queryRunner.query(`
+      CREATE POLICY "users_auth_signup" ON "users"
+        FOR INSERT
+        WITH CHECK (app.actor_type() = 'auth')
     `);
 
     // O webhook precisa achar a instalação pelo `installation_id` do payload
@@ -279,6 +288,7 @@ export class EnableRowLevelSecurity1789000000000 implements MigrationInterface {
       ['benchmark_cases', 'benchmark_cases_write'],
       ['refresh_sessions', 'refresh_sessions_scope'],
       ['users', 'users_auth_bootstrap'],
+      ['users', 'users_auth_signup'],
       ['users', 'users_demo_reaper'],
       ['analyses', 'analyses_demo_reaper'],
       ['github_webhook_deliveries', 'github_webhook_deliveries_service'],
