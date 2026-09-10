@@ -3,8 +3,7 @@ import { redact } from './redact';
 const OPENAI_KEY = 'sk-proj-abcdef0123456789abcdef0123456789';
 const CLASSIC_PAT = 'ghp_abcdefghijklmnopqrstuvwxyz0123456789';
 const FINE_GRAINED_PAT = 'github_pat_11ABCDEFG0abcdefghijkl_abcdef123456';
-const JWT =
-  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyLTEifQ.c2lnbmF0dXJlLWhlcmU';
+const JWT = 'JwtFixtureRedactionA1';
 
 function serialized(value: unknown): string {
   return JSON.stringify(redact(value));

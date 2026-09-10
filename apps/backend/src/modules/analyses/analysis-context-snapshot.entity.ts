@@ -1,5 +1,5 @@
-import { DefaultEntity } from '../../shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
+import { DefaultEntity } from '../../shared/database/postgres/default.entity';
 import type { AnalysisContextSnapshot } from './analyses.types';
 
 @Entity({ name: 'analysis_context_snapshots' })

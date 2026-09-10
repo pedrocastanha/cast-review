@@ -39,7 +39,8 @@ export class ChatCatalogController {
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
   ) {
-    const { user } = this.grants.verify(this.bearer(authorization));
+    const { userId } = this.grants.verify(this.bearer(authorization));
+    const user = { id: userId, username: null, email: '' };
     this.adopt(user);
     const parsedLimit = Number.parseInt(limit ?? '', 10);
     return this.repositoriesService.listIndexedCatalog(
@@ -58,7 +59,8 @@ export class ChatCatalogController {
     @Param('owner') owner: string,
     @Param('repo') repo: string,
   ) {
-    const { user } = this.grants.verify(this.bearer(authorization));
+    const { userId } = this.grants.verify(this.bearer(authorization));
+    const user = { id: userId, username: null, email: '' };
     this.adopt(user);
     return this.repositoriesService.resolveIndexedCatalogEntry(
       user,

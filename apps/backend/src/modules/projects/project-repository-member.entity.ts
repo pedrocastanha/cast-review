@@ -1,5 +1,5 @@
-import { DefaultEntity } from '../../shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
+import { DefaultEntity } from '../../shared/database/postgres/default.entity';
 
 @Entity({ name: 'project_repositories' })
 @Index('UQ_project_repositories_project_full_name', ['projectId', 'fullName'], {

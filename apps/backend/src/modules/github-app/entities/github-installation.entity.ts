@@ -1,5 +1,5 @@
-import { DefaultEntity } from '../../../shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
+import { DefaultEntity } from '../../../shared/database/postgres/default.entity';
 import type { GithubInstallationStatus } from '../domain/github-app.types';
 
 @Entity({ name: 'github_installations' })

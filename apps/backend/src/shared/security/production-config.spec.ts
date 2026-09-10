@@ -17,6 +17,7 @@ function productionEnv(overrides: Record<string, string | undefined> = {}) {
     JWT_ACCESS_SECRET: 'access'.padEnd(40, 'a'),
     JWT_REFRESH_SECRET: 'refresh'.padEnd(40, 'b'),
     AI_SERVICE_TOKEN: 'service'.padEnd(40, 'c'),
+    CHAT_GRANT_SECRET: 'chat-grant'.padEnd(40, 'd'),
     SECRET_ENCRYPTION_KEY: VALID_HEX_KEY,
     DB_HOST: 'db.internal',
     DB_PORT: '5432',
@@ -121,6 +122,29 @@ describe('production configuration boundary', () => {
         ALLOW_INSECURE_DEPENDENCIES: 'true',
       });
       expect(() => validateProductionConfig()).toThrow(/REDIS_URL/);
+    });
+  });
+
+  describe('database identities and internal grants', () => {
+    it('requires an independent chat grant secret in production', () => {
+      productionEnv({ CHAT_GRANT_SECRET: undefined });
+      expect(() => validateProductionConfig()).toThrow(/CHAT_GRANT_SECRET/);
+    });
+
+    it('rejects a migration URL that uses the runtime role', () => {
+      productionEnv({
+        MIGRATION_DATABASE_URL:
+          'postgres://runtime:secret@db.internal:5432/cast',
+      });
+      expect(() => validateProductionConfig()).toThrow(/mesma role/);
+    });
+
+    it('accepts a migration URL with a separate role', () => {
+      productionEnv({
+        MIGRATION_DATABASE_URL:
+          'postgres://migrator:secret@db.internal:5432/cast',
+      });
+      expect(() => validateProductionConfig()).not.toThrow();
     });
   });
 

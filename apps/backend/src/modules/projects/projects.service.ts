@@ -5,19 +5,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { AiApiClient } from '../../shared/clients/ai/ai-api.client';
+import { runInRlsTransaction } from '../../shared/database/postgres/rls-context';
 import type {
   FrozenImpactRepository,
   FrozenImpactScope,
 } from '../../shared/types';
-import { DataSource } from 'typeorm';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import type { RepositoriesService } from '../repositories/repositories.service';
 import type { CreateProjectDto } from './dtos/create-project.dto';
 import type { UpdateProjectDto } from './dtos/update-project.dto';
 import { ProjectRepository } from './project.repository';
 import { ProjectRepositoryMemberRepository } from './project-repository-member.repository';
-import { runInRlsTransaction } from '../../shared/database/postgres/rls-context';
 
 type AuthorizedRepository = Awaited<
   ReturnType<RepositoriesService['listRepos']>
@@ -169,24 +169,27 @@ export class ProjectsService {
       currentUser,
     );
 
-    const project = await runInRlsTransaction(this.dataSource, async (manager) => {
-      const entity = this.projectRepository.create({
-        ownerId: currentUser.id,
-        name: input.name.trim(),
-        description: input.description?.trim() || null,
-      });
-      const saved = await this.projectRepository.save(
-        entity,
-        undefined,
-        manager,
-      );
-      await this.memberRepository.replaceForProject(
-        saved.id,
-        repositories.map((repository) => this.toMember(saved.id, repository)),
-        manager,
-      );
-      return saved;
-    });
+    const project = await runInRlsTransaction(
+      this.dataSource,
+      async (manager) => {
+        const entity = this.projectRepository.create({
+          ownerId: currentUser.id,
+          name: input.name.trim(),
+          description: input.description?.trim() || null,
+        });
+        const saved = await this.projectRepository.save(
+          entity,
+          undefined,
+          manager,
+        );
+        await this.memberRepository.replaceForProject(
+          saved.id,
+          repositories.map((repository) => this.toMember(saved.id, repository)),
+          manager,
+        );
+        return saved;
+      },
+    );
 
     return this.withRepositories(project);
   }

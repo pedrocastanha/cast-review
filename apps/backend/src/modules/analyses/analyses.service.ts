@@ -838,27 +838,29 @@ export class AnalysesService extends BaseService {
     const owner = input.owner?.trim();
 
     return this.analysisRepository.withRlsTransaction(async (manager) => {
-    const query = this.analysisRepository
-      .createQueryBuilder('analysis', manager)
-      .where('analysis.requestedBy = :userId', { userId: input.currentUser.id })
-      .andWhere('LOWER(analysis.repo) = LOWER(:repo)', {
-        repo: input.repo.trim(),
-      })
-      .orderBy('analysis.createdAt', 'DESC');
+      const query = this.analysisRepository
+        .createQueryBuilder('analysis', manager)
+        .where('analysis.requestedBy = :userId', {
+          userId: input.currentUser.id,
+        })
+        .andWhere('LOWER(analysis.repo) = LOWER(:repo)', {
+          repo: input.repo.trim(),
+        })
+        .orderBy('analysis.createdAt', 'DESC');
 
-    if (owner) {
-      query.andWhere(
-        '(LOWER(analysis.owner) = LOWER(:owner) OR analysis.owner = :emptyOwner)',
-        { owner, emptyOwner: '' },
-      );
-    }
+      if (owner) {
+        query.andWhere(
+          '(LOWER(analysis.owner) = LOWER(:owner) OR analysis.owner = :emptyOwner)',
+          { owner, emptyOwner: '' },
+        );
+      }
 
-    if (pullNumber !== undefined) {
-      query.andWhere('analysis.pullNumber = :pullNumber', { pullNumber });
-    }
+      if (pullNumber !== undefined) {
+        query.andWhere('analysis.pullNumber = :pullNumber', { pullNumber });
+      }
 
-    const rows = await query.getMany();
-    return rows.map((row) => this.toRecord(row));
+      const rows = await query.getMany();
+      return rows.map((row) => this.toRecord(row));
     });
   }
 

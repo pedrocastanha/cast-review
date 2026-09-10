@@ -3,10 +3,10 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from 'src/app.module';
 import { AuthService } from 'src/modules/auth/auth.service';
-import { encryptBoundSecret } from 'src/shared/crypto/secret-crypto';
 import { User } from 'src/modules/users/user.entity';
 import { UserRepository } from 'src/modules/users/user.repository';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import { encryptBoundSecret } from 'src/shared/crypto/secret-crypto';
 import type {
   AgentEvent,
   AgentResumeRequest,

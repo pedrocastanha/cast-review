@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DefaultRepository } from '../../shared/database/postgres/default.database';
 import { DataSource } from 'typeorm';
+import { DefaultRepository } from '../../shared/database/postgres/default.database';
 import { BenchmarkCase } from './benchmark-case.entity';
 
 @Injectable()

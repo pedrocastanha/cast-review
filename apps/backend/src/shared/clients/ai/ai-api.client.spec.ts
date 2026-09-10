@@ -295,9 +295,7 @@ describe('AiApiClient.listIndexRepositories', () => {
 
       await expect(
         client.getArchitectureImpact([], [], [], 'owner-1'),
-      ).rejects.toThrow(
-        'ai-api indisponível (status 503)',
-      );
+      ).rejects.toThrow('ai-api indisponível (status 503)');
       expect(logger.error).toHaveBeenCalled();
     });
   });

@@ -1,5 +1,5 @@
-import { DefaultEntity } from '../../shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
+import { DefaultEntity } from '../../shared/database/postgres/default.entity';
 
 @Entity({ name: 'projects' })
 @Index('IDX_projects_owner_active', ['ownerId', 'active'])

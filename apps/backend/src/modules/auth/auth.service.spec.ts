@@ -196,7 +196,9 @@ describe('AuthService refresh token families', () => {
     it('purges expired guests before creating a new one', async () => {
       process.env.DEMO_LOGIN = 'true';
       const purgeExpiredGuests = jest.fn(async () => 3);
-      const createGuestUser = jest.fn(async () => activeUser({ id: 'guest-2' }));
+      const createGuestUser = jest.fn(async () =>
+        activeUser({ id: 'guest-2' }),
+      );
       const { service } = buildService({
         userService: { createGuestUser, purgeExpiredGuests },
       });

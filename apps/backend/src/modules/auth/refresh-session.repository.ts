@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { runInRlsTransaction } from '../../shared/database/postgres/rls-context';
 import { DataSource, EntityManager } from 'typeorm';
+import { runInRlsTransaction } from '../../shared/database/postgres/rls-context';
 
 export interface RefreshSessionRow {
   id: string;

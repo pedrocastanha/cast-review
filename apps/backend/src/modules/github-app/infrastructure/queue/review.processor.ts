@@ -64,11 +64,18 @@ export class ReviewProcessor extends WorkerHost {
   }
 
   async process(job: Job<GithubReviewJobData>): Promise<void> {
+    const actorUserId = job.data?.actorUserId;
+    if (typeof actorUserId !== 'string' || !actorUserId.trim()) {
+      this.logger.error('Job de revisão sem ator rejeitado', {
+        reviewRunId: job.data?.reviewRunId ?? null,
+      });
+      return;
+    }
+
     // Worker age em nome do dono da instalação (SEC-17). Sem abrir este escopo,
     // toda leitura abaixo roda como anônimo — e anônimo não lê nada sob RLS.
-    return dbActorStorage.run(
-      { userId: job.data.actorUserId, actorType: 'job' },
-      () => this.handle(job),
+    return dbActorStorage.run({ userId: actorUserId, actorType: 'job' }, () =>
+      this.handle(job),
     );
   }
 
@@ -113,6 +120,19 @@ export class ReviewProcessor extends WorkerHost {
       );
       return;
     }
+
+    if (installation.ownerUserId !== job.data.actorUserId) {
+      this.logger.warn(
+        'Job de revisão descartado após mudança de proprietário',
+        {
+          reviewRunId: run.id,
+          actorUserId: job.data.actorUserId,
+          currentOwnerUserId: installation.ownerUserId,
+        },
+      );
+      return;
+    }
+
     const repositoryCheck = evaluateRepository(repository);
     if (!repositoryCheck.eligible || !repository) {
       await this.skip(

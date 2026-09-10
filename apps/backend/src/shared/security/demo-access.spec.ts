@@ -42,9 +42,7 @@ describe('demo access configuration', () => {
     'rejects the invalid ttl %p',
     (value) => {
       process.env.DEMO_SESSION_TTL_MINUTES = value;
-      expect(() => demoSessionTtlMinutes()).toThrow(
-        /DEMO_SESSION_TTL_MINUTES/,
-      );
+      expect(() => demoSessionTtlMinutes()).toThrow(/DEMO_SESSION_TTL_MINUTES/);
     },
   );
 

@@ -1,5 +1,5 @@
-import { DefaultEntity } from '../../../shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
+import { DefaultEntity } from '../../../shared/database/postgres/default.entity';
 
 @Entity({ name: 'architecture_map_versions' })
 @Index('UQ_architecture_map_versions_map_version', ['mapId', 'version'], {

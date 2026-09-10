@@ -23,6 +23,9 @@ export class AppController {
   @Public()
   @Get('instance')
   instance() {
-    return { credentialsMode: credentialsMode(), demoLogin: demoLoginEnabled() };
+    return {
+      credentialsMode: credentialsMode(),
+      demoLogin: demoLoginEnabled(),
+    };
   }
 }

@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import configured from '../src/shared/database/postgres/postgres.datasource';
-import { runInRlsTransaction } from '../src/shared/database/postgres/rls-context';
-import { runWithDbActor } from '../src/shared/database/postgres/db-actor';
 import { DataSource } from 'typeorm';
 import type { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
+import { runWithDbActor } from '../src/shared/database/postgres/db-actor';
+import configured from '../src/shared/database/postgres/postgres.datasource';
+import { runInRlsTransaction } from '../src/shared/database/postgres/rls-context';
+import { validateRuntimeDatabaseRole } from '../src/shared/database/postgres/runtime-role';
 
 /**
  * O teste que decide se a RLS pode ser ligada em produção.
@@ -83,6 +84,18 @@ describe('RLS with a real runtime role', () => {
     expect(owned[0].total).toBe(0);
   });
 
+  it('passes the same runtime-role validation used by production boot', async () => {
+    await expect(validateRuntimeDatabaseRole(runtime)).resolves.toBeUndefined();
+  });
+
+  it('keeps analyses attached to an existing user', async () => {
+    const [constraint] = await owner.query(
+      `SELECT 1 FROM pg_constraint
+       WHERE conname = 'FK_analyses_requested_by_user'`,
+    );
+    expect(constraint).toBeTruthy();
+  });
+
   it('runs the signup path: create a user with no authenticated actor', async () => {
     const id = randomUUID();
 
@@ -115,7 +128,9 @@ describe('RLS with a real runtime role', () => {
     const rows = await runInRlsTransaction(
       runtime,
       (manager) =>
-        manager.query(`SELECT id, password FROM users WHERE email = $1`, [email]),
+        manager.query(`SELECT id, password FROM users WHERE email = $1`, [
+          email,
+        ]),
       { actorType: 'auth', userId: null },
     );
     expect(rows).toHaveLength(1);

@@ -1,9 +1,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { chatGrantSecret } from '../../shared/security/production-config';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 
 interface CatalogGrantClaims {
-  user: CurrentUserData;
+  userId: string;
   threadId: string;
   expiresAt: number;
 }
@@ -15,7 +16,7 @@ export class ChatCatalogGrantService {
   issue(user: CurrentUserData, threadId: string): string {
     const payload = Buffer.from(
       JSON.stringify({
-        user,
+        userId: user.id,
         threadId,
         expiresAt: Date.now() + GRANT_TTL_MS,
       } satisfies CatalogGrantClaims),
@@ -24,8 +25,14 @@ export class ChatCatalogGrantService {
   }
 
   verify(grant: string): CatalogGrantClaims {
-    const [payload, signature] = grant.split('.');
-    if (!payload || !signature || !this.matches(payload, signature)) {
+    const parts = grant.split('.');
+    const [payload, signature] = parts;
+    if (
+      parts.length !== 2 ||
+      !payload ||
+      !signature ||
+      !this.matches(payload, signature)
+    ) {
       throw new UnauthorizedException('Grant de catálogo inválido');
     }
 
@@ -39,9 +46,15 @@ export class ChatCatalogGrantService {
     }
 
     if (
-      !claims.user?.id ||
-      !claims.user.email ||
+      !claims ||
+      typeof claims !== 'object' ||
+      Array.isArray(claims) ||
+      typeof claims.userId !== 'string' ||
+      !claims.userId ||
+      typeof claims.threadId !== 'string' ||
       !claims.threadId ||
+      typeof claims.expiresAt !== 'number' ||
+      !Number.isFinite(claims.expiresAt) ||
       claims.expiresAt < Date.now()
     ) {
       throw new UnauthorizedException('Grant de catálogo expirado');
@@ -59,10 +72,8 @@ export class ChatCatalogGrantService {
   }
 
   private sign(payload: string): string {
-    const secret = process.env.SECRET_ENCRYPTION_KEY?.trim();
-    if (!secret) {
-      throw new Error('SECRET_ENCRYPTION_KEY não configurada');
-    }
-    return createHmac('sha256', secret).update(payload).digest('base64url');
+    return createHmac('sha256', chatGrantSecret())
+      .update(payload)
+      .digest('base64url');
   }
 }

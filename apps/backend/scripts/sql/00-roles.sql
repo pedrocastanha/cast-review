@@ -11,20 +11,55 @@
 
 \set ON_ERROR_STOP on
 
-CREATE ROLE cast_migrator LOGIN PASSWORD :'migrator_password'
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cast_migrator') THEN
+    CREATE ROLE cast_migrator;
+  END IF;
+END
+$$;
+
+ALTER ROLE cast_migrator LOGIN PASSWORD :'migrator_password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 
 -- NOBYPASSRLS é obrigatório e NÃO é suficiente: o dono da tabela ignora RLS por
 -- padrão. É por isso que cast_runtime nunca pode ser dono, e por isso a
 -- migration usa FORCE ROW LEVEL SECURITY.
-CREATE ROLE cast_runtime LOGIN PASSWORD :'runtime_password'
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cast_runtime') THEN
+    CREATE ROLE cast_runtime;
+  END IF;
+END
+$$;
+
+ALTER ROLE cast_runtime LOGIN PASSWORD :'runtime_password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 
-ALTER DATABASE :"DBNAME" OWNER TO cast_migrator;
+SELECT format('ALTER DATABASE %I OWNER TO cast_migrator', current_database())
+\gexec
 ALTER SCHEMA public OWNER TO cast_migrator;
 
 -- As tabelas existentes pertencem à role original do bootstrap.
-REASSIGN OWNED BY CURRENT_USER TO cast_migrator;
+SELECT format(
+  'ALTER %s %I.%I OWNER TO cast_migrator',
+  CASE c.relkind
+    WHEN 'r' THEN 'TABLE'
+    WHEN 'p' THEN 'TABLE'
+    WHEN 'S' THEN 'SEQUENCE'
+    WHEN 'v' THEN 'VIEW'
+    WHEN 'm' THEN 'MATERIALIZED VIEW'
+    WHEN 'f' THEN 'FOREIGN TABLE'
+  END,
+  n.nspname,
+  c.relname
+)
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')
+  AND n.nspname IN ('public', 'app')
+  AND c.relowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+\gexec
 
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO cast_runtime;

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   dbActorStorage,
-  setCurrentDbActor,
+  runWithDbActor,
 } from '../../../../shared/database/postgres/db-actor';
 import { AppLogger } from '../../../../shared/logger/logger.service';
 import { resolveGithubAppConfig } from '../../config/github-app.config';
@@ -52,24 +52,17 @@ export class HandleWebhookUseCase {
   ) {}
 
   async execute(input: WebhookInput): Promise<WebhookOutcome> {
-    // Webhook chega sem usuário autenticado. Abrimos o escopo como 'service',
-    // que só alcança as tabelas de entrega e a leitura de instalação — nunca
-    // dado de negócio de um usuário. Assim que a instalação é resolvida, o
-    // handler re-escopa para o dono dela (ver `adoptInstallationOwner`).
     return dbActorStorage.run({ userId: null, actorType: 'service' }, () =>
       this.handle(input),
     );
   }
 
-  /**
-   * Passa a agir em nome do dono da instalação.
-   *
-   * `ownerUserId` vem do banco, resolvido a partir do `installation_id` do
-   * payload — nunca de campo controlado por quem envia o webhook.
-   */
-  private adoptInstallationOwner(ownerUserId: string | null): void {
-    if (!ownerUserId) return;
-    setCurrentDbActor(ownerUserId, 'job');
+  private withInstallationOwner<T>(
+    ownerUserId: string | null,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    if (!ownerUserId) return work();
+    return runWithDbActor({ userId: ownerUserId, actorType: 'job' }, work);
   }
 
   private async handle(input: WebhookInput): Promise<WebhookOutcome> {
@@ -173,7 +166,6 @@ export class HandleWebhookUseCase {
     if (!installation) {
       return { status: 'ignored', reason: 'instalação ainda não vinculada' };
     }
-    this.adoptInstallationOwner(installation.ownerUserId);
 
     if (action === 'deleted') {
       await this.installationRepository.update(installation.id, {
@@ -185,38 +177,40 @@ export class HandleWebhookUseCase {
       return { status: 'ignored', reason: 'instalação removida' };
     }
 
-    if (action === 'suspend') {
+    return this.withInstallationOwner(installation.ownerUserId, async () => {
+      if (action === 'suspend') {
+        await this.installationRepository.update(installation.id, {
+          status: 'suspended',
+          suspendedAt: new Date(),
+          lastEventAt: new Date(),
+        });
+        this.tokenService.forget(installationId);
+        return { status: 'ignored', reason: 'instalação suspensa' };
+      }
+
+      if (action === 'unsuspend') {
+        await this.installationRepository.update(installation.id, {
+          status: installation.ownerUserId ? 'active' : 'pending',
+          suspendedAt: null,
+          lastEventAt: new Date(),
+        });
+      }
+
       await this.installationRepository.update(installation.id, {
-        status: 'suspended',
-        suspendedAt: new Date(),
         lastEventAt: new Date(),
       });
-      this.tokenService.forget(installationId);
-      return { status: 'ignored', reason: 'instalação suspensa' };
-    }
 
-    if (action === 'unsuspend') {
-      await this.installationRepository.update(installation.id, {
-        status: installation.ownerUserId ? 'active' : 'pending',
-        suspendedAt: null,
-        lastEventAt: new Date(),
-      });
-    }
+      try {
+        await this.syncRepositories.execute(installation);
+      } catch (err) {
+        this.logger.error('Falha ao sincronizar repositórios da instalação', {
+          exception: err,
+          installationId,
+        });
+      }
 
-    await this.installationRepository.update(installation.id, {
-      lastEventAt: new Date(),
+      return { status: 'ignored', reason: `installation ${action ?? 'sync'}` };
     });
-
-    try {
-      await this.syncRepositories.execute(installation);
-    } catch (err) {
-      this.logger.error('Falha ao sincronizar repositórios da instalação', {
-        exception: err,
-        installationId,
-      });
-    }
-
-    return { status: 'ignored', reason: `installation ${action ?? 'sync'}` };
   }
 
   private async handlePullRequestEvent(
@@ -224,21 +218,12 @@ export class HandleWebhookUseCase {
     payload: Record<string, unknown>,
   ): Promise<WebhookOutcome> {
     const facts = extractPullRequestFacts(payload);
-    if (!facts || !facts.installationId) {
+    if (!facts?.installationId) {
       return { status: 'ignored', reason: 'payload sem dados de pull request' };
     }
+    const installationId = facts.installationId;
 
-    if (action === 'closed') {
-      await this.enqueueReviewRun.supersedeOpenRuns(
-        facts.installationId,
-        facts.pullNumber,
-        null,
-        'pull_closed',
-      );
-      return { status: 'ignored', reason: 'pull request fechada' };
-    }
-
-    if (!action || !isEligibleAction(action)) {
+    if (!action || (action !== 'closed' && !isEligibleAction(action))) {
       return {
         status: 'ignored',
         reason: `ação ${action ?? 'desconhecida'} fora do P1`,
@@ -248,7 +233,6 @@ export class HandleWebhookUseCase {
     const installation = await this.installationRepository.findOne({
       where: { installationId: facts.installationId },
     });
-    this.adoptInstallationOwner(installation?.ownerUserId ?? null);
     const installationCheck = evaluateInstallation(installation);
     if (!installationCheck.eligible || !installation) {
       return {
@@ -259,34 +243,48 @@ export class HandleWebhookUseCase {
       };
     }
 
-    const repository = await this.findRepository(installation.id, facts);
-    const repositoryCheck = evaluateRepository(repository);
-    if (!repositoryCheck.eligible || !repository) {
-      return {
-        status: 'skipped',
-        reason: repositoryCheck.eligible
-          ? 'automation_disabled'
-          : repositoryCheck.reason,
-      };
+    if (action === 'closed') {
+      return this.withInstallationOwner(installation.ownerUserId, async () => {
+        await this.enqueueReviewRun.supersedeOpenRuns(
+          installationId,
+          facts.pullNumber,
+          null,
+          'pull_closed',
+        );
+        return { status: 'ignored', reason: 'pull request fechada' };
+      });
     }
 
-    const eventCheck = evaluatePullEvent(repository, {
-      action,
-      draft: facts.draft,
-      baseRef: facts.baseRef,
-      state: facts.state,
-    });
-    if (!eventCheck.eligible) {
-      return { status: 'skipped', reason: eventCheck.reason };
-    }
+    return this.withInstallationOwner(installation.ownerUserId, async () => {
+      const repository = await this.findRepository(installation.id, facts);
+      const repositoryCheck = evaluateRepository(repository);
+      if (!repositoryCheck.eligible || !repository) {
+        return {
+          status: 'skipped',
+          reason: repositoryCheck.eligible
+            ? 'automation_disabled'
+            : repositoryCheck.reason,
+        };
+      }
 
-    return this.enqueueReviewRun.execute({
-      installation,
-      repository,
-      facts,
-      trigger: 'webhook',
-      eventAction: action,
-      deliveryId: null,
+      const eventCheck = evaluatePullEvent(repository, {
+        action,
+        draft: facts.draft,
+        baseRef: facts.baseRef,
+        state: facts.state,
+      });
+      if (!eventCheck.eligible) {
+        return { status: 'skipped', reason: eventCheck.reason };
+      }
+
+      return this.enqueueReviewRun.execute({
+        installation,
+        repository,
+        facts,
+        trigger: 'webhook',
+        eventAction: action,
+        deliveryId: null,
+      });
     });
   }
 

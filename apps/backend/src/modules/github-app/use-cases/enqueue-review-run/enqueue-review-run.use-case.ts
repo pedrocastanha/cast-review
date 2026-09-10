@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Queue } from 'bullmq';
-import { AppLogger } from '../../../../shared/logger/logger.service';
 import { In, Not } from 'typeorm';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import { budgetMonthFor, hashRepositoryConfig } from '../../domain/config-hash';
 import type {
   GithubReviewRunTrigger,
