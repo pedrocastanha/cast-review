@@ -1,4 +1,4 @@
-import { DefaultEntity } from 'src/shared/database/postgres/default.entity';
+import { DefaultEntity } from '../../../shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
 
 @Entity('feature_card_revisions')
