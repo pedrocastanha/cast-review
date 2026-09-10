@@ -38,6 +38,7 @@ function buildService(overrides: Record<string, any> = {}) {
     getByEmail: jest.fn(async () => activeUser()),
     getByUsername: jest.fn(async () => activeUser()),
     getById: jest.fn(async () => activeUser()),
+    getForSessionRefresh: jest.fn(async () => activeUser()),
     createUser: jest.fn(async () => activeUser()),
     ...overrides.userService,
   };
@@ -342,7 +343,10 @@ describe('AuthService refresh token families', () => {
 
     it('revokes the family when the user vanished', async () => {
       const { service, refreshSessions } = buildService({
-        userService: { getById: jest.fn(async () => null) },
+        userService: {
+          getById: jest.fn(async () => null),
+          getForSessionRefresh: jest.fn(async () => null),
+        },
       });
 
       await expect(
@@ -359,6 +363,9 @@ describe('AuthService refresh token families', () => {
       const { service, refreshSessions } = buildService({
         userService: {
           getById: jest.fn(async () => activeUser({ active: false })),
+          getForSessionRefresh: jest.fn(async () =>
+            activeUser({ active: false }),
+          ),
         },
       });
 

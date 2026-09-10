@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import { demoLoginEnabled } from 'src/shared/security/demo-access';
+import { AppLogger } from '../../shared/logger/logger.service';
+import { demoLoginEnabled } from '../../shared/security/demo-access';
 import { CreateUserDto } from '../users/dtos/create-user.dto';
 import { User } from '../users/user.entity';
 import { UserService } from '../users/user.service';
@@ -166,7 +166,7 @@ export class AuthService {
       throw new UnauthorizedException('Token de atualização inválido');
     }
 
-    const user = await this.userService.getById(session.userId);
+    const user = await this.userService.getForSessionRefresh(session.userId);
 
     if (!user) {
       await this.refreshSessions.revokeFamily(session.familyId, 'logout');
