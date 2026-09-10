@@ -5,15 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import { openSseStream } from 'src/shared/security/sse-limits';
+import { AiApiClient } from '../../shared/clients/ai/ai-api.client';
+import { AppLogger } from '../../shared/logger/logger.service';
+import { issueIndexScopeGrant } from '../../shared/security/index-scope-grant';
+import { openSseStream } from '../../shared/security/sse-limits';
 import type {
   ChatEvent,
   ChatRunMention,
   ChatRunRequest,
   ChatRunScopeRepository,
-} from 'src/shared/types';
+} from '../../shared/types';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import type { FeatureProposal } from '../feature-cards/domain/card.types';
 import { ProjectsService } from '../projects/projects.service';
@@ -28,6 +29,7 @@ import type {
 import { ChatCatalogGrantService } from './chat-catalog-grant.service';
 import type { ChatMessage } from './chat-message.entity';
 import { ChatMessageRepository } from './chat-message.repository';
+import { ChatScopeRevalidator } from './chat-scope-revalidator';
 import type { ChatThread } from './chat-thread.entity';
 import { ChatThreadRepository } from './chat-thread.repository';
 import type { CreateChatThreadDto } from './dtos/create-chat-thread.dto';
@@ -57,7 +59,42 @@ export class ChatService {
     private readonly catalogGrants: ChatCatalogGrantService,
     private readonly logger: AppLogger,
     private readonly projects: ProjectsService,
+    private readonly scopeRevalidator: ChatScopeRevalidator,
   ) {}
+
+  /**
+   * Repositórios do escopo persistido que o usuário AINDA pode ler.
+   *
+   * `thread.scope` foi autorizado na criação da thread e nunca mais. Sem esta
+   * revalidação, perder acesso a um repositório no GitHub não tira o acesso ao
+   * grafo já indexado dele.
+   */
+  private async includedAndStillAuthorized(
+    thread: ChatThread,
+    currentUser: CurrentUserData,
+  ) {
+    const included = thread.scope.repositories.filter(
+      (repository) => repository.included && repository.sha,
+    );
+    if (included.length === 0) return included;
+
+    const allowed = await this.scopeRevalidator.accessible(
+      included.map((repository) => repository.repoId),
+      currentUser,
+    );
+    const authorized = included.filter((repository) =>
+      allowed.has(repository.repoId),
+    );
+
+    if (authorized.length !== included.length) {
+      this.logger.warn('Repositórios removidos do escopo por permissão', {
+        threadId: thread.id,
+        removed: included.length - authorized.length,
+      });
+    }
+
+    return authorized;
+  }
 
   async create(dto: CreateChatThreadDto, currentUser: CurrentUserData) {
     const scope = await this.resolveScope(dto, currentUser);
@@ -133,8 +170,14 @@ export class ChatService {
     limit: number,
   ) {
     const thread = await this.requireThread(id, currentUser);
-    const included = thread.scope.repositories.filter(
-      (repository) => repository.included && repository.sha,
+    const included = await this.includedAndStillAuthorized(thread, currentUser);
+    // O grant carrega exatamente o que acabou de ser revalidado no GitHub.
+    const scopeGrant = issueIndexScopeGrant(
+      currentUser.id,
+      included.map((repository) => ({
+        repoId: repository.repoId,
+        sha: repository.sha as string,
+      })),
     );
 
     const perRepo = await Promise.all(
@@ -143,6 +186,7 @@ export class ChatService {
           repository.repoId,
           repository.sha as string,
           currentUser.id,
+          scopeGrant,
           query,
           limit,
         );
@@ -173,9 +217,7 @@ export class ChatService {
       );
     }
     const mode = thread.scope.mode;
-    const included = thread.scope.repositories.filter(
-      (repository) => repository.included && repository.sha,
-    );
+    const included = await this.includedAndStillAuthorized(thread, currentUser);
     if (thread.scope.mode !== 'global' && included.length === 0) {
       throw new BadRequestException(
         'Nenhum repositório indexado nesta conversa.',
@@ -325,11 +367,25 @@ export class ChatService {
       );
       if (!repository?.sha || !repository.included) continue;
 
+      // Menção resolve conteúdo de arquivo: revalidar aqui também, senão uma
+      // menção antiga continua lendo repositório ao qual o acesso foi revogado.
+      if (
+        !(await this.scopeRevalidator.isAccessible(
+          repository.repoId,
+          currentUser,
+        ))
+      ) {
+        continue;
+      }
+
       const fromGraph = await this.aiApiClient.getIndexFile(
         repository.repoId,
         repository.sha,
         mention.path,
         currentUser.id,
+        issueIndexScopeGrant(currentUser.id, [
+          { repoId: repository.repoId, sha: repository.sha },
+        ]),
       );
       if (fromGraph) {
         resolved.push({
