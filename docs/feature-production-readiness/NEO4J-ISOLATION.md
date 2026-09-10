@@ -9,11 +9,11 @@ Data: 2026-09-09. Cobre a pendência 2 de `IMPLEMENTATION.md` na parte de grafo.
 | 1. Leitura cross-tenant do grafo | **Corrigido.** `assertRepositoryAccess` + 4 testes de regressão |
 | 2. Destruição de grafo entre usuários | **Corrigido.** delete por sha, lock por (dono, repo), MATCH rotulado, escrita antes da virada |
 | 3. `ownerId` nos nós | **Feito.** Propagado por ai-api e backend; 5 testes de isolamento contra Neo4j real |
-| 4. Grant nas rotas de conteúdo | Pendente |
-| 5. Revalidação de permissão | Pendente |
-| 6. Higiene de produção | Pendente (operação) |
+| 4. Grant nas rotas de conteúdo | **Feito.** Grant HMAC ligado a (dono, repo, sha), 17 testes |
+| 5. Revalidação de permissão | **Feito.** `ChatScopeRevalidator`, 10 testes |
+| 6. Higiene de produção | **Feito.** Allowlist de procedures, usuário dedicado exigido, script de limpeza |
 
-Suites: 357 testes Python, 631 unitários do backend, 77 e2e.
+Suites: 370 testes Python, 647 unitários do backend, 80 e2e.
 
 ---
 
@@ -155,36 +155,95 @@ Nota secundária no mesmo trecho: o laço `while (selected.length < limit)` pagi
 
 ---
 
-## 4. Fechar as rotas de conteúdo do ai-api
+## 4. Rotas de conteúdo do ai-api — feito
 
-`GET /index/file` e `GET /index/files` (`apps/ai-api/app/api/routes/chat.py:48` e `:63`) aceitam `repoId` e `sha` arbitrários e devolvem **conteúdo de código**. A única barreira é o `AI_SERVICE_TOKEN`.
+`GET /index/file` e `GET /index/files` devolvem **conteúdo de código** e aceitavam `repoId`/`sha` arbitrários, com o `AI_SERVICE_TOKEN` como única barreira. O token autentica o SERVIÇO; ele não autoriza CONTEÚDO.
 
-Hoje o caminho real é seguro por acidente de composição: o chat resolve `thread.scope.repositories` a partir do catálogo (que é verificado) e a thread é escopada por `userId`. Mas a rota em si não tem nada.
+Agora as duas rotas exigem um grant de escopo no header `X-Index-Scope`, além do bearer:
 
-Correção: aplicar o mesmo padrão já usado no catálogo — `ChatCatalogGrantService` (`src/modules/chat/chat-catalog-grant.service.ts`) emite um grant HMAC de vida curta com o usuário e a thread. Estender esse grant para carregar o escopo de repositórios autorizado, e exigir sua apresentação em `/index/file` e `/index/files`. O token de serviço passa a autenticar o serviço; o grant passa a autorizar o conteúdo.
+- **emissão** — `src/shared/security/index-scope-grant.ts`. O backend assina `{ownerId, repositories: [{repoId, sha}], expiresAt}` com HMAC-SHA256, TTL de 5 min, e só inclui o que acabou de revalidar no GitHub (seção 5);
+- **verificação** — `apps/ai-api/app/index_scope.py`. Confere assinatura em tempo constante, expiração, `ownerId` e a presença exata do par `(repoId, sha)` pedido.
+
+**Chave de assinatura.** Derivada do `AI_SERVICE_TOKEN` com separação de domínio (`HMAC(token, "index-scope-grant-v1")`), não um segredo novo. Os dois serviços já compartilham e já validam esse token em produção, então não há configuração adicional; derivar evita usá-lo cru como chave HMAC. `SECRET_ENCRYPTION_KEY` foi descartada de propósito — o ai-api não deve tê-la.
+
+Ligar `ownerId` ao grant é o que impede que ele vire chave-mestra: um grant do usuário A não serve para ler o grafo de B, mesmo com o token de serviço em mãos.
+
+Coberto por `tests/test_index_scope_grant.py` (11 casos: grant ausente, assinado com outro token, expirado, payload adulterado, dono trocado, repo fora do escopo, sha diferente) e `index-scope-grant.spec.ts` (6).
 
 ---
 
-## 5. Revalidação de permissão
+## 5. Revalidação de permissão — feito
 
-`thread.scope.repositories` é persistido. Se o acesso do usuário ao repositório for revogado no GitHub depois da criação da thread, nada revalida.
+`chat_threads.scope` é gravado na criação da thread, quando a permissão foi de fato verificada. Depois disso nada revalidava: um usuário removido de um repositório continuava lendo o grafo indexado dele por uma thread antiga.
 
-Definir um TTL de escopo — reusar `GRANT_TTL_MS` (300_000) como referência — e revalidar contra o GitHub na emissão de cada grant, não só na criação da thread.
+`ChatScopeRevalidator` (`src/modules/chat/chat-scope-revalidator.ts`) revalida contra o GitHub nos três pontos que consomem o escopo persistido:
+
+| Ponto | Efeito |
+|---|---|
+| `sendMessage` | repositórios sem acesso saem do escopo do run; escopo vazio recusa a mensagem |
+| `listFiles` | listagem só cobre o que ainda é autorizado |
+| `resolveMentions` | menção a repositório revogado é descartada |
+
+TTL de 5 min (`SCOPE_REVALIDATION_TTL_MS`), igual ao do grant de catálogo — é o teto de defasagem aceito. O cache é por processo e existe por necessidade, não por latência: sem ele, uma thread de projeto com N repositórios faria N chamadas ao GitHub por mensagem.
+
+**Falha fechada**: qualquer erro na verificação nega. Falhar aberto devolveria exatamente o acesso que a revalidação corta.
+
+Coberto por `chat-scope-revalidator.spec.ts` (8 casos) e dois testes de revogação em `chat.service.spec.ts`.
 
 ---
 
-## 6. Higiene de produção
+## 6. Higiene de produção — feito
 
-- `NEO4J_dbms_security_procedures_unrestricted: "gds.*"` e o volume `.neo4j-plugins` no `docker-compose.yml` são de desenvolvimento. Não levar para produção.
-- Credencial do runtime do ai-api deve ser um usuário Neo4j dedicado, sem privilégio administrativo, e não o `neo4j` padrão.
-- Já está correto e deve ser mantido: `apps/ai-api/app/config/settings.py` exige esquema TLS em `NEO4J_URI` e rejeita a senha default em produção.
-- Já está correto: não há injeção de Cypher. Todas as queries são parametrizadas; a única interpolação de f-string é `rel_type`, vinda do dicionário fixo `RELATIONSHIP_TYPE_BY_KIND`. Manter essa propriedade — nunca interpolar valor de entrada em Cypher.
+### Sandbox de procedures estreitado
+
+`gds.*` liberava a biblioteca inteira do Graph Data Science sem sandbox. O ranker chama exatamente cinco procedures (`app/code_graph/ranker.py`):
+
+```
+gds.graph.project   gds.graph.exists   gds.graph.drop
+gds.pageRank.stream gds.util.asNode
+```
+
+`docker-compose.yml` agora lista só essas em `unrestricted`, e adiciona um `allowlist` explícito com as mesmas. Verificado com o Neo4j real: as suites de ranker, contexto e cache passam; `gds.graph.list`, que nenhuma parte da aplicação usa, deixou de ser chamável — o teste de limpeza de projeção foi reescrito para asserir via `gds.graph.exists`, passando pelo mesmo portão que produção.
+
+### Usuário dedicado
+
+`validate_production_config` passa a recusar `NEO4J_USER=neo4j` em produção.
+
+**O que isso compra, exatamente:** Community 5.26 aceita `CREATE USER` mas **não tem RBAC** — `SHOW ROLES` é "Unsupported administration command", e todo usuário é efetivamente admin do banco. Confirmado no servidor em uso. Portanto isto é **separação de credencial, não de privilégio**: a credencial da aplicação pode ser rotacionada ou revogada sem mexer na conta `neo4j`, que é a que administra auth e configuração do servidor. Não trate como fronteira de privilégio; a fronteira continua sendo o `ownerId` e a autorização na borda.
+
+### Plugin do GDS
+
+O bind-mount `./.neo4j-plugins` entrega um jar de 64 MB do disco do host, sem verificação de integridade nem versão fixada na imagem. Em produção o plugin deve ser embutido numa imagem versionada. O `docker-compose.yml` está marcado como desenvolvimento apenas.
+
+### Já correto, manter
+
+- `settings.py` exige esquema TLS em `NEO4J_URI` e rejeita a senha default.
+- Não há injeção de Cypher: todas as queries são parametrizadas, e a única interpolação de f-string é `rel_type`, vinda do dicionário fixo `RELATIONSHIP_TYPE_BY_KIND`. Nunca interpolar valor de entrada em Cypher.
+
+## 7. Limpeza do acervo órfão
+
+Nós gravados antes do escopo por dono não têm `ownerId` e nenhuma query os alcança — toda leitura passou a exigi-lo. São lixo inacessível, não dado perdido: o grafo é derivado do código e volta com uma reindexação normal.
+
+`apps/ai-api/scripts/cleanup_orphan_graph.py`:
+
+```bash
+python scripts/cleanup_orphan_graph.py                       # só relata
+python scripts/cleanup_orphan_graph.py --repo owner/nome --apply
+python scripts/cleanup_orphan_graph.py --apply               # tudo
+```
+
+`--repo` permite limpar e reindexar um repositório por vez em vez de esvaziar o acervo de uma vez. A deleção é em lotes de 10 mil — um `DETACH DELETE` sem limite num acervo grande segura a transação inteira em memória.
+
+A condição `ownerId IS NULL` é o que define órfão e nunca deve ser removida: sem ela o script apagaria grafo vivo.
+
+Verificado contra o Neo4j real: com nós órfãos e nós com dono no mesmo banco, o `--apply` escopado removeu apenas os órfãos do repositório alvo e deixou intactos tanto os nós com dono quanto o restante do acervo.
 
 ---
 
 ## O que falta
 
-1. **Reindexação do acervo existente.** Os nós gravados antes desta mudança não têm `ownerId`, então nenhuma query os alcança — na prática ficaram órfãos. Não há perda de dado de negócio (o grafo é derivado do código), mas cada repositório precisa ser reindexado. Alternativa: um script que atribua `ownerId` a partir de quem enfileirou a última indexação, se esse histórico ainda existir.
-2. Seção 4 — grant nas rotas de conteúdo (`/index/file`, `/index/files`).
-3. Seção 5 — revalidação de permissão do GitHub no escopo de thread.
-4. Seção 6 — higiene de produção (usuário Neo4j dedicado, tirar `gds.*` irrestrito e o volume de plugins).
+Só operação:
+
+1. Rodar `cleanup_orphan_graph.py --apply` e reindexar os repositórios. **Não executado**: são 3.487 nós órfãos no Neo4j de desenvolvimento, e apagar é decisão do mantenedor. O modo relatório e o `--apply` escopado por repositório já foram exercitados.
+2. Provisionar o usuário Neo4j dedicado e apontar `NEO4J_USER` para ele — sem isso o serviço recusa subir em produção.
+3. Empacotar o GDS numa imagem versionada e remover o bind-mount do compose de produção.
