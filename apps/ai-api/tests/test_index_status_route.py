@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
+OWNER_ID = "owner-test"
+
 pytestmark = pytest.mark.integration
 
 
@@ -15,7 +17,7 @@ def repo_id():
 
 def test_index_status_never_indexed(repo_id):
     with TestClient(app) as client:
-        response = client.get("/index/status", params={"repoId": repo_id})
+        response = client.get("/index/status", params={"ownerId": OWNER_ID, "repoId": repo_id})
 
     assert response.status_code == 200
     assert response.json() == {"indexed": False, "sha": None}
@@ -25,9 +27,9 @@ def test_index_status_after_build(repo_id):
     with TestClient(app) as client:
         client.post(
             "/index/build",
-            json={"repoId": repo_id, "sha": "sha1", "files": [{"path": "src/a.ts", "content": "function a() {}\n"}]},
+            json={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "files": [{"path": "src/a.ts", "content": "function a() {}\n"}]},
         )
-        response = client.get("/index/status", params={"repoId": repo_id})
+        response = client.get("/index/status", params={"ownerId": OWNER_ID, "repoId": repo_id})
 
     assert response.status_code == 200
     assert response.json() == {"indexed": True, "sha": "sha1"}

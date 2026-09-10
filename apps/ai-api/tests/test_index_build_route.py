@@ -16,6 +16,8 @@ from fastapi.testclient import TestClient
 from app.code_graph.cache import IndexCache, build_neo4j_driver, build_redis_client
 from app.main import app
 
+OWNER_ID = "owner-test"
+
 pytestmark = pytest.mark.integration
 
 
@@ -36,6 +38,7 @@ def test_index_build_http_returns_stats(repo_id):
         response = client.post(
             "/index/build",
             json={
+                "ownerId": OWNER_ID,
                 "repoId": repo_id,
                 "sha": "sha1",
                 "files": [
@@ -56,13 +59,13 @@ async def test_index_build_persists_queryable_graph(repo_id):
     with TestClient(app) as client:
         client.post(
             "/index/build",
-            json={"repoId": repo_id, "sha": "sha1", "files": [{"path": "src/a.ts", "content": "function a() {}\n"}]},
+            json={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "files": [{"path": "src/a.ts", "content": "function a() {}\n"}]},
         )
 
     driver = build_neo4j_driver()
     redis_client = build_redis_client()
     cache = IndexCache(driver, redis_client)
-    graph = await cache.lookup(repo_id, "sha1")
+    graph = await cache.lookup(repo_id, "sha1", OWNER_ID)
     assert graph is not None
     assert any(n.name == "a" for n in graph.nodes.values())
 
@@ -92,7 +95,7 @@ def test_index_build_concurrent_second_call_returns_409(repo_id, monkeypatch):
         def call():
             resp = client.post(
                 "/index/build",
-                json={"repoId": repo_id, "sha": "sha1", "files": [{"path": "src/a.ts", "content": "function a() {}\n"}]},
+                json={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "files": [{"path": "src/a.ts", "content": "function a() {}\n"}]},
             )
             results.append(resp.status_code)
 

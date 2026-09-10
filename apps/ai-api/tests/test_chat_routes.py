@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 from app.chat.models import ChatEvent
 from app.main import app
 
+OWNER_ID = "owner-test"
+
 pytestmark = pytest.mark.integration
 
 FILES = [
@@ -40,14 +42,14 @@ def _cleanup(repo_id):
 
 
 def _build(client, repo_id):
-    client.post("/index/build", json={"repoId": repo_id, "sha": "sha1", "files": FILES})
+    client.post("/index/build", json={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "files": FILES})
 
 
 def test_index_file_renders_from_graph(repo_id):
     with TestClient(app) as client:
         _build(client, repo_id)
         response = client.get(
-            "/index/file", params={"repoId": repo_id, "sha": "sha1", "path": "src/auth.ts"}
+            "/index/file", params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "path": "src/auth.ts"}
         )
 
     assert response.status_code == 200
@@ -61,7 +63,7 @@ def test_index_file_unknown_path_returns_404(repo_id):
     with TestClient(app) as client:
         _build(client, repo_id)
         response = client.get(
-            "/index/file", params={"repoId": repo_id, "sha": "sha1", "path": "README.md"}
+            "/index/file", params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "path": "README.md"}
         )
 
     assert response.status_code == 404
@@ -71,7 +73,7 @@ def test_index_file_unknown_path_returns_404(repo_id):
 def test_index_file_unknown_index_returns_404(repo_id):
     with TestClient(app) as client:
         response = client.get(
-            "/index/file", params={"repoId": repo_id, "sha": "nope", "path": "src/auth.ts"}
+            "/index/file", params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "nope", "path": "src/auth.ts"}
         )
 
     assert response.status_code == 404
@@ -80,9 +82,9 @@ def test_index_file_unknown_index_returns_404(repo_id):
 def test_index_files_lists_and_filters_paths(repo_id):
     with TestClient(app) as client:
         _build(client, repo_id)
-        every = client.get("/index/files", params={"repoId": repo_id, "sha": "sha1"}).json()
+        every = client.get("/index/files", params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1"}).json()
         filtered = client.get(
-            "/index/files", params={"repoId": repo_id, "sha": "sha1", "query": "auth"}
+            "/index/files", params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "query": "auth"}
         ).json()
 
     assert set(every["paths"]) == {"src/auth.ts", "src/other.ts"}
@@ -119,6 +121,7 @@ def test_chat_run_streams_tool_and_message_events(repo_id, monkeypatch):
         response = client.post(
             "/chat/run",
             json={
+                "ownerId": OWNER_ID,
                 "threadId": "t1",
                 "mode": "repository",
                 "repositories": [{"repoId": repo_id, "sha": "sha1"}],
@@ -152,6 +155,7 @@ def test_chat_run_on_unindexed_repo_emits_error(repo_id, monkeypatch):
         response = client.post(
             "/chat/run",
             json={
+                "ownerId": OWNER_ID,
                 "threadId": "t1",
                 "mode": "repository",
                 "repositories": [{"repoId": repo_id, "sha": "nope"}],

@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
+OWNER_ID = "owner-test"
+
 pytestmark = pytest.mark.integration
 
 
@@ -30,7 +32,7 @@ def _cleanup(repo_id):
 
 def test_index_graph_not_indexed_returns_empty_with_indexed_false(repo_id):
     with TestClient(app) as client:
-        response = client.get("/index/graph", params={"repoId": repo_id, "sha": "sha1"})
+        response = client.get("/index/graph", params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1"})
 
     assert response.status_code == 200
     body = response.json()
@@ -43,6 +45,7 @@ def test_index_graph_overview_after_build(repo_id):
         client.post(
             "/index/build",
             json={
+                "ownerId": OWNER_ID,
                 "repoId": repo_id,
                 "sha": "sha1",
                 "files": [
@@ -51,7 +54,7 @@ def test_index_graph_overview_after_build(repo_id):
                 ],
             },
         )
-        response = client.get("/index/graph", params={"repoId": repo_id, "sha": "sha1"})
+        response = client.get("/index/graph", params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1"})
 
     assert response.status_code == 200
     body = response.json()
@@ -68,6 +71,7 @@ def test_index_graph_focus_expands_neighborhood(repo_id):
         client.post(
             "/index/build",
             json={
+                "ownerId": OWNER_ID,
                 "repoId": repo_id,
                 "sha": "sha1",
                 "files": [
@@ -77,11 +81,11 @@ def test_index_graph_focus_expands_neighborhood(repo_id):
                 ],
             },
         )
-        overview = client.get("/index/graph", params={"repoId": repo_id, "sha": "sha1"}).json()
+        overview = client.get("/index/graph", params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1"}).json()
         fn_b_id = next(n["id"] for n in overview["nodes"] if n["label"] == "b")
 
         response = client.get(
-            "/index/graph", params={"repoId": repo_id, "sha": "sha1", "focus": fn_b_id, "depth": 1}
+            "/index/graph", params={"ownerId": OWNER_ID, "repoId": repo_id, "sha": "sha1", "focus": fn_b_id, "depth": 1}
         )
 
     assert response.status_code == 200

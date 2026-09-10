@@ -8,6 +8,8 @@ from app.code_graph.indexer import parse_file
 from app.graph.nodes.change_analyzer import agent as agent_module
 from app.graph.nodes.change_analyzer.agent import node
 
+OWNER_ID = "owner-test"
+
 pytestmark = pytest.mark.integration
 
 
@@ -59,7 +61,7 @@ async def _store_two_symbol_repo(repo_id):
     )
     driver = build_neo4j_driver()
     redis_client = build_redis_client()
-    await IndexCache(driver, redis_client).build_and_store(repo_id, "sha1", graph)
+    await IndexCache(driver, redis_client).build_and_store(repo_id, "sha1", graph, OWNER_ID)
     await driver.close()
     await redis_client.aclose()
 
@@ -70,6 +72,7 @@ async def test_node_scopes_related_context_to_the_symbols_the_diff_touches(repo_
     state = {
         "changed_files": [{"path": "src/z.ts", "diff": TOUCHES_ZTWO_ONLY}],
         "diff": TOUCHES_ZTWO_ONLY,
+        "owner_id": OWNER_ID,
         "repo_id": repo_id,
         "sha": "sha1",
     }
@@ -88,6 +91,7 @@ async def test_snapshot_marks_only_the_touched_symbols_as_changed(repo_id):
     state = {
         "changed_files": [{"path": "src/z.ts", "diff": TOUCHES_ZTWO_ONLY}],
         "diff": TOUCHES_ZTWO_ONLY,
+        "owner_id": OWNER_ID,
         "repo_id": repo_id,
         "sha": "sha1",
     }
@@ -110,13 +114,14 @@ async def test_node_returns_real_related_context_when_repo_is_indexed(repo_id):
     driver = build_neo4j_driver()
     redis_client = build_redis_client()
     cache = IndexCache(driver, redis_client)
-    await cache.build_and_store(repo_id, "sha1", graph)
+    await cache.build_and_store(repo_id, "sha1", graph, OWNER_ID)
     await driver.close()
     await redis_client.aclose()
 
     state = {
         "changed_files": [{"path": "src/b.ts"}],
         "diff": "",
+        "owner_id": OWNER_ID,
         "repo_id": repo_id,
         "sha": "sha1",
     }

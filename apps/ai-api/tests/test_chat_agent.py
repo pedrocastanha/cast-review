@@ -12,6 +12,8 @@ from app.code_graph.models import Graph, HttpEndpoint, Symbol
 from app.infrastructure.llm.client import LlmError, LlmToolResult, ToolCall
 from app.infrastructure.llm.tokens import TokenUsage
 
+OWNER_ID = "owner-test"
+
 
 def _usage(prompt: int = 10, completion: int = 5) -> TokenUsage:
     return TokenUsage(
@@ -53,13 +55,14 @@ class FakeCache:
         self._graph = graph
         self.calls: list[tuple[str, str]] = []
 
-    async def lookup(self, repo_id: str, sha: str):
+    async def lookup(self, repo_id: str, sha: str, owner_id: str):
         self.calls.append((repo_id, sha))
         return self._graph
 
 
 def _request(**overrides) -> ChatRunRequest:
     payload = {
+        "ownerId": OWNER_ID,
         "threadId": "t1",
         "mode": "repository",
         "repositories": [{"repoId": "acme/back", "sha": "sha1"}],
