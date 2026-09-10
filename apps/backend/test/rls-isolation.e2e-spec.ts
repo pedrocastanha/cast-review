@@ -350,6 +350,67 @@ describe('RLS isolation (SEC-19)', () => {
     ]);
   });
 
+  // --- Fluxos de autenticação --------------------------------------------
+  // register/demo/login/refresh são rotas @Public(): o guard não roda e o ator
+  // fica anônimo. Sob RLS, anônimo não lê nem escreve nada. Estes casos travam
+  // o contrato mínimo que o bootstrap de autenticação precisa.
+
+  it('refuses to create a user without an auth context', async () => {
+    await expect(
+      asUser(
+        null,
+        (q) =>
+          q(
+            `INSERT INTO users (id, name, email, password) VALUES ($1, 'X', $2, 'x')`,
+            [randomUUID(), `${randomUUID()}@test.invalid`],
+          ),
+        'anonymous',
+      ),
+    ).rejects.toThrow(/row-level security/i);
+  });
+
+  it('lets the signup flow create a user under the auth context', async () => {
+    const created = randomUUID();
+    const rows = await asUser(
+      null,
+      async (q) => {
+        await q(
+          `INSERT INTO users (id, name, email, password) VALUES ($1, 'Novo', $2, 'x')`,
+          [created, `${created}@test.invalid`],
+        );
+        return q(`SELECT id FROM users WHERE id = $1`, [created]);
+      },
+      'auth',
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('lets the refresh flow read the session owner by id', async () => {
+    const rows = await asUser(
+      null,
+      (q) => q(`SELECT id, active FROM users WHERE id = $1`, [bob]),
+      'auth',
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('does not let the auth context modify or delete an existing user', async () => {
+    // O bootstrap precisa ler e criar. Alterar ou apagar conta alheia, não.
+    const updated = await asUser(
+      null,
+      (q) => q(`UPDATE users SET name = 'sequestrado' WHERE id = $1`, [bob]),
+      'auth',
+    );
+    expect(updated[1]).toBe(0);
+
+    const deleted = await asUser(
+      null,
+      (q) => q(`DELETE FROM users WHERE id = $1`, [bob]),
+      'auth',
+    );
+    expect(deleted[1]).toBe(0);
+  });
+
   it('leaves no table with RLS enabled but no policy', async () => {
     const orphans = await owner.query(`
       SELECT c.relname
