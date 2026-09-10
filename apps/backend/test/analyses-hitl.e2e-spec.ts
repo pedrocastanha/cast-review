@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from 'src/app.module';
 import { AuthService } from 'src/modules/auth/auth.service';
+import { encryptBoundSecret } from 'src/shared/crypto/secret-crypto';
 import { User } from 'src/modules/users/user.entity';
 import { UserRepository } from 'src/modules/users/user.repository';
 import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
@@ -126,6 +127,7 @@ const MODELS = {
   architectureReviewer: 'gpt-4o-mini',
 };
 const API_KEYS = { openai: 'sk-test-fake-key' };
+const seededUserId = randomUUID();
 
 /**
  * Scripted `AiApiClient` replacement. Each method is an async generator, so
@@ -266,7 +268,7 @@ describe('Analyses HITL flow (e2e)', () => {
 
     const user = await userRepository.save(
       userRepository.create({
-        id: randomUUID(),
+        id: seededUserId,
         name: 'HITL E2E User',
         email: `hitl-e2e-${randomUUID()}@example.com`,
         username: `hitl-e2e-${randomUUID()}`,
@@ -274,6 +276,14 @@ describe('Analyses HITL flow (e2e)', () => {
         githubToken: 'gho_fake_token_for_e2e_testing_only',
         githubTokenLastFour: 'nly',
         githubLogin: TEST_OWNER,
+        // A chave da OpenAI vem das configurações do usuário, não do corpo da
+        // requisição — `apiKeys` no body não basta mais. Sem semear a chave
+        // cifrada, a rota de análise responde 400 antes de rodar nada.
+        openaiKey: encryptBoundSecret('sk-test-fake-key', {
+          ownerId: seededUserId,
+          field: 'openai_key',
+        }),
+        openaiKeyLastFour: 'key0',
       }) as Partial<User>,
     );
     accessToken = await authService.generateAccessToken(user);
