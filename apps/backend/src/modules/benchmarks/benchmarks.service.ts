@@ -6,8 +6,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import type { AgentRunRequest } from 'src/shared/types';
+import { AiApiClient } from '../../shared/clients/ai/ai-api.client';
+import type { AgentRunRequest } from '../../shared/types';
 import { AnalysisRepository } from '../analyses/analysis.repository';
 import { AnalysisContextSnapshotRepository } from '../analyses/analysis-context-snapshot.repository';
 import {
