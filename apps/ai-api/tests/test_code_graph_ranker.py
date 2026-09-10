@@ -5,7 +5,7 @@ import pytest
 from app.code_graph.cache import IndexCache, build_neo4j_driver, build_redis_client
 from app.code_graph.graph import build_graph
 from app.code_graph.indexer import parse_file
-from app.code_graph.ranker import rank
+from app.code_graph.ranker import GRAPH_PROJECTION_PREFIX, rank
 
 OWNER_ID = "owner-test"
 
@@ -108,18 +108,32 @@ async def test_rank_scopes_to_repo_and_sha(driver, redis_client, repo_id):
     await _cleanup(driver, other_repo_id)
 
 
-async def test_rank_cleans_up_graph_projection(driver, redis_client, repo_id):
+async def test_rank_cleans_up_graph_projection(driver, redis_client, repo_id, monkeypatch):
     a = parse_file("src/a.ts", "import { b } from './b';\nfunction a() { return b(); }\n")
     b = parse_file("src/b.ts", "function b() {}\n")
     graph = build_graph([a, b])
+
+    # Fixa o nome da projeção para poder perguntar por ELA depois. Sem isso o
+    # nome é um uuid interno do ranker e o teste não teria o que consultar.
+    projection_hex = uuid.uuid4().hex
+    monkeypatch.setattr(
+        "app.code_graph.ranker.uuid.uuid4", lambda: uuid.UUID(hex=projection_hex)
+    )
+    graph_name = f"{GRAPH_PROJECTION_PREFIX}_{projection_hex}"
 
     cache = IndexCache(driver, redis_client)
     await cache.build_and_store(repo_id, "sha1", graph, OWNER_ID)
     await rank(driver, repo_id, "sha1", ["src/b.ts"], OWNER_ID)
 
+    # Asserção via `gds.graph.exists`, e não `gds.graph.list`: a allowlist de
+    # procedures do Neo4j em produção só libera o que o ranker realmente chama,
+    # e `list` não está entre elas. O teste tem que passar pelo mesmo portão.
     async with driver.session() as session:
-        result = await session.run("CALL gds.graph.list() YIELD graphName RETURN graphName")
-        names = [rec["graphName"] async for rec in result]
-    assert not any(name.startswith("rank_") for name in names)
+        result = await session.run(
+            "CALL gds.graph.exists($graphName) YIELD exists RETURN exists",
+            graphName=graph_name,
+        )
+        record = await result.single()
+    assert record["exists"] is False
 
     await _cleanup(driver, repo_id)
