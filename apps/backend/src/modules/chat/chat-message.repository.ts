@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DefaultRepository } from 'src/shared/database/postgres/default.database';
+import { DefaultRepository } from '../../shared/database/postgres/default.database';
 import { DataSource } from 'typeorm';
 import { ChatMessage } from './chat-message.entity';
 

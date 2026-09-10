@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import { AiApiClient } from '../../shared/clients/ai/ai-api.client';
 import { ProjectsModule } from '../projects/projects.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { RepositoriesService } from '../repositories/repositories.service';
@@ -10,6 +10,7 @@ import { ChatService } from './chat.service';
 import { ChatCatalogController } from './chat-catalog.controller';
 import { ChatCatalogGrantService } from './chat-catalog-grant.service';
 import { ChatMessageRepository } from './chat-message.repository';
+import { ChatScopeRevalidator } from './chat-scope-revalidator';
 import { ChatThreadRepository } from './chat-thread.repository';
 
 @Module({
@@ -20,6 +21,7 @@ import { ChatThreadRepository } from './chat-thread.repository';
     ChatThreadRepository,
     ChatMessageRepository,
     ChatCatalogGrantService,
+    ChatScopeRevalidator,
     AiApiClient,
     { provide: 'REPOSITORIES_SERVICE', useExisting: RepositoriesService },
     { provide: 'USER_SERVICE', useExisting: UserService },
