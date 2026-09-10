@@ -27,6 +27,7 @@ class FileInput(BaseModel):
 
 
 class IndexBuildRequest(BaseModel):
+    ownerId: str
     repoId: str
     sha: str
     files: list[FileInput]
@@ -48,6 +49,7 @@ class IndexRepositoriesResponse(BaseModel):
 
 
 class IndexContextRequest(BaseModel):
+    ownerId: str
     repoId: str
     sha: str
     changedFiles: list[str]
@@ -55,6 +57,7 @@ class IndexContextRequest(BaseModel):
 
 
 class ProjectGraphRequest(BaseModel):
+    ownerId: str
     projectId: str
     repositories: list[ProjectRepositoryRef]
 
@@ -68,16 +71,16 @@ async def build_index(body: IndexBuildRequest, request: Request) -> IndexResult:
     cache = _get_cache(request)
     start = time.monotonic()
 
-    locked = await cache.acquire_lock(body.repoId, body.sha)
+    locked = await cache.acquire_lock(body.repoId, body.ownerId)
     if not locked:
         raise HTTPException(status_code=409, detail="indexing already in progress for this repo@sha")
 
     try:
         files = [{"path": f.path, "content": f.content} for f in body.files]
 
-        result = await build_incremental(cache, body.repoId, files)
+        result = await build_incremental(cache, body.repoId, files, body.ownerId)
         result.graph.endpoints = extract_http_endpoints(files, result.graph)
-        await cache.build_and_store(body.repoId, body.sha, result.graph)
+        await cache.build_and_store(body.repoId, body.sha, result.graph, body.ownerId)
 
         return IndexResult(
             indexId=f"{body.repoId}@{body.sha}",
@@ -88,25 +91,27 @@ async def build_index(body: IndexBuildRequest, request: Request) -> IndexResult:
             durationMs=int((time.monotonic() - start) * 1000),
         )
     finally:
-        await cache.release_lock(body.repoId, body.sha)
+        await cache.release_lock(body.repoId, body.ownerId)
 
 
 @router.get("/index/status", response_model=IndexStatusResponse)
-async def index_status(repoId: str, request: Request) -> IndexStatusResponse:
+async def index_status(repoId: str, ownerId: str, request: Request) -> IndexStatusResponse:
     cache = _get_cache(request)
-    sha = await cache.get_latest_sha(repoId)
+    sha = await cache.get_latest_sha(repoId, ownerId)
     return IndexStatusResponse(indexed=sha is not None, sha=sha)
 
 
 @router.get("/index/repositories", response_model=IndexRepositoriesResponse)
 async def index_repositories(
     request: Request,
+    ownerId: str,
     query: str | None = None,
     limit: int = 50,
     cursor: str | None = None,
 ) -> IndexRepositoriesResponse:
     bounded_limit = min(max(limit, 1), 200)
     repositories, next_cursor = await _get_cache(request).list_repositories(
+        ownerId,
         query,
         bounded_limit,
         cursor,
@@ -126,6 +131,7 @@ async def index_context(body: IndexContextRequest, request: Request) -> RelatedC
         body.repoId,
         body.sha,
         body.changedFiles,
+        body.ownerId,
         body.tokenBudget,
     )
 
@@ -134,6 +140,7 @@ async def index_context(body: IndexContextRequest, request: Request) -> RelatedC
 async def index_graph(
     repoId: str,
     sha: str,
+    ownerId: str,
     request: Request,
     focus: str | None = None,
     depth: int = 1,
@@ -142,7 +149,7 @@ async def index_graph(
     (symbol-level, never aggregated); omitted means the default aggregated overview.
     Same read-only `cache.lookup`, no build/lock involved."""
     cache = _get_cache(request)
-    graph = await cache.lookup(repoId, sha)
+    graph = await cache.lookup(repoId, sha, ownerId)
     if graph is None:
         return VizGraph(nodes=[], edges=[], stats=IndexStats(indexed=False))
 
@@ -154,4 +161,4 @@ async def index_graph(
 @router.post("/index/project/graph", response_model=ProjectGraph)
 async def project_graph(body: ProjectGraphRequest, request: Request) -> ProjectGraph:
     cache = _get_cache(request)
-    return await cache.materialize_project_graph(body.projectId, body.repositories)
+    return await cache.materialize_project_graph(body.projectId, body.repositories, body.ownerId)

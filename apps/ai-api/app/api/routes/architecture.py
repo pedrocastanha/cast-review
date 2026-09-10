@@ -19,15 +19,18 @@ router = APIRouter()
 
 
 class CandidatesRequest(BaseModel):
+    ownerId: str
     repositories: list[ArchitectureRepositoryRef] = Field(default_factory=list)
 
 
 class DependenciesRequest(BaseModel):
+    ownerId: str
     repositories: list[ArchitectureRepositoryRef] = Field(default_factory=list)
     components: list[ComponentRef] = Field(default_factory=list)
 
 
 class ImpactRequest(BaseModel):
+    ownerId: str
     repositories: list[ArchitectureRepositoryRef] = Field(default_factory=list)
     components: list[ComponentRef] = Field(default_factory=list)
     changedFiles: list[ChangedFileRef] = Field(default_factory=list)
@@ -40,20 +43,23 @@ def _get_cache(request: Request) -> IndexCache:
 async def _load_graphs(
     request: Request,
     repositories: list[ArchitectureRepositoryRef],
+    owner_id: str,
 ) -> dict[str, Graph | None]:
     cache = _get_cache(request)
     graphs: dict[str, Graph | None] = {}
     for repository in repositories:
         if repository.repoId in graphs:
             continue
-        sha = repository.sha or await cache.get_latest_sha(repository.repoId)
-        graphs[repository.repoId] = await cache.lookup(repository.repoId, sha) if sha else None
+        sha = repository.sha or await cache.get_latest_sha(repository.repoId, owner_id)
+        graphs[repository.repoId] = (
+            await cache.lookup(repository.repoId, sha, owner_id) if sha else None
+        )
     return graphs
 
 
 @router.post("/architecture/candidates", response_model=CandidatesResponse)
 async def architecture_candidates(body: CandidatesRequest, request: Request) -> CandidatesResponse:
-    graphs = await _load_graphs(request, body.repositories)
+    graphs = await _load_graphs(request, body.repositories, body.ownerId)
     return build_candidates(body.repositories, graphs)
 
 
@@ -62,11 +68,11 @@ async def architecture_dependencies(
     body: DependenciesRequest,
     request: Request,
 ) -> DependenciesResponse:
-    graphs = await _load_graphs(request, body.repositories)
+    graphs = await _load_graphs(request, body.repositories, body.ownerId)
     return build_dependencies(body.repositories, body.components, graphs)
 
 
 @router.post("/architecture/impact", response_model=ImpactResponse)
 async def architecture_impact(body: ImpactRequest, request: Request) -> ImpactResponse:
-    graphs = await _load_graphs(request, body.repositories)
+    graphs = await _load_graphs(request, body.repositories, body.ownerId)
     return build_impact(body.repositories, body.components, body.changedFiles, graphs)

@@ -47,9 +47,11 @@ async def chat_run(body: ChatRunRequest, request: Request) -> StreamingResponse:
 
 
 @router.get("/index/file", response_model=IndexFileResponse)
-async def index_file(repoId: str, sha: str, path: str, request: Request) -> IndexFileResponse:
+async def index_file(
+    repoId: str, sha: str, path: str, ownerId: str, request: Request
+) -> IndexFileResponse:
     cache = _get_cache(request)
-    graph = await cache.lookup(repoId, sha)
+    graph = await cache.lookup(repoId, sha, ownerId)
     if graph is None:
         raise HTTPException(status_code=404, detail="índice não encontrado para repo@sha")
 
@@ -64,12 +66,13 @@ async def index_file(repoId: str, sha: str, path: str, request: Request) -> Inde
 async def index_files(
     repoId: str,
     sha: str,
+    ownerId: str,
     request: Request,
     query: str | None = None,
     limit: int = 100,
 ) -> IndexFilesResponse:
     cache = _get_cache(request)
-    graph = await cache.lookup(repoId, sha)
+    graph = await cache.lookup(repoId, sha, ownerId)
     if graph is None:
         raise HTTPException(status_code=404, detail="índice não encontrado para repo@sha")
 

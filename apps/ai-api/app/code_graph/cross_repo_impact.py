@@ -141,6 +141,7 @@ def _source_evidence(
 async def resolve_cross_repo_impacts(
     *,
     cache,
+    owner_id: str,
     source_repo_id: str,
     source_sha: str,
     changed_files: list[dict],
@@ -164,7 +165,7 @@ async def resolve_cross_repo_impacts(
         endpoints_by_repo.append(
             (
                 repository,
-                await cache.list_endpoints(repository["repoId"], repository["indexedSha"]),
+                await cache.list_endpoints(repository["repoId"], repository["indexedSha"], owner_id),
             )
         )
 

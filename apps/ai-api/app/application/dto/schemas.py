@@ -68,6 +68,7 @@ class AgentRunRequest(BaseModel):
     models: ReviewModels
     apiKeys: ApiKeys
     policies: Policies = Field(default_factory=Policies)
+    ownerId: str | None = None
     repoId: str | None = None
     sha: str | None = None
     baseSha: str | None = None

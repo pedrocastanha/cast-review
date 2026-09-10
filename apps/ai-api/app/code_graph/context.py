@@ -49,13 +49,14 @@ async def assemble_related_context(
     repo_id: str,
     sha: str,
     changed_paths: list[str],
+    owner_id: str,
     token_budget: int = DEFAULT_TOKEN_BUDGET,
     changed_files: list[dict] | None = None,
 ) -> RelatedContext:
     """Single facade shared by the standalone `/index/context` route (P5) and
     `change_analyzer` (P2, in-process) — same selection logic either way, per CGC-16's
     'not a divergent implementation' requirement."""
-    graph = await cache.lookup(repo_id, sha)
+    graph = await cache.lookup(repo_id, sha, owner_id)
     if graph is None:
         return RelatedContext(stats=IndexStats(indexed=False))
 
@@ -71,7 +72,7 @@ async def assemble_related_context(
     test_ids = set(_direct_sources(graph, changed_ids, "tests")[:MAX_TEST_REFS])
 
     ranked_callers = await rank_callers(
-        driver, repo_id, sha, changed_paths, source_symbol_ids=source_symbol_ids
+        driver, repo_id, sha, changed_paths, owner_id, source_symbol_ids=source_symbol_ids
     )
 
     combined_ranked = list(ranked_callers) + [

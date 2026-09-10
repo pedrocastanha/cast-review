@@ -136,6 +136,7 @@ async def run_pipeline(graph, request: AgentRunRequest) -> AsyncIterator[AgentEv
         "diff": request.diff,
         "changed_files": [file.model_dump() for file in request.changedFiles],
         "conventions": request.conventions,
+        "owner_id": request.ownerId,
         "repo_id": request.repoId,
         "sha": request.sha,
         "base_sha": request.baseSha,
