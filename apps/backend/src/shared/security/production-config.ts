@@ -14,6 +14,46 @@ export function allowsPlaintextDependencies(): boolean {
   return flag('ALLOW_INSECURE_DEPENDENCIES');
 }
 
+export function chatGrantSecret(): string {
+  const secret = process.env.CHAT_GRANT_SECRET?.trim();
+
+  if (isProduction() && (!secret || secret.length < 32)) {
+    throw new Error('CHAT_GRANT_SECRET inválido');
+  }
+
+  if (!secret) {
+    throw new Error('CHAT_GRANT_SECRET não configurado');
+  }
+
+  return secret;
+}
+
+function validateMigrationDatabaseIdentity() {
+  const raw = process.env.MIGRATION_DATABASE_URL?.trim();
+  if (!raw) return;
+
+  let migrationUser: string;
+  try {
+    const parsed = new URL(raw);
+    if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
+      throw new Error('protocolo inválido');
+    }
+    migrationUser = decodeURIComponent(parsed.username);
+  } catch {
+    throw new Error('MIGRATION_DATABASE_URL inválida');
+  }
+
+  if (!migrationUser) {
+    throw new Error('MIGRATION_DATABASE_URL sem usuário');
+  }
+
+  if (migrationUser === process.env.DB_USER?.trim()) {
+    throw new Error(
+      'MIGRATION_DATABASE_URL não pode usar a mesma role do runtime',
+    );
+  }
+}
+
 export function trustProxyHops(): number {
   const raw = process.env.TRUST_PROXY_HOPS?.trim();
 
@@ -192,6 +232,7 @@ export function validateProductionConfig() {
     'JWT_ACCESS_SECRET',
     'JWT_REFRESH_SECRET',
     'AI_SERVICE_TOKEN',
+    'CHAT_GRANT_SECRET',
   ]) {
     if ((process.env[name]?.length ?? 0) < 32)
       throw new Error(`${name} inválido`);
@@ -201,9 +242,10 @@ export function validateProductionConfig() {
     process.env.JWT_ACCESS_SECRET,
     process.env.JWT_REFRESH_SECRET,
     process.env.AI_SERVICE_TOKEN,
+    process.env.CHAT_GRANT_SECRET,
   ];
   if (new Set(secrets).size !== secrets.length)
-    throw new Error('JWT secrets and service token must be independent');
+    throw new Error('JWT, service and chat grant secrets must be independent');
 
   if (!/^[a-fA-F0-9]{64}$/.test(process.env.SECRET_ENCRYPTION_KEY ?? ''))
     throw new Error('SECRET_ENCRYPTION_KEY inválido');
@@ -222,4 +264,5 @@ export function validateProductionConfig() {
   }
 
   validateTransportSecurity();
+  validateMigrationDatabaseIdentity();
 }

@@ -165,7 +165,10 @@ function build(
   };
 }
 
-const job = (reviewRunId = 'run-1') => ({ data: { reviewRunId } }) as never;
+const job = (
+  reviewRunId = 'run-1',
+  actorUserId: string | undefined = 'user-1',
+) => ({ data: { reviewRunId, actorUserId } }) as never;
 
 describe('ReviewProcessor.process', () => {
   beforeEach(() => {
@@ -173,6 +176,45 @@ describe('ReviewProcessor.process', () => {
       () => ({
         getPullHeadSha: jest.fn().mockResolvedValue('sha-a'),
       }),
+    );
+  });
+
+  it('rejects a job without an explicit actor before reading the database', async () => {
+    const { processor, reviewRunRepository, logger } = build();
+
+    await processor.process(job('run-1', ''));
+
+    expect(reviewRunRepository.findOne).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      'Job de revisão sem ator rejeitado',
+      expect.objectContaining({ reviewRunId: 'run-1' }),
+    );
+  });
+
+  it('does not execute a job after the installation owner changes', async () => {
+    const { processor, analysesService, reviewRunRepository, logger } = build({
+      installation: {
+        id: 'inst-row',
+        installationId: '42',
+        ownerUserId: 'user-2',
+        status: 'active',
+        pausedAt: null,
+      },
+    });
+
+    await processor.process(job());
+
+    expect(analysesService.runHeadless).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Job de revisão descartado após mudança de proprietário',
+      expect.objectContaining({
+        actorUserId: 'user-1',
+        currentOwnerUserId: 'user-2',
+      }),
+    );
+    expect(reviewRunRepository.update).toHaveBeenCalledWith(
+      'run-1',
+      expect.objectContaining({ status: 'running' }),
     );
   });
 

@@ -1,6 +1,6 @@
 # Estado da implementação
 
-Data: 2026-09-06. Implementação parcial; não liberar produção usando este documento como aprovação de segurança. Sem commits e sem publicação remota.
+Data: 2026-09-10. Implementação parcial; não liberar produção usando este documento como aprovação de segurança. Sem commits e sem publicação remota.
 
 ## Entregue localmente
 
@@ -17,19 +17,24 @@ Data: 2026-09-06. Implementação parcial; não liberar produção usando este d
 - Workflows de qualidade, migrations, CodeQL, auditoria Node/Python e scan de segredos em histórico e bundle. Os workflows ainda não foram executados pelo GitHub nem configurados como checks obrigatórios.
 - Configuração de headers Vercel e gerador de rewrites em `apps/frontend/scripts/configure-vercel.mjs`, dependente de PUBLIC_API_ORIGIN.
 - Correções mecânicas de formatação/imports no backend para desbloquear o lint preexistente. Avisos de lint permanecem.
+- RLS PostgreSQL com `ENABLE` + `FORCE`, policies por ownership, bootstrap de autenticação, contexto transacional e E2E com role real de runtime. A migration também corrige a FK de `analyses.requested_by`.
+- Validação de boot para impedir runtime `SUPERUSER`, `BYPASSRLS`, dono de tabela, DDL ou role de migration compartilhada; scripts SQL agora falham com exit code diferente de zero quando a verificação encontra uma violação.
+- Grant interno do catálogo com `CHAT_GRANT_SECRET` independente e payload mínimo (`userId`, `threadId`, expiração); contexto de webhook e actor explícito/revalidado nos jobs de review.
 
 ## Validação realizada
 
-- Backend: build e 399 testes unitários passaram.
-- Python: 329 testes passaram também após atualização de FastAPI, Starlette, LangGraph, checkpoint Redis e pytest.
+- Backend desta rodada: build, 661 testes unitários e 31 testes E2E de isolamento/RLS passaram.
+- Python (validação histórica antes desta rodada): 329 testes passaram após atualização de FastAPI, Starlette, LangGraph, checkpoint Redis e pytest.
 - Frontend: build, lint e 33 testes passaram.
 - Integração Redis: 3 testes passaram, incluindo concorrência entre instâncias.
 - Feature Cards HTTP/Postgres: 5 testes passaram em banco isolado.
 - Sessão HTTP: 4 testes passaram, incluindo cookie, CSRF e origem em rotas com variações de caixa/barra final. O serviço de autenticação é substituído; isso não equivale ao E2E completo de login com banco e browser.
 - Imagem backend construída localmente. A imagem deve ser reconstruída depois de alterações posteriores no código.
 - Auditoria Node após atualização compatível: zero vulnerabilidades reportadas.
+- Auditoria Node desta rodada após `npm ci`: zero vulnerabilidades (`multer` 2.3.0 e `js-yaml` 4.3.2 via overrides).
 - Auditoria Python: 13 vulnerabilidades iniciais em 5 pacotes; após atualização das dependências e nova execução do pip-audit, nenhuma vulnerabilidade conhecida reportada.
 - Histórico Git: 224 commits examinados. Bundle: aproximadamente 757 KB examinados; scanner não detectou segredos. Isso não prova ausência de dados sensíveis em todas as respostas de runtime.
+- Revalidação Python desta rodada: 350 testes passaram e 20 falharam por dependências/serviços locais — GDS ausente no Neo4j e incompatibilidade do serializer de checkpoint Redis —, portanto não é um gate verde para produção até repetir no ambiente do CI.
 
 ## Triagem do scanner de segredos
 
@@ -37,15 +42,15 @@ Data: 2026-09-06. Implementação parcial; não liberar produção usando este d
 
 ## Pendências obrigatórias
 
-1. RLS completo, roles de runtime/migration, bootstrap de autenticação, contexto transacional e adaptação dos workers. Não há migration ativando RLS nesta entrega.
-2. Isolamento de conteúdo no Neo4j, cache e checkpoints Redis; revalidação de permissão GitHub e de snapshots históricos.
+1. Operacionalizar as roles em cada ambiente: executar `00-roles.sql`, apontar `MIGRATION_DATABASE_URL` para a role de migration e `DB_USER` para `cast_runtime`, e executar `01-verify-roles.sql` como gate.
+2. Isolamento de conteúdo no Neo4j, cache e checkpoints Redis; a parte de ownership do grafo e revalidação de permissão GitHub está implementada, mas ainda requer purga/reindexação do acervo legado e operação em imagem Neo4j versionada.
 3. Servidor MCP e integração OAuth, grants, asserção interna, ferramentas e testes. Nenhum servidor MCP foi criado nesta entrega.
 4. E2E completo em browser, DAST, scans de imagem/IaC, SBOM, assinatura e promoção do mesmo artefato.
 5. Configuração efetiva de Railway/Vercel, domínios, rede privada, TLS de dependências, proxy confiável e checks obrigatórios no GitHub.
 6. Quotas de custo e concorrência por usuário/projeto, rate limit por identificador de conta, limites de SSE e comportamento de desconexão/retry.
 7. Retenção, backups, restore, re-encryption, rotação operacional, trilha de auditoria persistente e alertas.
 8. Auditoria completa de DTOs, exports, mensagens SSE, imagens externas, logs Python e conteúdo enviado ao LLM.
-9. Lock completo de dependências Python e lint/typecheck Python. As dependências diretas estão fixadas e as vulnerabilidades conhecidas encontradas foram resolvidas.
+9. Lock completo de dependências Python e lint/typecheck Python. As dependências diretas estão fixadas e as vulnerabilidades conhecidas encontradas foram resolvidas. Neste ambiente, a suíte Python ficou bloqueada por incompatibilidade do Neo4j GDS carregado e do serializer de checkpoints Redis; precisa ser repetida com as imagens/dependências do CI.
 
 ## Bloqueios externos verificados
 
