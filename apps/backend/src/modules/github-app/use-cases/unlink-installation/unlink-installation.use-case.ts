@@ -1,4 +1,4 @@
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import type { CurrentUserData } from '../../../auth/utils/current-user-decorator';
 import type { InstallationTokenService } from '../../infrastructure/github/installation-token.service';
 import type { GithubAppRepositoryRepository } from '../../infrastructure/persistence/github-app-repository.repository';

@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Octokit } from '@octokit/rest';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import { resolveGithubAppConfig } from '../../config/github-app.config';
 import { signAppJwt } from './security/app-jwt';
 

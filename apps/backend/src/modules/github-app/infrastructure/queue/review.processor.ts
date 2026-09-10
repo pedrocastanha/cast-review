@@ -1,8 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
-import { dbActorStorage } from 'src/shared/database/postgres/db-actor';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import type { FrozenImpactScope } from 'src/shared/types';
+import { dbActorStorage } from '../../../../shared/database/postgres/db-actor';
+import { AppLogger } from '../../../../shared/logger/logger.service';
+import type { FrozenImpactScope } from '../../../../shared/types';
 import { AnalysesService } from '../../../analyses/analyses.service';
 import type {
   AnalysisReview,

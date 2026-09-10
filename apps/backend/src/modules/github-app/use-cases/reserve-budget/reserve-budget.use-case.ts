@@ -1,4 +1,4 @@
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import { In, Not } from 'typeorm';
 import { budgetMonthFor } from '../../domain/config-hash';
 import type { BudgetUsage } from '../../domain/github-app.types';

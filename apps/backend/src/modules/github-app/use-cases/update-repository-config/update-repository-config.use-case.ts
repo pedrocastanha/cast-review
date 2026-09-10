@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import type { CurrentUserData } from '../../../auth/utils/current-user-decorator';
 import type { UserService } from '../../../users/user.service';
 import type { GithubAppRepositoryConfig } from '../../domain/github-app.types';

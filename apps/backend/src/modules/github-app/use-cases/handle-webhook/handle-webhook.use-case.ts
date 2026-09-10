@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import {
   dbActorStorage,
   setCurrentDbActor,
-} from 'src/shared/database/postgres/db-actor';
-import { AppLogger } from 'src/shared/logger/logger.service';
+} from '../../../../shared/database/postgres/db-actor';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import { resolveGithubAppConfig } from '../../config/github-app.config';
 import {
   evaluateInstallation,
