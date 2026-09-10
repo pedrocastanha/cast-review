@@ -1,5 +1,5 @@
 import type { Queue } from 'bullmq';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import {
   buildIndexJobId,
   IndexJobData,

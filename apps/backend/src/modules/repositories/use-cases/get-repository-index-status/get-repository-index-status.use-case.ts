@@ -1,5 +1,5 @@
 import type { Queue } from 'bullmq';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import { AiApiClient } from '../../../../shared/clients/ai/ai-api.client';
 import {
   buildIndexJobId,
   IndexJobData,

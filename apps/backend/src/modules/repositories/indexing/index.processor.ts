@@ -1,9 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Octokit } from '@octokit/rest';
 import type { Job } from 'bullmq';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import { dbActorStorage } from 'src/shared/database/postgres/db-actor';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AiApiClient } from '../../../shared/clients/ai/ai-api.client';
+import { dbActorStorage } from '../../../shared/database/postgres/db-actor';
+import { AppLogger } from '../../../shared/logger/logger.service';
 import { UserService } from '../../users/user.service';
 import {
   CODE_INDEX_QUEUE,

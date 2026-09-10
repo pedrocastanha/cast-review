@@ -4,7 +4,7 @@
 jest.mock('@octokit/rest', () => ({ Octokit: jest.fn() }));
 jest.mock('./tree-fetcher.helper');
 
-import type { AppLogger } from 'src/shared/logger/logger.service';
+import type { AppLogger } from '../../../shared/logger/logger.service';
 import { IndexProcessor } from './index.processor';
 import { fetchRepoTree } from './tree-fetcher.helper';
 

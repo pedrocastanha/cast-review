@@ -1,4 +1,4 @@
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import { AiApiClient } from '../../../../shared/clients/ai/ai-api.client';
 import type { GithubSessionSource } from '../shared/github-session.provider';
 import { GetRepositoryGraphDto } from './get-repository-graph.dto';
 
