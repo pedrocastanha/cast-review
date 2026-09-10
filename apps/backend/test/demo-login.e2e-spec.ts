@@ -264,10 +264,9 @@ describe('Guest access from the login screen', () => {
 
       await post('/auth/demo').expect(200);
 
-      const remaining = (await db.query(
-        `SELECT id FROM users WHERE id = $1`,
-        [stale.id],
-      )) as unknown[];
+      const remaining = (await db.query(`SELECT id FROM users WHERE id = $1`, [
+        stale.id,
+      ])) as unknown[];
       const orphans = (await db.query(
         `SELECT id FROM analyses WHERE requested_by = $1`,
         [stale.id],
@@ -283,10 +282,9 @@ describe('Guest access from the login screen', () => {
 
       await post('/auth/demo').expect(200);
 
-      const remaining = (await db.query(
-        `SELECT id FROM users WHERE id = $1`,
-        [alive.id],
-      )) as unknown[];
+      const remaining = (await db.query(`SELECT id FROM users WHERE id = $1`, [
+        alive.id,
+      ])) as unknown[];
       expect(remaining).toHaveLength(1);
     });
 
@@ -299,10 +297,9 @@ describe('Guest access from the login screen', () => {
 
       await post('/auth/demo').expect(200);
 
-      const remaining = (await db.query(
-        `SELECT id FROM users WHERE id = $1`,
-        [realId],
-      )) as unknown[];
+      const remaining = (await db.query(`SELECT id FROM users WHERE id = $1`, [
+        realId,
+      ])) as unknown[];
       expect(remaining).toHaveLength(1);
     });
   });

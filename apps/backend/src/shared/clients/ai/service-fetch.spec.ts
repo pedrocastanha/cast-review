@@ -11,7 +11,10 @@ interface Received {
 }
 
 function listen(
-  handler: (received: Received, respond: (status: number, headers?: Record<string, string>) => void) => void,
+  handler: (
+    received: Received,
+    respond: (status: number, headers?: Record<string, string>) => void,
+  ) => void,
 ): Promise<{ server: Server; origin: string; received: Received[] }> {
   const received: Received[] = [];
 

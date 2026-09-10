@@ -1,5 +1,5 @@
-import { DefaultEntity } from '../../shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
+import { DefaultEntity } from '../../shared/database/postgres/default.entity';
 import type { ArchitectureImpact } from '../architecture-maps/domain/architecture-maps.types';
 import type {
   AnalysisImpactScopeSummary,

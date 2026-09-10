@@ -1,9 +1,9 @@
+import { MigrationInterface, QueryRunner } from 'typeorm';
 import {
   decryptSecret,
   encryptSecret,
   isEncrypted,
 } from '../../../crypto/secret-crypto';
-import { MigrationInterface, QueryRunner } from 'typeorm';
 
 const UNIQUE_CONSTRAINT = 'UQ_75e3f8fedec94bab4c751ee9910';
 

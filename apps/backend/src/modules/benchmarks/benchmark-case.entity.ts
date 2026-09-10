@@ -1,5 +1,5 @@
-import { DefaultEntity } from '../../shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
+import { DefaultEntity } from '../../shared/database/postgres/default.entity';
 import type { AnalysisContextSnapshot } from '../analyses/analyses.types';
 
 export type BenchmarkCaseKind = 'curated' | 'private';

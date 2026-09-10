@@ -1,5 +1,6 @@
 import 'dotenv/config';
 
+import { DataSource } from 'typeorm';
 import { Analysis } from '../../../modules/analyses/analysis.entity';
 import { AnalysisContextSnapshotEntity } from '../../../modules/analyses/analysis-context-snapshot.entity';
 import { ArchitectureBoundary } from '../../../modules/architecture-maps/entities/architecture-boundary.entity';
@@ -27,7 +28,6 @@ import {
   allowsPlaintextDependencies,
   isProduction,
 } from '../../security/production-config';
-import { DataSource } from 'typeorm';
 
 function resolveSsl() {
   if (process.env.DB_SSL === 'true') {

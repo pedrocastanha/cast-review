@@ -18,11 +18,7 @@ function run(headers: Record<string, string | string[]>) {
     seen.push(currentRequestCredentials());
   }) as NextFunction;
 
-  requestCredentials(
-    { headers } as unknown as Request,
-    {} as Response,
-    next,
-  );
+  requestCredentials({ headers } as unknown as Request, {} as Response, next);
 
   return { credentials: seen[0], errors };
 }

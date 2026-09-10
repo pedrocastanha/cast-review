@@ -1,6 +1,6 @@
 import { Injectable, LoggerService } from '@nestjs/common';
-import { initLogger } from './logger.factory';
 import { Logger } from 'winston';
+import { initLogger } from './logger.factory';
 
 type ContextType = Record<string, unknown> & { exception?: unknown };
 

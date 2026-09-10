@@ -1,5 +1,5 @@
-import { decryptSecret } from '../../../crypto/secret-crypto';
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { decryptSecret } from '../../../crypto/secret-crypto';
 
 export class AddGithubTokenLastFour1786500000000 implements MigrationInterface {
   name = 'AddGithubTokenLastFour1786500000000';

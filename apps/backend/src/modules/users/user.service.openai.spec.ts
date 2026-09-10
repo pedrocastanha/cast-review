@@ -154,9 +154,7 @@ describe('UserService.getOpenaiKey', () => {
     process.env.CREDENTIALS_MODE = 'ephemeral';
     const { service, userRepository } = buildService();
 
-    await expect(service.getOpenaiKey(OWNER)).rejects.toThrow(
-      /nesta sessão/,
-    );
+    await expect(service.getOpenaiKey(OWNER)).rejects.toThrow(/nesta sessão/);
     expect(userRepository.findOne).not.toHaveBeenCalled();
   });
 

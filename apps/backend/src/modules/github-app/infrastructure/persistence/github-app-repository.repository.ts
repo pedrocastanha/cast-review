@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DefaultRepository } from '../../../../shared/database/postgres/default.database';
 import { DataSource } from 'typeorm';
+import { DefaultRepository } from '../../../../shared/database/postgres/default.database';
 import { GithubAppRepository } from '../../entities/github-app-repository.entity';
 
 @Injectable()

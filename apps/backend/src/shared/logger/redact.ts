@@ -6,8 +6,7 @@ const knownSecret =
 
 const candidate = /[A-Za-z0-9_\-+=]{20,}/g;
 
-const uuid =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const hexOnly = /^[0-9a-f]+$/i;
 const digitsOnly = /^\d+$/;
 const isoDate = /^\d{4}-\d{2}-\d{2}T?[\dZ]*$/;
@@ -22,9 +21,7 @@ function looksLikeSecret(token: string): boolean {
     return false;
   }
 
-  return (
-    /[a-z]/.test(token) && /[A-Z]/.test(token) && /[0-9]/.test(token)
-  );
+  return /[a-z]/.test(token) && /[A-Z]/.test(token) && /[0-9]/.test(token);
 }
 
 export function scrubSecrets(value: string): string {

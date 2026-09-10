@@ -145,14 +145,19 @@ describe('What an intercepted token buys an attacker', () => {
         JSON.stringify({ alg: 'none', typ: 'JWT' }),
       ).toString('base64url');
       const payload = Buffer.from(
-        JSON.stringify({ sub: userId, exp: Math.floor(Date.now() / 1000) + 900 }),
+        JSON.stringify({
+          sub: userId,
+          exp: Math.floor(Date.now() / 1000) + 900,
+        }),
       ).toString('base64url');
 
       await protectedGet(`${header}.${payload}.`).expect(401);
     });
 
     it('rejects a token whose payload was swapped after signing', async () => {
-      const genuine = sign({ sub: userId }, ACCESS_SECRET, { expiresIn: '15m' });
+      const genuine = sign({ sub: userId }, ACCESS_SECRET, {
+        expiresIn: '15m',
+      });
       const [head, , signature] = genuine.split('.');
       const swapped = Buffer.from(
         JSON.stringify({ sub: randomUUID() }),
@@ -162,7 +167,9 @@ describe('What an intercepted token buys an attacker', () => {
     });
 
     it('rejects a token with a valid shape but no signature', async () => {
-      const genuine = sign({ sub: userId }, ACCESS_SECRET, { expiresIn: '15m' });
+      const genuine = sign({ sub: userId }, ACCESS_SECRET, {
+        expiresIn: '15m',
+      });
       const [head, payload] = genuine.split('.');
 
       await protectedGet(`${head}.${payload}.`).expect(401);
@@ -219,7 +226,9 @@ describe('What an intercepted token buys an attacker', () => {
     });
 
     it('is refused once it has expired', async () => {
-      const expired = sign({ sub: userId }, ACCESS_SECRET, { expiresIn: '-1s' });
+      const expired = sign({ sub: userId }, ACCESS_SECRET, {
+        expiresIn: '-1s',
+      });
 
       await protectedGet(expired).expect(401);
     });

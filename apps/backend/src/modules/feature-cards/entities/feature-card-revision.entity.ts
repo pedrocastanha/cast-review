@@ -1,5 +1,5 @@
-import { DefaultEntity } from '../../../shared/database/postgres/default.entity';
 import { Column, Entity, Index } from 'typeorm';
+import { DefaultEntity } from '../../../shared/database/postgres/default.entity';
 
 @Entity('feature_card_revisions')
 @Index('IDX_feature_card_revisions_card', ['cardId', 'version'], {
