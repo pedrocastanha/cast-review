@@ -12,14 +12,14 @@ import {
   encryptBoundSecret,
   isBoundToOwner,
   SecretDecryptionError,
-} from 'src/shared/crypto/secret-crypto';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import { demoSessionTtlMinutes } from 'src/shared/security/demo-access';
+} from '../../shared/crypto/secret-crypto';
+import { AppLogger } from '../../shared/logger/logger.service';
+import { demoSessionTtlMinutes } from '../../shared/security/demo-access';
 import {
   currentRequestCredentials,
   isEphemeralMode,
-} from 'src/shared/security/request-credentials';
-import { BaseService } from 'src/shared/services/base.service';
+} from '../../shared/security/request-credentials';
+import { BaseService } from '../../shared/services/base.service';
 import { RefreshSessionRepository } from '../auth/refresh-session.repository';
 import { CreateUserDto } from './dtos/create-user.dto';
 import { UpdateUserDto } from './dtos/update-user.dto';
@@ -42,13 +42,21 @@ export class UserService extends BaseService {
     super(logger);
   }
 
+  /**
+   * Cadastro roda sem usuário autenticado (rota `@Public()`), então o ator do
+   * escopo é anônimo — que sob RLS não escreve nada. `users_auth_signup` cobre
+   * exatamente este caso, e só INSERT.
+   */
   async createUser(dto: CreateUserDto): Promise<UserResponseDto> {
     return await this.safeExecute(async () => {
       const user = this.userRepository.create({
         ...dto,
         password: await bcrypt.hash(dto.password, 12),
       });
-      await this.userRepository.save(user);
+      await this.userRepository.withRlsTransaction(
+        (manager) => this.userRepository.save(user, undefined, manager),
+        { actorType: 'auth', userId: null },
+      );
 
       return toUserResponse(user);
     });
@@ -143,7 +151,11 @@ export class UserService extends BaseService {
       demoExpiresAt: expiresAt,
     });
 
-    await this.userRepository.save(user);
+    // Mesma razão de `createUser`: o login demo é rota pública.
+    await this.userRepository.withRlsTransaction(
+      (manager) => this.userRepository.save(user, undefined, manager),
+      { actorType: 'auth', userId: null },
+    );
 
     return user;
   }
@@ -344,6 +356,24 @@ export class UserService extends BaseService {
 
   async getById(id: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { id } });
+  }
+
+  /**
+   * Resolve o dono de uma sessão de refresh.
+   *
+   * O refresh é rota `@Public()`: o ator do escopo é anônimo, então `getById`
+   * comum não devolveria nada sob RLS. Método separado de propósito — dar o
+   * privilégio de bootstrap ao `getById` geral alargaria o buraco para todo
+   * caminho que resolve usuário por id.
+   *
+   * O `id` vem da sessão de refresh já validada por token hash, nunca do
+   * cliente.
+   */
+  async getForSessionRefresh(id: string): Promise<User | null> {
+    return this.userRepository.withRlsTransaction(
+      (manager) => this.userRepository.findOne({ where: { id } }, manager),
+      { actorType: 'auth', userId: null },
+    );
   }
 
   async getByIdOrFail(id: string): Promise<UserResponseDto> {

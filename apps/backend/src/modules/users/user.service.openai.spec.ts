@@ -4,8 +4,8 @@ import {
   encryptBoundSecret,
   encryptSecret,
   isBoundToOwner,
-} from 'src/shared/crypto/secret-crypto';
-import { runWithRequestCredentials } from 'src/shared/security/request-credentials';
+} from '../../shared/crypto/secret-crypto';
+import { runWithRequestCredentials } from '../../shared/security/request-credentials';
 import { UserService } from './user.service';
 
 const OWNER = 'user-1';
