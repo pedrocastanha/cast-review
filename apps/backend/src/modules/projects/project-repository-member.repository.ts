@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DefaultRepository } from 'src/shared/database/postgres/default.database';
+import { DefaultRepository } from '../../shared/database/postgres/default.database';
 import type { DeepPartial, EntityManager } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { ProjectRepositoryMember } from './project-repository-member.entity';

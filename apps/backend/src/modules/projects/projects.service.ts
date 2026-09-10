@@ -5,11 +5,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import { AiApiClient } from '../../shared/clients/ai/ai-api.client';
 import type {
   FrozenImpactRepository,
   FrozenImpactScope,
-} from 'src/shared/types';
+} from '../../shared/types';
 import { DataSource } from 'typeorm';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import type { RepositoriesService } from '../repositories/repositories.service';
@@ -17,7 +17,7 @@ import type { CreateProjectDto } from './dtos/create-project.dto';
 import type { UpdateProjectDto } from './dtos/update-project.dto';
 import { ProjectRepository } from './project.repository';
 import { ProjectRepositoryMemberRepository } from './project-repository-member.repository';
-import { runInRlsTransaction } from 'src/shared/database/postgres/rls-context';
+import { runInRlsTransaction } from '../../shared/database/postgres/rls-context';
 
 type AuthorizedRepository = Awaited<
   ReturnType<RepositoriesService['listRepos']>

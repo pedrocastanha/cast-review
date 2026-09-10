@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
+import { AiApiClient } from '../../shared/clients/ai/ai-api.client';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { ProjectRepository } from './project.repository';
