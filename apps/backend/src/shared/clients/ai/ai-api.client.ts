@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AppLogger } from '../../logger/logger.service';
+import { INDEX_SCOPE_HEADER } from '../../security/index-scope-grant';
 import type {
   AgentEvent,
   AgentResumeRequest,
@@ -21,7 +22,7 @@ import type {
   ProjectGraphRequest,
   ProjectGraphResult,
   VizGraph,
-} from 'src/shared/types';
+} from '../../types';
 import { serviceFetch as fetch } from './service-fetch';
 
 const DEFAULT_AI_API_URL = 'http://localhost:8000';
@@ -239,10 +240,12 @@ export class AiApiClient {
     sha: string,
     path: string,
     ownerId: string,
+    scopeGrant: string,
   ): Promise<IndexFileResult | null> {
     const params = new URLSearchParams({ repoId, sha, path, ownerId });
     const response = await fetch(
       `${resolveAiApiUrl()}/index/file?${params.toString()}`,
+      { headers: { [INDEX_SCOPE_HEADER]: scopeGrant } },
     );
 
     if (response.status === 404) return null;
@@ -266,6 +269,7 @@ export class AiApiClient {
     repoId: string,
     sha: string,
     ownerId: string,
+    scopeGrant: string,
     query?: string,
     limit?: number,
   ): Promise<IndexFilesResult> {
@@ -275,6 +279,7 @@ export class AiApiClient {
 
     const response = await fetch(
       `${resolveAiApiUrl()}/index/files?${params.toString()}`,
+      { headers: { [INDEX_SCOPE_HEADER]: scopeGrant } },
     );
 
     if (response.status === 404) {

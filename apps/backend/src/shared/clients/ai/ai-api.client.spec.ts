@@ -1,5 +1,5 @@
-import type { AppLogger } from 'src/shared/logger/logger.service';
-import type { AgentResumeRequest, AgentRunRequest } from 'src/shared/types';
+import type { AppLogger } from '../../logger/logger.service';
+import type { AgentResumeRequest, AgentRunRequest } from '../../types';
 import { AiApiClient } from './ai-api.client';
 
 const payload: AgentRunRequest = {
