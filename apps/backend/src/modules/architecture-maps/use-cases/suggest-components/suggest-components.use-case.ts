@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { ArchitectureCandidate } from 'src/shared/types';
+import type { ArchitectureCandidate } from '../../../../shared/types';
 import type { ArchitectureScope } from '../../domain/architecture-maps.types';
 import type { ArchitectureComponent } from '../../entities/architecture-component.entity';
 import type { ArchitectureMap } from '../../entities/architecture-map.entity';

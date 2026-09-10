@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { AiApiClient } from 'src/shared/clients/ai/ai-api.client';
-import { AppLogger } from 'src/shared/logger/logger.service';
+import { AiApiClient } from '../../../../shared/clients/ai/ai-api.client';
+import { AppLogger } from '../../../../shared/logger/logger.service';
 import type {
   ArchitectureCandidatesResult,
   ArchitectureChangedFile,
@@ -8,7 +8,7 @@ import type {
   ArchitectureComponentRef,
   ArchitectureImpactResult,
   ArchitectureRepositoryRef,
-} from 'src/shared/types';
+} from '../../../../shared/types';
 import type { ArchitectureScope } from '../../domain/architecture-maps.types';
 import type { ArchitectureComponent } from '../../entities/architecture-component.entity';
 

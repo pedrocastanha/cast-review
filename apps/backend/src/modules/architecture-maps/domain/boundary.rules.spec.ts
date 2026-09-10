@@ -1,4 +1,4 @@
-import type { ArchitectureComponentDependency } from 'src/shared/types';
+import type { ArchitectureComponentDependency } from '../../../shared/types';
 import type { ArchitectureBoundary } from '../entities/architecture-boundary.entity';
 import type { ArchitectureComponent } from '../entities/architecture-component.entity';
 import { detectBoundaryViolations } from './boundary.rules';

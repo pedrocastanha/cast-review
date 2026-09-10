@@ -1,4 +1,4 @@
-import type { ArchitectureChangedFile } from 'src/shared/types';
+import type { ArchitectureChangedFile } from '../../../../shared/types';
 import type {
   ArchitectureImpact,
   ArchitectureImpactCapability,

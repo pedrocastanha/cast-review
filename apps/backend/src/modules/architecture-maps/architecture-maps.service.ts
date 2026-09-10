@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AppLogger } from 'src/shared/logger/logger.service';
-import { BaseService } from 'src/shared/services/base.service';
-import type { ArchitectureChangedFile } from 'src/shared/types';
+import { AppLogger } from '../../shared/logger/logger.service';
+import { BaseService } from '../../shared/services/base.service';
+import type { ArchitectureChangedFile } from '../../shared/types';
 import type { CurrentUserData } from '../auth/utils/current-user-decorator';
 import { ProjectsService } from '../projects/projects.service';
 import { RepositoriesService } from '../repositories/repositories.service';
