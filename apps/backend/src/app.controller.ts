@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
 import { Public } from './modules/auth/utils/public.decorator';
 import { demoLoginEnabled } from './shared/security/demo-access';
+import { allowedOrigins } from './shared/security/http-security';
 import { credentialsMode } from './shared/security/request-credentials';
 
 @Controller()
@@ -26,6 +27,7 @@ export class AppController {
     return {
       credentialsMode: credentialsMode(),
       demoLogin: demoLoginEnabled(),
+      frontendUrl: process.env.FRONTEND_URL?.trim() || allowedOrigins()[0],
     };
   }
 }
