@@ -1,0 +1,31 @@
+name: Retrieval Evaluation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  retrieval-eval:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install openai python-dotenv pytest
+
+      - name: Run retrieval evaluation
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python -m pytest test.py -v

@@ -1,0 +1,3 @@
+{"query": "Which elements must a claimant prove for careless conduct that causes harm?", "relevant_passage_ids": ["chunk_10"], "category": "negligence"}
+{"query": "When may one side end an agreement because the other side seriously violated it?", "relevant_passage_ids": ["chunk_27"], "category": "contract"}
+{"query": "When does failing to meet the expected standard of care amount to a legal violation?", "relevant_passage_ids": ["chunk_42"], "category": "duty"}
