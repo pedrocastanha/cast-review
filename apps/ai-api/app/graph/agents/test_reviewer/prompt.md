@@ -28,6 +28,8 @@ PRD (contexto), `businessRules` da spec, changed files (incluindo *.test / *.spe
 }
 ```
 
+`line` é opcional. Só inclua quando existir um trecho de código específico pra apontar (ex.: um teste que existe mas não cobre o caso). Se a falha é "nenhum teste cobre esta regra" — não existe uma linha certa pra isso — **omita `line` completamente**. Nunca invente/adivinhe um número de linha; um `line` errado aponta o comentário do GitHub pro lugar errado, o que é pior que não ter `line` nenhum.
+
 ## Hard rules
 - Texto em português.
 - `pass` só se o arquivo de teste menciona ou exercita aquela regra. Existir pasta `tests/` não basta.
@@ -35,4 +37,4 @@ PRD (contexto), `businessRules` da spec, changed files (incluindo *.test / *.spe
 - Não acrescente regra que não está na spec.
 - Copie o texto de `businessRule` exatamente.
 - Não revise arquitetura.
-- Em fail/warning: `path` é um arquivo da PR (o source que ficou sem teste, ou o spec). `line` é 1-based no arquivo novo. Sem path o finding vale no relatório, mas não vai ao GitHub.
+- Em fail/warning: `path` é um arquivo da PR (o source que ficou sem teste, ou o spec). `line` é 1-based no arquivo novo, e só deve aparecer quando aponta pra um trecho real e específico — nunca um palpite. Sem path o finding vale no relatório, mas não vai ao GitHub; sem `line` o finding também vale no relatório, mas também não vira comentário de linha (só path sozinho não é suficiente pro GitHub ancorar).
