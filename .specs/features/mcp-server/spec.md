@@ -81,7 +81,7 @@ Como usuário autenticado na UI web, quero criar e revogar tokens MCP escopados 
 Acceptance criteria:
 
 1. WHEN um usuário cria um token MCP escolhendo um ou mais projetos THEN o sistema SHALL gerar um token opaco, mostrado uma única vez, e persistir apenas seu hash.
-2. WHEN um usuário revoga um token MCP THEN chamadas subsequentes com esse token SHALL falhar imediatamente (sem esperar expiração).
+2. WHEN um usuário revoga um token MCP THEN chamadas subsequentes com esse token SHALL falhar em até `MCP_TOKEN_CACHE_TTL_SECONDS` (default 30s) — sem esperar a expiração de 7 dias. (Nota pós-implementação/UAT: `mcp-server` cacheia o resultado da introspecção por essa janela para evitar round-trip ao Nest em toda chamada MCP; dentro dela, um token recém-revogado pode ainda funcionar. Trade-off aceito deliberadamente — ver `design.md`.)
 3. WHEN um token MCP expira (TTL configurável) THEN o sistema SHALL recusar seu uso e sinalizar expiração distinta de revogação.
 
 ## Edge Cases

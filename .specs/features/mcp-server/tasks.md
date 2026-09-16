@@ -1,7 +1,7 @@
 # MCP Server Tasks
 
 **Design:** `.specs/features/mcp-server/design.md`
-**Status:** Ready for execution
+**Status:** Complete (T1-T14 implemented and gate-checked; T15 UAT run — see Validation Result. `run_pr_analysis` against a real GitHub PR remains blocked on real GitHub PAT + LLM API key, not available in this environment — documented as a follow-up, not faked.)
 
 ## Execution Plan
 
@@ -138,3 +138,12 @@ Trilha mcp-server:  T5 → T6 ────────┼──► T7 → T8 [P 
 | T13 | ✅ | ✅ | infra check |
 | T14 | ✅ | ✅ | gate |
 | T15 | ✅ | ✅ | UAT |
+
+## Validation Result
+
+- Backend: 82 suites / 687 testes passando; build limpo; lint (Biome) 0 erros.
+- mcp-server: 8 suites / 36 testes passando; build limpo; lint (Biome) 0 erros.
+- Docker: `apps/mcp-server/Dockerfile` builda e sobe `healthy` via `docker compose`.
+- T12 (smoke e2e real): cadeia completa validada — mcp-server → introspecção (Nest) → `ai-api` (índice) e → Nest (`actingJwt`, análise) — contra Postgres/Redis/Neo4j/Nest/ai-api reais, token MCP real, 5 tools listadas e chamadas via `@modelcontextprotocol/inspector`. 2 bugs reais encontrados e corrigidos nesse processo (`JwtModule` faltando em `mcp-tokens.module.ts`; `issue()` precisava de `repository.create()` antes de `save()`).
+- T15 (UAT): revogação de token confirmada — funciona dentro de até `MCP_TOKEN_CACHE_TTL_SECONDS` (30s), não na chamada seguinte (spec.md e design.md atualizados para refletir isso). Expiração de token confirmada com o mesmo comportamento de cache. `run_pr_analysis` contra PR real do GitHub **não executado** — falta PAT do GitHub + chave de LLM real no ambiente; passos para completar documentados no relatório da task.
+- Doc de arquitetura: `docs/feature-mcp-server/ARCHITECTURE-mcp-server.md`.
