@@ -12,6 +12,7 @@ import { BenchmarksModule } from './modules/benchmarks/benchmarks.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { FeatureCardsModule } from './modules/feature-cards/feature-cards.module';
 import { GithubAppModule } from './modules/github-app/github-app.module';
+import { McpTokensModule } from './modules/mcp-tokens/mcp-tokens.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { RepositoriesModule } from './modules/repositories/repositories.module';
 import { UsersModule } from './modules/users/user.module';
@@ -47,6 +48,7 @@ import { RedisThrottler } from './shared/security/redis-throttler';
     FeatureCardsModule,
     GithubAppModule,
     ArchitectureMapsModule,
+    McpTokensModule,
   ],
   controllers: [AppController],
   providers: [

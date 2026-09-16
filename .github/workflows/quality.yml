@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [backend, frontend]
+        app: [backend, frontend, mcp-server]
     defaults:
       run:
         working-directory: apps/${{ matrix.app }}

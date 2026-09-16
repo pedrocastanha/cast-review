@@ -21,6 +21,7 @@ import { GithubAppRepository } from '../../../modules/github-app/entities/github
 import { GithubInstallation } from '../../../modules/github-app/entities/github-installation.entity';
 import { GithubReviewRun } from '../../../modules/github-app/entities/github-review-run.entity';
 import { GithubWebhookDelivery } from '../../../modules/github-app/entities/github-webhook-delivery.entity';
+import { McpToken } from '../../../modules/mcp-tokens/mcp-token.entity';
 import { Project } from '../../../modules/projects/project.entity';
 import { ProjectRepositoryMember } from '../../../modules/projects/project-repository-member.entity';
 import { User } from '../../../modules/users/user.entity';
@@ -70,6 +71,7 @@ export default new DataSource({
     GithubAppRepository,
     GithubWebhookDelivery,
     GithubReviewRun,
+    McpToken,
     Project,
     ProjectRepositoryMember,
     ArchitectureMap,

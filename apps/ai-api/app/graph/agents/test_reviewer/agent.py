@@ -68,7 +68,7 @@ def _missing_test(rule: str, path: str | None = None) -> Finding:
         detail=f"Nenhum arquivo de teste na PR cobre: {rule}",
         business_rule=rule,
         path=path,
-        line=1 if path else None,
+        line=None,
     )
 
 

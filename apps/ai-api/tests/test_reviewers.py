@@ -30,7 +30,7 @@ async def test_no_tests_fails_every_business_rule_without_llm(monkeypatch):
     assert all(item["status"] == "fail" for item in result["findings"])
     assert result["usage"]["skipped"] is True
     assert all(item["path"] == "src/interest.ts" for item in result["findings"])
-    assert all(item["line"] == 1 for item in result["findings"])
+    assert all("line" not in item for item in result["findings"])
 
 @pytest.mark.asyncio
 async def test_tests_known_by_graph_let_llm_run_when_pr_has_no_test_file(monkeypatch):
