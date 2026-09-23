@@ -41,7 +41,7 @@ async def run_test_reviewer(
         api_key=api_key,
         on_delta=lambda delta: emit_thought("test_reviewer", delta, run_id),
     )
-    findings = normalize_findings(result.data.get("findings"))
+    findings = normalize_findings(result.data.get("findings"), changed_files)
     findings = _ensure_every_rule_covered(
         business_rules, findings, _anchor_path(analysis, changed_files)
     )

@@ -237,6 +237,7 @@ function normalizeFinding(value: unknown): ReviewFinding | null {
   if (!isRecord(value)) return null;
   const status = value.status;
   if (typeof status !== 'string' || !FINDING_STATUS.has(status)) return null;
+  const evidence = optionalString(value.evidence);
   return {
     status: status as ReviewFinding['status'],
     title: isNonEmptyString(value.title) ? value.title : 'Finding',
@@ -247,6 +248,7 @@ function normalizeFinding(value: unknown): ReviewFinding | null {
     line: asCount(value.line) || undefined,
     endLine: asCount(value.endLine ?? value.end_line) || undefined,
     evidenceId: optionalString(value.evidenceId ?? value.evidence_id),
+    ...(evidence ? { evidence } : {}),
   };
 }
 

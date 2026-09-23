@@ -102,9 +102,19 @@ def _one_file(file: dict, limit: int) -> str:
     return (
         f"## {file.get('path')}\n"
         f"DIFF:\n{str(file.get('diff') or '')[:limit]}\n"
-        f"FULL:\n{str(file.get('fullContent') or '')[:limit]}\n"
+        f"FULL (1-based line numbers; omit prefixes from evidence):\n"
+        f"{_number_lines(str(file.get('fullContent') or '')[:limit])}\n"
         f"{related_text}"
     )
+
+
+def _number_lines(content: str) -> str:
+    lines = content.splitlines()
+    width = len(str(len(lines))) if lines else 1
+    return "\n".join(
+        f"{number:>{width}} | {line}" for number, line in enumerate(lines, 1)
+    )
+
 
 def _should_skip(path: str) -> bool:
     lowered = path.replace("\\", "/").lower()

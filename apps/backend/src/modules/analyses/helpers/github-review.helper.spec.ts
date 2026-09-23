@@ -137,6 +137,7 @@ describe('planInlineComments', () => {
             conventionRef: 'porta fina',
             path: 'src/a.ts',
             line: 2,
+            evidence: 'added',
           },
           {
             reviewer: 'test_reviewer',
@@ -162,9 +163,11 @@ describe('planInlineComments', () => {
     expect(comments[0].body).toContain('an-1');
     expect(comments[0].body).toContain('Architecture');
     expect(comments[0].body).toContain('porta fina');
+    expect(comments[0].body).toContain('Trecho verificado:');
+    expect(comments[0].body).toContain('added');
   });
 
-  it('finding sem path cai no primeiro arquivo da PR; path errado é skip', () => {
+  it('não inventa path para finding sem localização; path errado é skip', () => {
     const { comments, skipped } = planInlineComments(
       'an-1',
       review({
@@ -187,9 +190,8 @@ describe('planInlineComments', () => {
       }),
       files,
     );
-    expect(comments).toHaveLength(1);
-    expect(comments[0].path).toBe('src/a.ts');
-    expect(skipped).toBe(1);
+    expect(comments).toHaveLength(0);
+    expect(skipped).toBe(2);
   });
 
   it('dedupa o mesmo path+line e limita a 20', () => {
@@ -200,6 +202,7 @@ describe('planInlineComments', () => {
       detail: 'd',
       path: 'src/a.ts',
       line: 1,
+      evidence: 'keep',
     }));
     // mesmo line=1 → um grupo só
     const sameLine = planInlineComments(
@@ -210,20 +213,30 @@ describe('planInlineComments', () => {
     expect(sameLine.comments).toHaveLength(1);
     expect(sameLine.comments[0].body).toContain('---');
 
+    const spreadPatch = [
+      '@@ -0,0 +1,25 @@',
+      ...Array.from({ length: 25 }, (_, index) => '+added-' + (index + 1)),
+      '',
+    ].join('\n');
+    const spreadFiles = [
+      { filename: 'src/a.ts', status: 'modified', patch: spreadPatch },
+    ];
     const spread = Array.from({ length: 25 }, (_, index) => ({
       reviewer: 'architecture_reviewer' as const,
       status: 'fail' as const,
-      title: `f${index}`,
+      title: 'f' + index,
       detail: 'd',
       path: 'src/a.ts',
       line: 1 + index,
+      evidence: 'added-' + (index + 1),
     }));
     const capped = planInlineComments(
       'an-1',
       review({ comments: spread }),
-      files,
+      spreadFiles,
     );
-    expect(capped.comments.length).toBeLessThanOrEqual(20);
+    expect(capped.comments).toHaveLength(20);
+    expect(capped.skipped).toBe(5);
   });
 });
 

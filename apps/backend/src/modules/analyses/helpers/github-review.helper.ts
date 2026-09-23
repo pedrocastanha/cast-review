@@ -5,7 +5,6 @@ import type {
   ReviewComment,
 } from '../analyses.types';
 import {
-  fallbackAnchor,
   type PullFileForAnchor,
   type ResolvedAnchor,
   resolveAnchor,
@@ -111,6 +110,16 @@ export function buildInlineBody(
   ];
   if (finding.conventionRef) lines.push('', `\`${finding.conventionRef}\``);
   if (finding.businessRule) lines.push('', `regra: ${finding.businessRule}`);
+  if (finding.evidence) {
+    const fenceLength = Math.max(
+      3,
+      ...[...finding.evidence.matchAll(/[\x60]+/g)].map(
+        ([match]) => match.length + 1,
+      ),
+    );
+    const fence = String.fromCharCode(96).repeat(fenceLength);
+    lines.push('', 'Trecho verificado:', fence, finding.evidence, fence);
+  }
   return lines.join('\n');
 }
 
@@ -131,9 +140,12 @@ export function planInlineComments(
   let skipped = 0;
 
   for (const finding of actionable) {
-    const anchor =
-      resolveAnchor(finding.path, finding.line, files, finding.endLine) ??
-      (finding.path ? null : fallbackAnchor(files));
+    const anchor = resolveAnchor(
+      finding.path,
+      finding.line,
+      finding.evidence,
+      files,
+    );
     if (!anchor) {
       skipped += 1;
       continue;

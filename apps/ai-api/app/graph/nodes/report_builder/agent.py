@@ -1,3 +1,5 @@
+import re
+
 from app.graph.state import GraphState
 from app.graph.utils.conventions import resolve_conventions
 from app.graph.utils.usage import aggregate_usage, collect_steps_from_state, without_usage
@@ -70,10 +72,20 @@ def build_report(
             continue
         for finding in ordered:
             ref = f" (`{finding['conventionRef']}`)" if finding.get("conventionRef") else ""
-            evidence = f" [{finding['evidenceId']}]" if finding.get("evidenceId") else ""
+            evidence_id = f" [{finding['evidenceId']}]" if finding.get("evidenceId") else ""
+            location = ""
+            if finding.get("path") and finding.get("line"):
+                location = f" (`{finding['path']}:{finding['line']}`)"
             lines.append(
-                f"- **{finding['status']}** {finding['title']}{evidence}: {finding['detail']}{ref}"
+                f"- **{finding['status']}** {finding['title']}{evidence_id}{location}: {finding['detail']}{ref}"
             )
+            excerpt = finding.get("evidence")
+            if isinstance(excerpt, str) and excerpt:
+                fence_length = max(
+                    [3, *(len(match) + 1 for match in re.findall(r"[\x60]+", excerpt))]
+                )
+                fence = chr(96) * fence_length
+                lines.extend(["", f"{fence}text", excerpt, fence])
         lines.append("")
 
     report = {

@@ -14,6 +14,7 @@ class Finding:
     path: str | None = None
     line: int | None = None
     end_line: int | None = None
+    evidence: str | None = None
 
     def to_payload(self) -> dict:
         payload: dict = {
@@ -31,4 +32,6 @@ class Finding:
             payload["line"] = self.line
         if self.end_line is not None:
             payload["endLine"] = self.end_line
+        if self.evidence:
+            payload["evidence"] = self.evidence
         return payload

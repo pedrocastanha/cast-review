@@ -26,8 +26,10 @@ function ActiveBadge({ value }: { value: string | null }) {
 
 export function EphemeralCredentials({
   persistenceAvailable = true,
+  isGuest = false,
 }: {
   persistenceAvailable?: boolean;
+  isGuest?: boolean;
 }) {
   const credentials = useSessionCredentials();
   const [githubDraft, setGithubDraft] = useState('');
@@ -83,7 +85,9 @@ export function EphemeralCredentials({
           você não está na tela, e aí não existe sessão de onde tirar a credencial.
           {persistenceAvailable
             ? ' Se você precisa dele, salve a credencial nos cartões abaixo.'
-            : ' Esta instância não oferece essa opção.'}
+            : isGuest
+              ? ' Contas de visitante não guardam credenciais — crie uma conta para isso.'
+              : ' Esta instância não guarda credenciais persistentes.'}
         </li>
       </ul>
 

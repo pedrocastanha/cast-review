@@ -19,7 +19,7 @@ E um fato da API do GitHub: o **autor da PR não pode** `REQUEST_CHANGES` nem `A
 
 ## Decisão 1 — Nest posta; Python só localiza
 
-**O quê:** reviewers passam a emitir `path` + `line` em fail/warning. O Nest, depois do `report_ready`, valida contra o patch da PR e chama `POST /repos/{owner}/{repo}/pulls/{n}/reviews`.
+**O quê:** reviewers passam a emitir `path` + uma citação literal `evidence` em fail/warning. O Python deriva a linha da ocorrência única no conteúdo completo do arquivo. O Nest, depois do `report_ready`, exige que essa linha exata pertença ao diff antes de chamar `POST /repos/{owner}/{repo}/pulls/{n}/reviews`.
 
 **Por quê:** mantém o `ai-api` stateless e testável sem Octokit. O Nest já tem PAT, owner, repo, pull number e os patches (`listPullFiles`).
 
@@ -35,21 +35,19 @@ E um fato da API do GitHub: o **autor da PR não pode** `REQUEST_CHANGES` nem `A
 
 ## Decisão 3 — Só fail e warning, e só se ancorar no diff
 
-**O quê:** `pass` não vai para o GitHub. Finding sem `path` válido, ou cujo `line` não dá para mapear a uma linha do **lado RIGHT** do patch, **não** vira comentário de conversa genérico. Fica só no relatório.
+**O quê:** `pass` não vai para o GitHub. Finding sem `path` válido, citação verificável ou linha exata no **lado RIGHT** do patch **não** vira comentário de conversa genérico. Fica só no relatório.
 
 **Por quê:** o pedido é “no trecho certo”. Comentário solto no fim da PR sem arquivo é ruído. Linha que não está no hunk o GitHub recusa (422).
 
-## Decisão 4 — O LLM sugere a linha; o patch manda
+## Decisão 4 — O código deriva a linha; o diff exige correspondência exata
 
-**O quê:** o modelo devolve `path` (path do arquivo na PR) e `line` (1-based no arquivo **novo**). O Nest parseia o `patch` daquele arquivo, monta o conjunto de linhas RIGHT (` ` e `+`) e:
+**O quê:** o modelo devolve `path` e copia uma ou mais linhas completas para `evidence`. O Python exige que essa citação apareça exatamente uma vez em `fullContent` e deriva `line`/`endLine` pela posição encontrada. O Nest compara cada linha da citação com o texto correspondente no patch mais recente e só aceita a âncora quando todas batem no lado RIGHT (contexto ou adição).
 
-- se `line` ∈ conjunto → usa;
-- senão → **snap** para a linha RIGHT mais próxima;
-- se o arquivo não está na PR, foi deletado, ou não tem hunk (binário) → descarta o inline.
+Se a citação faltar, for ambígua, não existir no arquivo, divergir do patch atual ou sua linha não estiver no hunk, o finding fica no relatório e não recebe comentário inline. Nenhuma âncora é deslocada para a linha mais próxima; finding sem path não cai no primeiro arquivo da PR.
 
-**Por quê:** o modelo inventa linha. Confiar nela crua quebra o post. O patch é a única fonte que o GitHub aceita.
+**Por quê:** contar linhas em contexto longo ou usar um índice de grafo antigo são fontes comuns de erro. A citação literal permite derivar a linha em código e verificar que o patch atual ainda contém aquele texto.
 
-**Alternativa descartada:** mandar o conjunto de linhas válidas no prompt. Infla o contexto e ainda não impede alucinação; o snap no Nest é barato e testável sem LLM.
+**Alternativa descartada:** confiar no número do modelo ou deslocar a âncora ao ponto mais próximo. Ambos podem publicar uma afirmação válida no lugar errado.
 
 ## Decisão 5 — Sempre o PAT do usuário; reexecução substitui
 
@@ -65,9 +63,9 @@ E um fato da API do GitHub: o **autor da PR não pode** `REQUEST_CHANGES` nem `A
 
 ## Consequências
 
-- `Finding` cresce `path` / `line` / `endLine?`. Score e veredito **não mudam**.
-- Prompts de Test e Architecture passam a exigir localização em fail/warning.
-- Atalho determinístico do test reviewer (PR sem testes) ancora no primeiro arquivo source da PR; o Nest faz o snap.
+- `Finding` cresce `path` / `evidence` / `line` derivada / `endLine` derivada. Score e veredito **não mudam**.
+- Prompts de Test e Architecture passam a pedir evidência literal em fail/warning.
+- Atalho determinístico do test reviewer (PR sem testes) não inventa linha; fica no relatório sem inline.
 - `getPull` passa a expor `headSha` — o `createReview` exige `commit_id`.
 - Front mostra `path:line` no finding e um estado “postado / falhou / nada a postar”.
 - Escopo `repo` do PAT (já exigido) cobre criar e apagar review comments.

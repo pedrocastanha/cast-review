@@ -149,6 +149,7 @@ export interface ReviewFinding {
   line?: number;
   endLine?: number;
   evidenceId?: string;
+  evidence?: string;
 }
 
 export interface ReviewResult {

@@ -3,7 +3,6 @@ import type { Finding, PrdPayload, ReportPayload, ReviewComment, SpecPayload } f
 import { formatTokens, formatUsd } from '../../lib/format-usage';
 import { Card } from '../ui/Card';
 import { Eyebrow, Pill } from '../ui/Pill';
-import { ReportMarkdown } from './ReportMarkdown';
 
 function scoreTone(score: number) {
   if (score >= 90) return 'bg-pass';
@@ -32,7 +31,7 @@ const SEV_BADGE: Record<Severity, string> = {
 function FindingCard({ comment }: { comment: ReviewComment | (Finding & { reviewer?: string }) }) {
   const [open, setOpen] = useState(false);
   const severity = comment.status as Severity;
-  const hasBody = Boolean(comment.detail || comment.businessRule || comment.path || comment.conventionRef);
+  const hasBody = Boolean(comment.detail || comment.businessRule || comment.path || comment.conventionRef || comment.evidence);
 
   return (
     <article
@@ -111,6 +110,16 @@ function FindingCard({ comment }: { comment: ReviewComment | (Finding & { review
               </span>
             )}
           </div>
+          {comment.evidence && (
+            <div className="mt-3.5">
+              <h4 className="mb-2 font-mono text-[10px] tracking-[0.12em] text-ink-faint uppercase">
+                Trecho de código verificado
+              </h4>
+              <pre className="overflow-x-auto rounded-sm border border-border bg-surface-2 p-3 font-mono text-xs leading-5 text-ink-dim">
+                <code>{comment.evidence}</code>
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </article>
@@ -468,8 +477,6 @@ export function ReportView({ report, focus = 'all' }: { report: ReportPayload; f
           </table>
         </section>
       )}
-
-      {focus === 'all' && report.markdown && <ReportMarkdown markdown={report.markdown} />}
     </div>
   );
 }

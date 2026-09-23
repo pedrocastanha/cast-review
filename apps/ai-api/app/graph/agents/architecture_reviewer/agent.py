@@ -39,7 +39,9 @@ async def run_architecture_reviewer(
     )
     findings = [
         finding
-        for finding in normalize_findings(result.data.get("findings"))
+        for finding in normalize_findings(
+            result.data.get("findings"), changed_files
+        )
         if finding.convention_ref
     ]
     payload = review_payload(findings)

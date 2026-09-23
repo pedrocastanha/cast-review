@@ -205,7 +205,7 @@ function StepBlock({ step, text, live }: { step: string; text: string; live: boo
   const value = parsed(text);
 
   useEffect(() => {
-    if (live) setOpen(true);
+    setOpen(live);
   }, [live]);
 
   return (

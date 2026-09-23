@@ -22,7 +22,13 @@ export function normalizeRepoPath(path: string): string {
 }
 
 export function rightSideLines(patch: string): number[] {
-  const lines: number[] = [];
+  return rightSideContentLines(patch).map((entry) => entry.line);
+}
+
+function rightSideContentLines(
+  patch: string,
+): Array<{ line: number; content: string }> {
+  const lines: Array<{ line: number; content: string }> = [];
   let newLine = 0;
 
   for (const raw of patch.split('\n')) {
@@ -33,8 +39,13 @@ export function rightSideLines(patch: string): number[] {
     }
     if (!newLine || raw.startsWith('\\')) continue;
     if (raw.startsWith('-')) continue;
-    if (raw.startsWith('+') || raw.startsWith(' ')) {
-      lines.push(newLine);
+    if (raw.startsWith('+')) {
+      lines.push({ line: newLine, content: raw.slice(1).replace(/\r$/, '') });
+      newLine += 1;
+      continue;
+    }
+    if (raw.startsWith(' ')) {
+      lines.push({ line: newLine, content: raw.slice(1).replace(/\r$/, '') });
       newLine += 1;
     }
   }
@@ -45,10 +56,10 @@ export function rightSideLines(patch: string): number[] {
 export function resolveAnchor(
   path: string | undefined,
   line: number | undefined,
+  evidence: string | undefined,
   files: PullFileForAnchor[],
-  endLine?: number,
 ): ResolvedAnchor | null {
-  if (!path || !line || line <= 0) return null;
+  if (!path || !line || line <= 0 || !evidence?.trim()) return null;
   const normalized = normalizeRepoPath(path);
   if (!normalized) return null;
 
@@ -57,31 +68,37 @@ export function resolveAnchor(
   );
   if (!file || file.status === 'removed' || !file.patch?.trim()) return null;
 
-  const rights = rightSideLines(file.patch);
+  const rightSideContent = rightSideContentLines(file.patch);
+  const rights = rightSideContent.map((entry) => entry.line);
   if (rights.length === 0) return null;
 
-  const anchored =
-    rights.find((value) => value === line) ??
-    rights.reduce((best, value) =>
-      Math.abs(value - line) < Math.abs(best - line) ? value : best,
-    );
+  const startIndex = rights.indexOf(line);
+  if (startIndex < 0) return null;
 
-  if (endLine && endLine > anchored && rights.includes(endLine)) {
-    return { path: file.filename, line: endLine, startLine: anchored };
+  const evidenceLines = evidence.replace(/\r\n?/g, '\n').split('\n');
+  const contentByLine = new Map<number, string>();
+  for (const entry of rightSideContent) {
+    contentByLine.set(entry.line, entry.content);
+  }
+  if (
+    evidenceLines.length > 10 ||
+    !evidenceLines.some((item) => item.trim()) ||
+    evidenceLines.some(
+      (expected, offset) =>
+        contentByLine.get(line + offset) !== expected,
+    )
+  ) {
+    return null;
   }
 
-  return { path: file.filename, line: anchored };
-}
-
-/** Primeiro arquivo da PR com hunk RIGHT — usado quando o finding não trouxe path. */
-export function fallbackAnchor(
-  files: PullFileForAnchor[],
-): ResolvedAnchor | null {
-  for (const file of files) {
-    if (file.status === 'removed' || !file.patch?.trim()) continue;
-    const rights = rightSideLines(file.patch);
-    if (rights.length === 0) continue;
-    return { path: file.filename, line: rights[0] };
+  if (evidenceLines.length > 1) {
+    const endLine = line + evidenceLines.length - 1;
+    const endIndex = rights.indexOf(endLine);
+    if (endIndex - startIndex === evidenceLines.length - 1) {
+      return { path: file.filename, line: endLine, startLine: line };
+    }
+    return null;
   }
-  return null;
+
+  return { path: file.filename, line };
 }
